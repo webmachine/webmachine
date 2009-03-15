@@ -1,0 +1,51 @@
+body {
+    margin:0px;
+    padding:0px;
+}
+
+canvas#v3map {
+    z-index: 1;
+}
+
+div#requestdetail {
+    z-index: 25;
+    position:absolute;
+    top: 1240px;
+    left: 250px;
+    width:60em;
+}
+
+div#responsedetail {
+    z-index: 50;
+    position:absolute;
+    visibility:hidden;
+    top: 0px;
+    left: 0px;
+    background:#eeeeee;
+    padding:3px;
+    width:60em;
+}
+
+div#requestdetail ul, div#responsedetail ul, #responsebody {
+    height:20em;
+    overflow:scroll;
+    background:#ffffff;
+}
+
+div#decisiondetail {
+    z-index: 100;
+    position:absolute;
+    visibility:hidden;
+    background: #eeeeee;
+    padding:3px;
+    top:0px;
+    left:0px;
+}
+
+pre#callinput, pre#calloutput {
+    background:#ffffff;
+    color:#000000;
+    width:60em;
+    height:20em;
+    overflow:scroll;
+};
