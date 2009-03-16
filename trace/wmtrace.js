@@ -255,97 +255,107 @@ var ends = {
 };
 
 var canvas;
-var detail;
-var decisionId;
-var decisionCalls;
-var callInput;
-var callOutput;
-var responseDetail;
+
+function decorateTrace() {
+    trace[0].x = cols[trace[0].d[0]];
+    trace[0].y = rows[trace[0].d.slice(1)];
+    trace[0].previewCalls = previewCalls(trace[0]);
+
+    for (var i = 1; i < trace.length; i++) {
+        trace[i].x = cols[trace[i].d[0]];
+        trace[i].y = rows[trace[i].d.slice(1)];
+        trace[i].previewCalls = previewCalls(trace[i]);
+        
+        var path = edges[trace[i-1].d+trace[i].d];
+        if (path) {
+            trace[i].path = [path.length-1];
+            for (var p = 1; p < path.length; p++) {
+                trace[i].path[p-1] = getSeg(path[p-1], path[p], p == path.length-1);
+            }
+        } else {
+            trace[i].path = [];
+        }
+    }
+    
+    var path = edges[trace[i-1].d+response.code];
+    if (path) {
+        var end = ends[path[path.length-1]];
+        response.x = cols[end.col];
+        response.y = rows[end.row];
+        response.width = end.width;
+        response.type = 'normal';
+
+        response.path = [path.length-1];
+        for (var p = 1; p < path.length; p++) {
+            response.path[p-1] = getSeg(path[p-1], path[p], p == path.length-1);
+        }
+    } else {
+        var ld = trace[trace.length-1];
+        response.x = ld.x+50;
+        response.y = ld.y-50;
+        response.width = 38;
+        response.type = 'other';
+
+        response.path = [
+            {x1: ld.x+10, y1: ld.y-10,
+             x2: ld.x+36, y2: ld.y-36}
+        ];
+    }
+};
+
+function previewCalls(dec) {
+    var prev = '';
+    for (var i = 0; i < dec.calls.length; i++) {
+        if (dec.calls[i].output != "wmtrace_not_exported")
+            prev += '<li>'+dec.calls[i].module+':'+dec.calls[i]['function']+'</li>';
+    }
+    return prev;
+};
 
 function drawTrace() {
     drawDecision(trace[0]);
     for (var i = 1; i < trace.length; i++) {
-        var path = edges[trace[i-1].d+trace[i].d];
-        if (path)
-            drawPath(path);
-        else
-            console.log("no known path from "+trace[i-1].d+" to "+trace[i].d);
-
+        drawPath(trace[i].path);
         drawDecision(trace[i]);
     }
 
-    var path = edges[trace[i-1].d+response.code];
-    if (path) {
-        drawPath(path);
-        drawResponse(ends[path[path.length-1]]);
+    drawPath(response.path);
+    drawResponse();
+};
+
+function drawResponse() {
+    if (response.type == 'normal') {
+        var context = canvas.getContext('2d');
+        context.strokeStyle=HIGHLIGHT;
+        context.lineWidth=4;
+
+        context.beginPath();
+        context.rect(response.x-(response.width/2),
+                     response.y-19,
+                     response.width,
+                     38);
+        context.stroke();
     } else {
-        console.log("no known path from "+trace[i-1].d+" to "+response.code);
-        drawOutOfOrderResponse(trace[i-1]);
+        var context = canvas.getContext('2d');
+        context.strokeStyle='#ff0000';
+        context.lineWidth=4;
+
+        context.beginPath();
+        context.arc(response.x, response.y, 19,
+                    0, 2*3.14159, false);
+        context.stroke();
+
     }
-};
-
-function moveResponseWindow() {
-    responseDetail.style.left = (response.x > 1569
-                                 ? response.x-responseDetail.clientWidth
-                                 : response.x)+'px';
-    responseDetail.style.top = (response.y > 1092
-                                ? response.y-responseDetail.clientHeight
-                                : response.y)+'px';
-};
-
-function drawResponse(end) {
-    var context = canvas.getContext('2d');
-    context.strokeStyle=HIGHLIGHT;
-    context.lineWidth=3;
-
-    response.x = cols[end.col];
-    response.y = rows[end.row];
-    response.width = end.width;
-
-    context.beginPath();
-    context.rect(response.x-(response.width/2),
-                 response.y-19,
-                 response.width,
-                 38);
-    context.stroke();
-
-    moveResponseWindow();
-};
-
-function drawOutOfOrderResponse(lastdec) {
-    var context = canvas.getContext('2d');
-    context.strokeStyle=REGULAR;
-    context.lineWidth=3;
-
-    response.x = lastdec.x+50;
-    response.y = lastdec.y-50;
-    response.width = 38;
-
-    context.beginPath();
-    context.moveTo(lastdec.x, lastdec.y);
-    context.lineTo(response.x, response.y);
-    context.stroke();
-
-    context.strokeStyle='#ff0000';
-    context.beginPath();
-    context.arc(response.x, response.y, 19,
-                0, 2*3.14159, false);
-    context.stroke();
-
-    moveResponseWindow();
 };
 
 function drawDecision(dec) {
     var context = canvas.getContext('2d');
 
-    if (onlyNotExportedCalls(dec))
+    if (dec.previewCalls == '')
         context.strokeStyle=REGULAR;
     else
         context.strokeStyle=HIGHLIGHT;
-    context.lineWidth=3;
-
-    dec.x = cols[dec.d[0]];
-    dec.y = rows[dec.d.slice(1)];
+    context.lineWidth=4;
 
     context.beginPath();
     context.moveTo(dec.x,    dec.y-19);
@@ -356,26 +366,15 @@ function drawDecision(dec) {
     context.stroke();
 };
 
-function onlyNotExportedCalls(dec) {
-    for (var i = dec.calls.length-1; i >= 0; i--) {
-        if (dec.calls[i].output != "wmtrace_not_exported")
-            return false;
-    }
-    return true;
-};
-
 function drawPath(path) {
     var context = canvas.getContext('2d');
     context.strokeStyle=REGULAR;
-    context.lineWidth=3;
+    context.lineWidth=4;
 
     context.beginPath();
-    var seg = getSeg(path[0], path[1], path.length==2);
-    context.moveTo(seg.x1, seg.y1);
-    context.lineTo(seg.x2, seg.y2);
-    for (var p = 2; p < path.length; p++) {
-        seg = getSeg(path[p-1], path[p], p == path.length-1);
-        context.lineTo(seg.x2, seg.y2);
+    context.moveTo(path[0].x1, path[0].y1);
+    for (var p = 0; p < path.length; p++) {
+        context.lineTo(path[p].x2, path[p].y2);
     }
     context.stroke();
 };
@@ -414,60 +413,91 @@ function getSeg(p1, p2, last) {
     return seg;
 };
 
-function findDecision(ev) {
-    var x = ev.clientX+window.pageXOffset;
-    var y = ev.clientY+window.pageYOffset;
-        
-    for (var i = trace.length-1; i >= 0; i--) {
-        if (x >= trace[i].x-19 && x <= trace[i].x+19 &&
-            y >= trace[i].y-19 && y <= trace[i].y+19)
-            return trace[i];
-    }
-};
-
-function overResponse(ev) {
-    var x = ev.clientX+window.pageXOffset;
-    var y = ev.clientY+window.pageYOffset;
-
-    return (x >= response.x-(response.width/2)
-            && x <= response.x+(response.width/2)
-            && y >= response.y-19 && y <= response.y+19);
-};
-
 function traceDecision(name) {
     for (var i = trace.length-1; i >= 0; i--)
         if (trace[i].d == name) return trace[i];
 };
 
-function headersList(headers) {
-    var h = '';
-    for (n in headers) {
-        h += '<li>'+n+': '+headers[n];
+var detailPanels = {};
+function initDetailPanels() {
+    var windowWidth = document.getElementById('sizetest').clientWidth;
+    var infoPanel = document.getElementById('infopanel');
+    var panelWidth = windowWidth-infoPanel.offsetLeft;
+
+    var panels = {
+        'request': document.getElementById('requestdetail'),
+        'response': document.getElementById('responsedetail'),
+        'decision': document.getElementById('decisiondetail')
+    };
+
+    var tabs = {
+        'request': document.getElementById('requesttab'),
+        'response': document.getElementById('responsetab'),
+        'decision': document.getElementById('decisiontab')
+    };
+
+    var decisionId = document.getElementById('decisionid');
+    var decisionCalls = document.getElementById('decisioncalls');
+    var callInput = document.getElementById('callinput');
+    var callOutput = document.getElementById('calloutput');
+
+    var lastUsedPanelWidth = windowWidth-infoPanel.offsetLeft;
+
+    var setPanelWidth = function(width) {
+        infoPanel.style.left = (windowWidth-width)+'px';
+        canvas.style.marginRight = (width+20)+'px';
+        panelWidth = width;
+    };
+    setPanelWidth(panelWidth);
+
+    var ensureVisible = function() {
+        if (windowWidth-infoPanel.offsetLeft < 10)
+            setPanelWidth(lastUsedPanelWidth);
+    };
+
+    var decChoices = '';
+    for (var i = 0; i < trace.length; i++) {
+        decChoices += '<option value="'+trace[i].d+'">'+trace[i].d+'</option>';
     }
-    return h;
-};
+    decisionId.innerHTML = decChoices;
+    decisionId.selectedIndex = -1;
 
-function fillRequestDetail() {
-    document.getElementById('requestmethod').textContent = request.method;
-    document.getElementById('requestpath').textContent = request.path;
-    document.getElementById('requestheaders').innerHTML = headersList(request.headers);
-    document.getElementById('requestbody').textContent = request.body;
-};
+    decisionId.onchange = function() {
+        detailPanels.setDecision(traceDecision(decisionId.value));
+    }
 
-function fillResponseDetail() {
-    document.getElementById('responsecode').textContent = response.code;
-    document.getElementById('responseheaders').innerHTML = headersList(response.headers);
-    document.getElementById('responsebody').textContent = response.body;
-};
+    detailPanels.setDecision = function(dec) {
+        decisionId.value = dec.d;
 
-window.onload = function() {
-    canvas = document.getElementById('v3map');
-    detail = document.getElementById('decisiondetail');
-    decisionId = document.getElementById('decisionid');
-    decisionCalls = document.getElementById('decisioncalls');
-    callInput = document.getElementById('callinput');
-    callOutput = document.getElementById('calloutput');
-    responseDetail = document.getElementById('responsedetail');
+        var calls = [];
+        for (var i = 0; i < dec.calls.length; i++) {
+            calls.push('<option value="'+dec.d+'-'+i+'">');
+            calls.push(dec.calls[i].module+':'+dec.calls[i]['function']);
+            calls.push('</option>');
+        }
+        decisionCalls.innerHTML = calls.join('');
+        decisionCalls.selectedIndex = 0;
+
+        decisionCalls.onchange();
+    };
+
+    detailPanels.show = function(name) {
+        for (p in panels) {
+            if (p == name) {
+                panels[p].style.display = 'block';
+                tabs[p].className = 'selectedtab';
+            }
+            else {
+                panels[p].style.display = 'none';
+                tabs[p].className = '';
+            }
+        }
+        ensureVisible();
+    };
+
+    detailPanels.hide = function() {
+        setPanelWidth(0);
+    }
 
     decisionCalls.onchange = function() {
         var val = decisionCalls.value;
@@ -477,10 +507,10 @@ window.onload = function() {
 
             if (call.output != "wmtrace_not_exported") {
                 callInput.style.color='#000000';
-                callInput.textContent = call.input;
+                callInput.innerHTML = call.input;
                 if (call.output != null) {
                     callOutput.style.color = '#000000';
-                    callOutput.textContent = call.output;
+                    callOutput.innerHTML = call.output;
                 } else {
                     callOutput.style.color = '#ff0000';
                     callOutput.textContent = 'Error: '+call.module+':'+call['function']+' never returned';
@@ -490,62 +520,189 @@ window.onload = function() {
                 callInput.textContent = call.module+':'+call['function']+' was not exported';
                 callOutput.textContent = '';
             }
+        } else {
+            callInput.textContent = '';
+            callOutput.textContent = '';
         }
     };
 
-    fillRequestDetail();
-    fillResponseDetail();
+    var headersList = function(headers) {
+        var h = '';
+        for (n in headers) h += '<li>'+n+': '+headers[n];
+        return h;
+    };
+
+    document.getElementById('requestmethod').innerHTML = request.method;
+    document.getElementById('requestpath').innerHTML = request.path;
+    document.getElementById('requestheaders').innerHTML = headersList(request.headers);
+    document.getElementById('requestbody').innerHTML = request.body;
+
+    document.getElementById('responsecode').innerHTML = response.code;
+    document.getElementById('responseheaders').innerHTML = headersList(response.headers);
+    document.getElementById('responsebody').innerHTML = response.body;
+
+
+    var infoControls = document.getElementById('infocontrols');
+    var md = false;
+    var dragged = false;
+    var msoff = 0;
+    infoControls.onmousedown = function(ev) {
+        md = true;
+        dragged = false;
+        msoff = ev.clientX-infoPanel.offsetLeft;
+    };
+
+    infoControls.onclick = function(ev) {
+        if (dragged) {
+            lastUsedPanelWidth = panelWidth;
+        }
+        else if (panelWidth < 10) {
+            switch(ev.target.id) {
+            case 'requesttab': detailPanels.show('request'); break;
+            case 'responsetab': detailPanels.show('response'); break;
+            case 'decisiontab': detailPanels.show('decision'); break;
+            default: ensureVisible();
+            }
+        } else {
+            var name = 'none';
+            switch(ev.target.id) {
+            case 'requesttab': name = 'request'; break;
+            case 'responsetab': name = 'response'; break;
+            case 'decisiontab': name = 'decision'; break;
+            }
+
+            if (panels[name] && panels[name].style.display != 'block')
+                detailPanels.show(name);
+            else
+                detailPanels.hide();
+        }
+
+        return false;
+    };
+
+    document.onmousemove = function(ev) {
+        if (md) {
+            dragged = true;
+            panelWidth = windowWidth-(ev.clientX-msoff);
+            if (panelWidth < 0) {
+                panelWidth = 0;
+                infoPanel.style.left = windowWidth+"px";
+            }
+            else if (panelWidth > windowWidth-21) {
+                panelWidth = windowWidth-21;
+                infoPanel.style.left = '21px';
+            }
+            else
+                infoPanel.style.left = (ev.clientX-msoff)+"px";
+
+            canvas.style.marginRight = panelWidth+20+"px";
+            return false;
+        }
+    };
+
+    document.onmouseup = function() { md = false; };
+
+    window.onresize = function() {
+        windowWidth = document.getElementById('sizetest').clientWidth;
+        infoPanel.style.left = windowWidth-panelWidth+'px';
+    };
+};
+
+window.onload = function() {
+    canvas = document.getElementById('v3map');
+
+    initDetailPanels();
+
+    var scale = 0.25;
+    var coy = canvas.offsetTop;
+    function findDecision(ev) {
+        var x = (ev.clientX+window.pageXOffset)/scale;
+        var y = (ev.clientY+window.pageYOffset-coy)/scale;
+
+        for (var i = trace.length-1; i >= 0; i--) {
+            if (x >= trace[i].x-19 && x <= trace[i].x+19 &&
+                y >= trace[i].y-19 && y <= trace[i].y+19)
+                return trace[i];
+        }
+    };
+
+    var preview = document.getElementById('preview');
+    var previewId = document.getElementById('previewid');
+    var previewCalls = document.getElementById('previewcalls');
+    function previewDecision(dec) {
+        preview.style.left = (dec.x*scale)+'px';
+        preview.style.top = (dec.y*scale+coy+15)+'px';
+        preview.style.display = 'block';
+        previewId.textContent = dec.d;
+
+        previewCalls.innerHTML = dec.previewCalls;
+    };
+
+    function overResponse(ev) {
+        var x = (ev.clientX+window.pageXOffset)/scale;
+        var y = (ev.clientY+window.pageYOffset-coy)/scale;
+        
+        return (x >= response.x-(response.width/2)
+                && x <= response.x+(response.width/2)
+                && y >= response.y-19 && y <= response.y+19);
+    };
+
+    decorateTrace();
 
     var bg = new Image(3138, 2184);
 
-    bg.onload = function() {
-        canvas.getContext("2d").drawImage(bg, 0, 0);
+    function drawMap() {
+        var ctx = canvas.getContext("2d");
+
+        ctx.save();
+        ctx.scale(1/scale, 1/scale);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 3138, 2184);
+        ctx.restore();
+
+        ctx.drawImage(bg, 0, 0);
         drawTrace();
+    };
+
+    bg.onload = function() {
+        canvas.getContext("2d").scale(scale, scale);
+        drawMap(scale);
 
         canvas.onmousemove = function(ev) {
-            if (findDecision(ev) || overResponse(ev))
+            if (findDecision(ev)) {
                 canvas.style.cursor = 'pointer';
-            else
-                canvas.style.cursor = 'default';
+                previewDecision(findDecision(ev));
+            }
+            else {
+                preview.style.display = 'none';
+                if (overResponse(ev))
+                    canvas.style.cursor = 'pointer';
+                else
+                    canvas.style.cursor = 'default';
+            }
         };
 
         canvas.onclick = function(ev) {
             var dec = findDecision(ev);
             if (dec) {
-                decisionId.innerHTML = dec.d;
-
-                var calls = [];
-                for (var i = 0; i < dec.calls.length; i++) {
-                    calls.push('<option value="'+dec.d+'-'+i+'">');
-                    calls.push(dec.calls[i].module+':'+dec.calls[i]['function']);
-                    calls.push('</option>');
-                }
-                decisionCalls.innerHTML = calls.join('');
-                decisionCalls.selectedIndex = 0;
-
-                decisionCalls.onchange();
-                
-                if (dec.x > 1569)
-                    detail.style.left = (dec.x-detail.clientWidth)+'px';
-                else
-                    detail.style.left = dec.x+'px';
-
-                if (dec.y > 1092)
-                    detail.style.top = (dec.y-detail.clientHeight)+'px';
-                else
-                    detail.style.top = dec.y+'px';
-
-                detail.style.visibility = 'visible';
-                responseDetail.style.visibility = 'hidden';
-            } else {
-                detail.style.visibility = 'hidden';
-                if (overResponse(ev))
-                    responseDetail.style.visibility = 'visible';
-                else
-                    responseDetail.style.visibility = 'hidden';
+                detailPanels.setDecision(dec);
+                detailPanels.show('decision');
+            } else if (overResponse(ev)) {
+                detailPanels.show('response');
             }
         };
 
+        document.getElementById('zoomin').onclick = function() {
+            scale = scale*2;
+            canvas.getContext("2d").scale(2, 2);
+            drawMap();
+        };
+ 
+        document.getElementById('zoomout').onclick = function() {
+            scale = scale/2;
+            canvas.getContext("2d").scale(0.5, 0.5);
+            drawMap();
+        };
     };
 
     bg.onerror = function() {

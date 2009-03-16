@@ -2,6 +2,9 @@
 %% @doc Webmachine trace file interpretter.
 -module(wmtrace_resource).
 
+-export([add_dispatch_rule/2,
+         remove_dispatch_rules/0]).
+
 -export([start_link/1,
          ping/2,
          init/1,
@@ -23,6 +26,36 @@
 -define(STYLE_EXTERNAL, "static/wmtrace.css").
 -define(STYLE_INTERNAL, "deps/webmachine/trace/wmtrace.css").
 
+%%
+%% Dispatch Modifiers
+%%
+
+%% @spec add_dispatch_rule(string(), string()) -> ok
+%% @doc Add a dispatch rule to point at wmtrace_resource.
+%%      Example: to serve wmtrace_resource from
+%%        http://yourhost/dev/wmtrace/
+%%               with trace files on disk at
+%%        priv/traces
+%%               call:
+%%        add_dispatch_rule("dev/wmtrace", "priv/traces")
+add_dispatch_rule(BasePath, TracePath) when is_list(BasePath),
+                                            is_list(TracePath) ->
+    Parts = string:tokens(BasePath, "/"),
+    webmachine_dispatcher:set_dispatch_list(
+      [{Parts++['*'], ?MODULE, [{trace_dir, TracePath}]}
+       |webmachine_dispatcher:get_dispatch_list()]).
+
+%% @spec remove_dispatch_rules() -> ok
+%% @doc Remove all dispatch rules pointing to wmtrace_resource.
+remove_dispatch_rules() ->
+    webmachine_dispatcher:set_dispatch_list(
+      [ D || D={_,M,_} <- webmachine_dispatcher:get_dispatch_list(),
+             M /= ?MODULE ]).
+
+%%
+%% Resource
+%%
+
 start_link(Args) ->
     webmachine_resource:start_link(?MODULE, [Args]).
 
@@ -37,7 +70,16 @@ init(Config) ->
 resource_exists(RD, Ctx) ->
     case wrq:disp_path(RD) of
         [] ->
-            {true, RD, Ctx};
+            case lists:reverse(wrq:raw_path(RD)) of
+                [$/|_] ->
+                    {true, RD, Ctx};
+                _ ->
+                    {{halt, 303},
+                     wrq:set_resp_header("Location",
+                                         wrq:raw_path(RD)++"/",
+                                         RD),
+                     Ctx}
+            end;
         ?MAP_EXTERNAL ->
             {filelib:is_file(?MAP_INTERNAL), RD, Ctx};
         ?SCRIPT_EXTERNAL ->
@@ -102,42 +144,61 @@ trace_html(Filename, Data) ->
                         {"src", "static/wmtrace.js"}],
                        []),
                 script([{"type", "text/javascript"}],
-                       cdata(["var request=",Request,";\n"
-                              "var response=",Response,";\n"
-                              "var trace=",Trace,";"]))
+                       mochiweb_html:escape(
+                         lists:flatten(
+                           ["var request=",Request,";\n"
+                            "var response=",Response,";\n"
+                            "var trace=",Trace,";"])))
                ]),
           body([],
-               [canvas([{"id", "v3map"},
+               [divblock([{"id", "zoompanel"}],
+                         [button([{"id", "zoomout"}], ["zoom out"]),
+                          button([{"id", "zoomin"}], ["zoom in"])
+                         ]),
+                canvas([{"id", "v3map"},
                         {"width", "3138"},
                         {"height", "2184"}],
                        []),
-                divblock([{"id", "requestdetail"}],
-                         [divblock([],
-                                   [span([{"id", "requestmethod"}], []),
-                                    " ",
-                                    span([{"id", "requestpath"}], [])]),
-                          divblock([{"id", "requestheaders"}],
-                                   [ul([], [])]),
-                          divblock([{"id", "requestbody"}],
-                                   [])
+                divblock([{"id", "sizetest"}], []),
+                divblock([{"id", "preview"}],
+                         [divblock([{"id", "previewid"}],[]),
+                          ul([{"id", "previewcalls"}], [])
                          ]),
-                divblock([{"id", "responsedetail"}],
-                         [divblock([{"id", "responsecode"}], []),
-                          divblock([{"id", "responseheaders"}],
-                                   [ul([], [])]),
-                          divblock([{"id", "responsebody"}], [])
-                         ]),
-                divblock([{"id", "decisiondetail"}],
-                         [divblock([],
-                                   ["Decision: ",
-                                    span([{"id", "decisionid"}], "&nbsp;")
+                divblock([{"id", "infopanel"}],
+                         [divblock([{"id", "infocontrols"}],
+                                   [divblock([{"id", "requesttab"},
+                                              {"class", "selectedtab"}],"Q"),
+                                    divblock([{"id", "responsetab"}], "R"),
+                                    divblock([{"id", "decisiontab"}], "D")
                                    ]),
-                          divblock([], "Calls:"),
-                          select([{"id", "decisioncalls"}, {"size", "4"}], []),
-                          divblock([], "Input:"),
-                          pre([{"id", "callinput"}], []),
-                          divblock([], "Output:"),
-                          pre([{"id", "calloutput"}], [])
+                          divblock([{"id", "requestdetail"}],
+                                   [divblock([],
+                                             [span([{"id", "requestmethod"}], []),
+                                              " ",
+                                              span([{"id", "requestpath"}], [])]),
+                                    ul([{"id", "requestheaders"}], []),
+                                    divblock([{"id", "requestbody"}],
+                                             [])
+                                   ]),
+                          divblock([{"id", "responsedetail"}],
+                                   [divblock([{"id", "responsecode"}], []),
+                                    ul([{"id", "responseheaders"}], []),
+                                    divblock([{"id", "responsebody"}], [])
+                                   ]),
+                          divblock([{"id", "decisiondetail"}],
+                                   [divblock([],
+                                             ["Decision: ",
+                                              select([{"id", "decisionid"}], [])
+                                             ]),
+                                    divblock([],
+                                             ["Calls:",
+                                              select([{"id", "decisioncalls"}], [])
+                                             ]),
+                                    divblock([], "Input:"),
+                                    pre([{"id", "callinput"}], []),
+                                    divblock([], "Output:"),
+                                    pre([{"id", "calloutput"}], [])
+                                   ])
                          ])
                ])
          ]).
@@ -268,6 +329,7 @@ encode_trace_io(Data) ->
 ?TAG(select).
 ?TAG(pre).
 ?TAG(span).
+?TAG(button).
 
 html(_Attrs, Content) ->
     [<<"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">">>,
@@ -290,6 +352,3 @@ tag(Name, Attrs, Content) ->
               Content,
               "</",Name,">"]
      end].
-
-cdata(Content) ->
-    ["//<![CDATA[\n",Content,"\n//]]>"].
