@@ -25,7 +25,7 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqdata.hrl").
 
--define(WMVSN, "0.21").
+-define(WMVSN, "0.96").
 -define(QUIP, "Better than a saber saw.").
 
 % Maximum recv_body() length of 50MB
