@@ -17,7 +17,7 @@
 -author('Justin Sheehy <justin@basho.com>').
 
 -export([create/4,load_dispatch_data/5]).
--export([method/1,version/1,disp_path/1,path/1,raw_path/1,path_info/1,
+-export([method/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,path_info/1,
          response_code/1,req_cookie/1,req_qs/1,req_headers/1,req_body/1,
          resp_redirect/1,resp_headers/1,resp_body/1,
         app_root/1,path_tokens/1]).
@@ -25,7 +25,7 @@
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
          merge_resp_headers/2,remove_resp_header/2,append_to_response_body/2,
-         get_cookie_value/2,get_qs_value/2,get_qs_value/3]).
+         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2]).
 
 -include_lib("include/wm_reqdata.hrl").
 
@@ -35,6 +35,7 @@ create(Method,Version,RawPath,Headers) ->
       path=defined_in_create,
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
+      peer=defined_in_wm_req_srv_init,
       req_body=defined_in_wm_req_srv_init,
       app_root=defined_in_load_dispatch_data,
       path_info=defined_in_load_dispatch_data,
@@ -60,6 +61,8 @@ method(_RD = #wm_reqdata{method=Method}) when is_atom(Method) -> Method.
 version(_RD = #wm_reqdata{version=Version})
   when is_tuple(Version), size(Version) == 2,
      is_integer(element(1,Version)), is_integer(element(2,Version)) -> Version.
+
+peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
 
 app_root(_RD = #wm_reqdata{app_root=AR}) when is_list(AR) -> AR.
 
@@ -106,6 +109,8 @@ get_req_header(HdrName, RD) -> % string->string
 
 do_redirect(true, RD) ->  RD#wm_reqdata{resp_redirect=true};
 do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.
+
+set_peer(P, RD) when is_list(P) -> RD#wm_reqdata{peer=P}. % string
 
 set_disp_path(P, RD) when is_list(P) -> RD#wm_reqdata{disp_path=P}. % string
 

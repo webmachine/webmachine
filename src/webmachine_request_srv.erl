@@ -49,9 +49,10 @@ init([Socket, Method, RawPath, Version, Headers]) ->
     %%process_flag(trap_exit, true),
     %% Calling get_peer() here is a little bit of an ugly way to populate the
     %% client IP address but it will do for now.
-    {_, State} = get_peer(#state{socket=Socket,
+    {Peer, State} = get_peer(#state{socket=Socket,
          reqdata=wrq:create(Method,Version,RawPath,Headers)}),
-    BodyState = do_recv_body(State),
+    BodyState = do_recv_body(State#state{
+                               reqdata=wrq:set_peer(Peer,State#state.reqdata)}),
     LogData = #wm_log_data{start_time=now(),
 			   method=Method,
 			   headers=Headers,
