@@ -24,7 +24,8 @@
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
-         merge_resp_headers/2,remove_resp_header/2,append_to_response_body/2,
+         merge_resp_headers/2,remove_resp_header/2,
+         append_to_resp_body/2,append_to_response_body/2,
          get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2]).
 
 -include_lib("include/wm_reqdata.hrl").
@@ -142,6 +143,7 @@ merge_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH}) ->
     NewHdrs = lists:foldl(F, RespH, Hdrs),
     RD#wm_reqdata{resp_headers=NewHdrs}.
 
+append_to_resp_body(Data, RD) -> append_to_response_body(Data, RD).
 append_to_response_body(Data, RD=#wm_reqdata{resp_body=RespB}) ->
     case is_binary(Data) of
 	true ->

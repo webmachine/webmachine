@@ -25,7 +25,7 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqdata.hrl").
 
--define(WMVSN, "0.97").
+-define(WMVSN, "0.98").
 -define(QUIP, "Better than a saber saw.").
 
 % Maximum recv_body() length of 50MB
@@ -229,6 +229,7 @@ get_outheader_value(K, State) ->
 send(Socket, Data) ->
     case gen_tcp:send(Socket, Data) of
 	ok -> ok;
+	{error,closed} -> ok;
 	_ -> exit(normal)
     end.
 

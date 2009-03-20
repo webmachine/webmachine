@@ -31,6 +31,7 @@ init([]) ->
     Ip = case os:getenv("WEBMACHINE_IP") of false -> "0.0.0.0"; Any -> Any end,
     WebConfig = [
 		 {ip, Ip},
+                 {backlog, 1000},
 		 {port, 8000},
                  {log_dir, "priv/log"},
 		 {dispatch, dispatch_map()}],

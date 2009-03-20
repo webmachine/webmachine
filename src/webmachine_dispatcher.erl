@@ -82,9 +82,9 @@ init([DispatchList]) ->
 %%                                      {stop, Reason, Reply, State} |
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
-handle_call({dispatch, Req}, _From, State) ->
-    DispatchData = binding_dispatch(State#state.dispatchlist, Req),
-    {reply, DispatchData, State};
+handle_call({dispatch, Req}, From, State) ->
+    spawn(fun() -> binding_dispatch(State#state.dispatchlist, Req, From) end),
+    {noreply, State};
 handle_call(get_error_handler, _From, State) ->
     {reply, State#state.error_handler, State};
 handle_call(get_dispatch_list, _From, State) ->
@@ -154,7 +154,7 @@ reconstitute([]) ->
 reconstitute(UnmatchedTokens) ->
     string:join(UnmatchedTokens, [?SEPARATOR]).
 
-binding_dispatch(DispatchList, Req) ->
+binding_dispatch(DispatchList, Req, Client) ->
     PathAsString = Req:path(),
     Path = string:tokens(PathAsString, [?SEPARATOR]),
     % URIs that end with a trailing slash are implicitly one token
@@ -164,7 +164,7 @@ binding_dispatch(DispatchList, Req) ->
 		     true -> 1;
 		     _ -> 0
 		 end,
-    try_binding(DispatchList, Path, ExtraDepth).
+    gen_server:reply(Client, try_binding(DispatchList, Path, ExtraDepth)).
 
 calculate_app_root(1) ->
     ".";
