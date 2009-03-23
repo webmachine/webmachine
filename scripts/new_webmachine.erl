@@ -5,7 +5,12 @@
 %% External API
 
 main([Name]) ->
-    main([Name, "."]);
+    case Name of
+        "." ++ _Rest -> usage();
+        "~" ++ _Rest -> usage();
+        "/" ++ _Rest -> usage();
+        _Any         -> main([Name, "."])
+    end;
 main([Name, Dest]) ->
     ensure(),
     DestDir = filename:absname(Dest),
