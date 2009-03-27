@@ -6,7 +6,7 @@
     webmachine_app,
     webmachine_decision_core,
     webmachine_deps,
-    webmachine_dispatch,
+    webmachine_dispatcher,
     webmachine_error_handler,
     webmachine_logger,
     webmachine_perf_logger,
