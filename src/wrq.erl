@@ -36,7 +36,7 @@ create(Method,Version,RawPath,Headers) ->
       path=defined_in_create,
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
-      peer=defined_in_wm_req_srv_init,
+      peer="defined_in_wm_req_srv_init",
       req_body=defined_in_wm_req_srv_init,
       app_root=defined_in_load_dispatch_data,
       path_info=defined_in_load_dispatch_data,
