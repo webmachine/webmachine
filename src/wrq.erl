@@ -39,7 +39,7 @@ create(Method,Version,RawPath,Headers) ->
       peer="defined_in_wm_req_srv_init",
       req_body=defined_in_wm_req_srv_init,
       app_root=defined_in_load_dispatch_data,
-      path_info=defined_in_load_dispatch_data,
+      path_info=dict:new(),
       path_tokens=defined_in_load_dispatch_data,
       disp_path=defined_in_load_dispatch_data,
       resp_redirect=false, resp_headers=mochiweb_headers:empty(),
