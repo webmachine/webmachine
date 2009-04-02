@@ -392,16 +392,20 @@ decision(v3n11) ->
     Stage1 = case resource_call(post_is_create) of
         true ->
             case resource_call(create_path) of
-                undefined -> respond(500);
+                undefined -> error_response("post_is_create w/o create_path");
                 NewPath ->
-                    wrcall({set_disp_path, NewPath}),
-                    Res = accept_helper(),
-                    case Res of
-                        {respond, Code} -> respond(Code);
-                        {halt, Code} -> respond(Code);
-                        {error, _,_} -> error_response(Res);
-                        {error, _} -> error_response(Res);
-                        _ -> stage1_ok
+                    case is_list(NewPath) of
+                        false -> error_response("create_path not a string");
+                        true ->
+                            wrcall({set_disp_path, NewPath}),
+                            Res = accept_helper(),
+                            case Res of
+                                {respond, Code} -> respond(Code);
+                                {halt, Code} -> respond(Code);
+                                {error, _,_} -> error_response(Res);
+                                {error, _} -> error_response(Res);
+                                _ -> stage1_ok
+                            end
                     end
             end;
         _ ->
