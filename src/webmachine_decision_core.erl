@@ -55,7 +55,7 @@ respond(Code) ->
 	    ErrorHandler = webmachine_dispatcher:get_error_handler(),
 	    Reason = {none, none, []},
 	    ErrorHTML = ErrorHandler:render_error(Code, get(req), Reason),
-            wrcall({append_to_response_body, ErrorHTML});
+            wrcall({set_resp_body, ErrorHTML});
         304 ->
             wrcall({remove_resp_header, "Content-Type"}),
             case resource_call(generate_etag) of
@@ -91,7 +91,7 @@ respond(Code, Headers) ->
 error_response(Code, Reason) ->
     ErrorHandler = webmachine_dispatcher:get_error_handler(),
     ErrorHTML = ErrorHandler:render_error(Code, get(req), Reason),
-    wrcall({append_to_response_body, ErrorHTML}),
+    wrcall({set_resp_body, ErrorHTML}),
     respond(Code).
 error_response(Reason) ->
     error_response(500, Reason).
@@ -489,7 +489,7 @@ decision(v3o18) ->
         {error, _,_} -> error_response(FinalBody);
         {halt, Code} -> respond(Code);
         nop -> d(v3o18b);
-        _ -> wrcall({append_to_response_body,
+        _ -> wrcall({set_resp_body,
                      encode_body(iolist_to_binary(FinalBody))}),
              d(v3o18b)
     end;

@@ -95,7 +95,8 @@ resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
 resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
-resp_body(_RD = #wm_reqdata{resp_body=RespB}) when is_binary(RespB) -> RespB.
+resp_body(_RD = #wm_reqdata{resp_body=RespB}) when is_binary(RespB) -> RespB;
+resp_body(_RD = #wm_reqdata{resp_body=RespB}) -> iolist_to_binary(RespB).
 
 %% --
 

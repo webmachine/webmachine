@@ -152,6 +152,10 @@ handle_call({send_response, Code}, _From, State) ->
     {reply, Reply, NewState#state{log_data=NewLogData}};
 handle_call(resp_body, _From, State) ->
     {reply, wrq:resp_body(State#state.reqdata), State};
+handle_call({set_resp_body, Body}, _From, State) ->
+    NewState = State#state{reqdata=wrq:set_resp_body(Body,
+                                     State#state.reqdata)},
+    {reply, ok, NewState};
 handle_call(has_resp_body, _From, State) ->
     Reply = case wrq:resp_body(State#state.reqdata) of
                 undefined -> false;

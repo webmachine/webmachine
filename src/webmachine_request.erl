@@ -46,6 +46,7 @@
 	 send_response/1,
 	 response_code/0,
 	 set_response_code/1,
+         set_resp_body/1,
 	 response_body/0,
 	 has_response_body/0,
 	 stop/0,
@@ -125,6 +126,7 @@ get_qs_value(Key, Default) -> proplists:get_value(Key, req_qs(), Default).
 
 stop() -> gen_server:cast(Pid, stop).
 
+set_resp_body(Body) -> call({set_resp_body, Body}).
 resp_body() -> call(resp_body).
 response_body() -> resp_body().
 
