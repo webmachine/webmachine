@@ -42,7 +42,7 @@ upgrade() ->
 %% @doc supervisor callback.
 init([]) ->
     Ip = case os:getenv("WEBMACHINE_IP") of false -> "0.0.0.0"; Any -> Any end,   
-    Dispatch = [{[], skel_resource, []}],
+    {ok, Dispatch} = file:consult("priv/dispatch.conf"),
     WebConfig = [
 		 {ip, Ip},
 		 {port, 8000},
