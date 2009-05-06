@@ -25,8 +25,8 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqdata.hrl").
 
--define(WMVSN, "1.1").
--define(QUIP, "Doing it live.").
+-define(WMVSN, "1.2").
+-define(QUIP, "HTTP, do you speak it?").
 
 % Maximum recv_body() length of 50MB
 -define(MAX_RECV_BODY, (50*(1024*1024))).
