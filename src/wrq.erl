@@ -57,7 +57,7 @@ load_dispatch_data(PathInfo, PathTokens, AppRoot, DispPath, RD) ->
     RD#wm_reqdata{path_info=PathInfo,path_tokens=PathTokens,
                  app_root=AppRoot,disp_path=DispPath}.
 
-method(_RD = #wm_reqdata{method=Method}) when is_atom(Method) -> Method.
+method(_RD = #wm_reqdata{method=Method}) -> Method.
 
 version(_RD = #wm_reqdata{version=Version})
   when is_tuple(Version), size(Version) == 2,

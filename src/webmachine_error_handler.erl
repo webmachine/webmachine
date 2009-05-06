@@ -36,5 +36,17 @@ render_error(500, Req, Reason) ->
     ErrorStart = "<html><head><title>500 Internal Server Error</title></head><body><h1>Internal Server Error</h1>The server encountered an error while processing this request:<br><pre>",
     ErrorEnd = "</pre><P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></body></html>",
     ErrorIOList = [ErrorStart,STString,ErrorEnd],
-    erlang:iolist_to_binary(ErrorIOList).
+    erlang:iolist_to_binary(ErrorIOList);
+
+render_error(501, Req, _Reason) ->
+    Req:add_response_header("Content-Type", "text/html"),
+    error_logger:error_msg("Webmachine does not support method ~p~n",
+                           [Req:method()]),
+    ErrorStr = io_lib:format("<html><head><title>501 Not Implemented</title>"
+                             "</head><body><h1>Internal Server Error</h1>"
+                             "The server does not support the ~p method.<br>"
+                             "<P><HR><ADDRESS>mochiweb+webmachine web server"
+                             "</ADDRESS></body></html>",
+                             [Req:method()]),
+    erlang:iolist_to_binary(ErrorStr).
 
