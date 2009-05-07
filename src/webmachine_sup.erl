@@ -21,7 +21,7 @@
 -behaviour(supervisor).
 
 %% External exports
--export([start_link/0, upgrade/0, start_dispatcher/1, start_logger/1]).
+-export([start_link/0, upgrade/0, start_logger/1]).
 -export([start_perf_logger/1]).
 
 %% supervisor callbacks
@@ -31,17 +31,6 @@
 %% @doc API for starting the supervisor.
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-%% @spec stat_dispatcher([dispatch_tuple()]) -> ok
-%% @doc Starts a supervised webmachine_dispatcher process to
-%% handle dispatch based on the list of dispatch tuples.
-%% See webmachine_dispatcher for the dispatch_tuple().
-start_dispatcher(DispatchList) ->
-    ChildSpec =
-	{webmachine_dispatcher,
-	 {webmachine_dispatcher, start_link, [DispatchList]},
-	 permanent, 5000, worker, dynamic},
-    supervisor:start_child(?MODULE, ChildSpec).
 
 start_logger(BaseDir) ->
     LoggerModule = 

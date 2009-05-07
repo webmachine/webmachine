@@ -39,8 +39,8 @@ start(Options) ->
 	_ ->
 	    ignore
     end,
-    webmachine_sup:start_dispatcher(DispatchList),
-    webmachine_dispatcher:set_error_handler(ErrorHandler),
+    application:set_env(webmachine, dispatch_list, DispatchList),
+    application:set_env(webmachine, error_handler, ErrorHandler),
     mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | Options4]).
 
 stop() ->
@@ -48,9 +48,10 @@ stop() ->
 
 loop(MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
-    case webmachine_dispatcher:dispatch(Req) of
+    {ok, DispatchList} = application:get_env(webmachine, dispatch_list),
+    case webmachine_dispatcher:dispatch(Req:path(), DispatchList) of
         {no_dispatch_match, _UnmatchedPathTokens} ->
-	    ErrorHandler = webmachine_dispatcher:get_error_handler(),
+            {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
 	    ErrorHTML = ErrorHandler:render_error(404, Req, {none, none, []}),
 	    Req:append_to_response_body(ErrorHTML),
 	    Req:send_response(404),

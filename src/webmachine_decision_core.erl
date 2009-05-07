@@ -52,7 +52,7 @@ respond(Code) ->
     EndTime = now(),
     case Code of
 	404 ->
-	    ErrorHandler = webmachine_dispatcher:get_error_handler(),
+	    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
 	    Reason = {none, none, []},
 	    ErrorHTML = ErrorHandler:render_error(Code, get(req), Reason),
             wrcall({set_resp_body, ErrorHTML});
@@ -89,7 +89,7 @@ respond(Code, Headers) ->
     respond(Code).
 
 error_response(Code, Reason) ->
-    ErrorHandler = webmachine_dispatcher:get_error_handler(),
+    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     ErrorHTML = ErrorHandler:render_error(Code, get(req), Reason),
     wrcall({set_resp_body, ErrorHTML}),
     respond(Code).

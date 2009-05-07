@@ -1,6 +1,6 @@
 %% @author Robert Ahrens <rahrens@basho.com>
-%% @copyright 2008 Basho Technologies
-%% @copyright 2007-2008 Basho Technologies
+%% @author Justin Sheehy <justin@basho.com>
+%% @copyright 2007-2009 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -14,148 +14,22 @@
 %%    See the License for the specific language governing permissions and
 %%    limitations under the License.
 
-%% @doc gen_server for dispatching page requests from webmachine.
+%% @doc Module for URL-dispatch by pattern matching.
 
 -module(webmachine_dispatcher).
 -author('Robert Ahrens <rahrens@basho.com>').
--behaviour(gen_server).
+-author('Justin Sheehy <justin@basho.com>').
+
+-export([dispatch/2]).
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
 
-%% API
--export([start_link/0, start_link/1, stop/0, dispatch/1,
-         set_dispatch_list/1, get_dispatch_list/0]).
--export([set_error_handler/1, get_error_handler/0]).
-
-%% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
-
--record(state, {dispatchlist=[], error_handler}).
-
-%%====================================================================
-%% API
-%%====================================================================
-%% @spec start_link() -> {ok,Pid} | ignore | {error,Error}
-%% @doc Starts the dispatch server
-start_link() ->
-    start_link([]).
-start_link(DispatchList) when is_list(DispatchList) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [DispatchList], []).
-
-stop() ->
-    gen_server:cast(?MODULE, stop).
-
-dispatch(Req) ->
-    gen_server:call(?MODULE, {dispatch, Req}).
-
-set_dispatch_list(List) when is_list(List) ->
-    gen_server:cast(?MODULE, {set_dispatch_list, List}).
-
-get_dispatch_list() ->
-    gen_server:call(?MODULE, get_dispatch_list).
-
-set_error_handler(ErrorHandlerMod) when is_atom(ErrorHandlerMod) ->
-    gen_server:cast(?MODULE, {set_error_handler, ErrorHandlerMod}).
-
-get_error_handler() ->
-    gen_server:call(?MODULE, get_error_handler).
-
-
-%%====================================================================
-%% gen_server callbacks
-%%====================================================================
-
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore               |
-%%                     {stop, Reason}
-%% @doc Initiates the server
-init([DispatchList]) ->
-    {ok, #state{dispatchlist=DispatchList}}.
-
-%% @spec %% handle_call(Request, From, State) -> {reply, Reply, State} |
-%%                                      {reply, Reply, State, Timeout} |
-%%                                      {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, Reply, State} |
-%%                                      {stop, Reason, State}
-%% Description: Handling call messages
-handle_call({dispatch, Req}, From, State) ->
-    spawn(fun() -> binding_dispatch(State#state.dispatchlist, Req, From) end),
-    {noreply, State};
-handle_call(get_error_handler, _From, State) ->
-    {reply, State#state.error_handler, State};
-handle_call(get_dispatch_list, _From, State) ->
-    {reply, State#state.dispatchlist, State}.
-
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
-%% @doc Handling cast messages
-handle_cast(stop, State) ->
-    {stop, normal, State};
-handle_cast({set_error_handler, ErrorHandlerMod}, State) ->
-    {noreply, State#state{error_handler=ErrorHandlerMod}};
-handle_cast({set_dispatch_list, List}, State) when is_list(List) ->
-    {noreply, State#state{dispatchlist=List}}.
-
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                       {noreply, State, Timeout} |
-%%                                       {stop, Reason, State}
-%% @doc Handling all non call/cast messages
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-%% @spec terminate(Reason, State) -> void()
-%% @doc This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any necessary
-%% cleaning up. When it returns, the gen_server terminates with Reason.
-%% The return value is ignored.
-terminate(_Reason, _State) ->
-    ok.
-
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @doc Convert process state when code is changed
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-%%--------------------------------------------------------------------
-%%% Internal functions
-%%--------------------------------------------------------------------
-
-bind_path([], [], Bindings, Depth) ->
-    {ok, [], Bindings, Depth};
-bind_path([?MATCH_ALL], PathRest, Bindings, Depth) when is_list(PathRest) ->
-    {ok, PathRest, Bindings, Depth + length(PathRest)};
-bind_path(_, [], _, _) ->
-    fail;
-bind_path([Token|Rest], [Match|PathRest], Bindings, Depth) when is_atom(Token) ->
-    bind_path(Rest, PathRest, [{Token, Match}|Bindings], Depth + 1);
-bind_path([Token|Rest], [Token|PathRest], Bindings, Depth) ->
-    bind_path(Rest, PathRest, Bindings, Depth + 1);
-bind_path(_, _, _, _) ->
-    fail.
-
-try_binding([], PathTokens, _) ->
-    {no_dispatch_match, PathTokens};
-try_binding([{PathSchema, Mod, Props}|Rest], PathTokens, ExtraDepth) ->
-    case bind_path(PathSchema, PathTokens, [], 0) of
-	    {ok, Remainder, Bindings, Depth} ->
-	        {Mod, Props, Remainder, Bindings, calculate_app_root(Depth + ExtraDepth), reconstitute(Remainder)};
-	    fail -> 
-	        try_binding(Rest, PathTokens, ExtraDepth)
-    end.
-
-reconstitute([]) ->
-     "";
-reconstitute(UnmatchedTokens) ->
-    string:join(UnmatchedTokens, [?SEPARATOR]).
-
-binding_dispatch(DispatchList, Req, Client) ->
-    PathAsString = Req:path(),
+%% @spec dispatch(Path::string(), DispatchList::[matchterm()]) ->
+%%                                            dispterm() | dispfail()
+%% @doc Interface for URL dispatching.
+%% See also http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
+dispatch(PathAsString, DispatchList) ->
     Path = string:tokens(PathAsString, [?SEPARATOR]),
     % URIs that end with a trailing slash are implicitly one token
     % "deeper" than we otherwise might think as we are "inside"
@@ -164,9 +38,75 @@ binding_dispatch(DispatchList, Req, Client) ->
 		     true -> 1;
 		     _ -> 0
 		 end,
-    gen_server:reply(Client, try_binding(DispatchList, Path, ExtraDepth)).
+    try_binding(DispatchList, Path, ExtraDepth).
 
-calculate_app_root(1) ->
-    ".";
+%% @type matchterm() = {[pathterm()], matchmod(), matchopts()}.
+% The dispatch configuration is a list of these terms, and the
+% first one whose list of pathterms matches the input path is used.
+
+%% @type pathterm() = '*' | string() | atom().
+% A list of pathterms is matched against a '/'-separated input path.
+% The '*' pathterm matches all remaining tokens.
+% A string pathterm will match a token of exactly the same string.
+% Any atom pathterm other than '*' will match any token and will
+% create a binding in the result if a complete match occurs.
+
+%% @type matchmod() = atom().
+% This atom, if present in a successful matchterm, will appear in
+% the resulting dispterm.  In Webmachine this is used to name the
+% resource module that will handle the matching request.
+
+%% @type matchopts() = [term()].
+% This term, if present in a successful matchterm, will appear in
+% the resulting dispterm.  In Webmachine this is used to provide
+% arguments to the resource module handling the matching request.
+
+%% @type dispterm() = {matchmod(), matchopts(), pathtokens(),
+%%                bindings(), approot(), stringpath()}.
+
+%% @type pathtokens() = [pathtoken()].
+% This is the list of tokens matched by a trailing '*' pathterm.
+
+%% @type pathtoken() = string().
+
+%% @type bindings() = [{bindingterm(),pathtoken()}].
+% This is a proplist of bindings indicated by atom terms in the
+% matching spec, bound to the matching tokens in the request path.
+
+%% @type approot() = string().
+
+%% @type stringpath() = string().
+% This is the path portion matched by a trailing '*' pathterm.
+
+%% @type dispfail() = {no_dispatch_match, pathtokens()}.
+
+try_binding([], PathTokens, _) ->
+    {no_dispatch_match, PathTokens};
+try_binding([{PathSchema, Mod, Props}|Rest], PathTokens, ExtraDepth) ->
+    case bind_path(PathSchema, PathTokens, [], 0) of
+        {ok, Remainder, Bindings, Depth} ->
+            {Mod, Props, Remainder, Bindings,
+             calculate_app_root(Depth + ExtraDepth), reconstitute(Remainder)};
+        fail -> 
+            try_binding(Rest, PathTokens, ExtraDepth)
+    end.
+
+bind_path([], [], Bindings, Depth) ->
+    {ok, [], Bindings, Depth};
+bind_path([?MATCH_ALL], PathRest, Bindings, Depth) when is_list(PathRest) ->
+    {ok, PathRest, Bindings, Depth + length(PathRest)};
+bind_path(_, [], _, _) ->
+    fail;
+bind_path([Token|Rest],[Match|PathRest],Bindings,Depth) when is_atom(Token) ->
+    bind_path(Rest, PathRest, [{Token, Match}|Bindings], Depth + 1);
+bind_path([Token|Rest], [Token|PathRest], Bindings, Depth) ->
+    bind_path(Rest, PathRest, Bindings, Depth + 1);
+bind_path(_, _, _, _) ->
+    fail.
+
+reconstitute([]) -> "";
+reconstitute(UnmatchedTokens) -> string:join(UnmatchedTokens, [?SEPARATOR]).
+
+calculate_app_root(1) -> ".";
 calculate_app_root(N) when N > 1 ->
     string:join(lists:duplicate(N, ".."), [?SEPARATOR]).
