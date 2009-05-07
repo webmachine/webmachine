@@ -41,16 +41,23 @@
 add_dispatch_rule(BasePath, TracePath) when is_list(BasePath),
                                             is_list(TracePath) ->
     Parts = string:tokens(BasePath, "/"),
-    webmachine_dispatcher:set_dispatch_list(
+    set_dispatch_list(
       [{Parts++['*'], ?MODULE, [{trace_dir, TracePath}]}
-       |webmachine_dispatcher:get_dispatch_list()]).
+       |get_dispatch_list()]).
 
 %% @spec remove_dispatch_rules() -> ok
 %% @doc Remove all dispatch rules pointing to wmtrace_resource.
 remove_dispatch_rules() ->
-    webmachine_dispatcher:set_dispatch_list(
-      [ D || D={_,M,_} <- webmachine_dispatcher:get_dispatch_list(),
+    set_dispatch_list(
+      [ D || D={_,M,_} <- get_dispatch_list(),
              M /= ?MODULE ]).
+
+get_dispatch_list() ->
+    {ok, Dispatch} = application:get_env(webmachine, dispatch_list),
+    Dispatch.
+
+set_dispatch_list(NewList) when is_list(NewList) ->
+    application:set_env(webmachine, dispatch_list, NewList).
 
 %%
 %% Resource
