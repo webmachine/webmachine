@@ -52,11 +52,14 @@ render_error(501, Req, _Reason) ->
 
 render_error(503, Req, _Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
-    error_logger:error_msg("Webmachine cannot fullfil the request at this time"),
+    error_logger:error_msg("Webmachine cannot fulfill"
+                           "the request at this time"),
     ErrorStr = "<html><head><title>503 Service Unavailable</title>"
-        "</head><body><h1>Internal Server Error</h1>"
-        "The server is currently unable to handle the request due to a temporary overloading or maintenance of the server.<br>"
-        "<P><HR><ADDRESS>mochiweb+webmachine web server"
-        "</ADDRESS></body></html>",
+               "</head><body><h1>Service Unavailable</h1>"
+               "The server is currently unable to handle "
+               "the request due to a temporary overloading "
+               "or maintenance of the server.<br>"
+               "<P><HR><ADDRESS>mochiweb+webmachine web server"
+               "</ADDRESS></body></html>",
     list_to_binary(ErrorStr).
 
