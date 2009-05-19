@@ -197,7 +197,7 @@ zone(Val) when Val < 0 ->
 zone(Val) when Val >= 0 ->
     io_lib:format("+~4..0w", [trunc(abs(Val))]).
 
-fmt_ip(IP) when tuple(IP) ->
+fmt_ip(IP) when is_tuple(IP) ->
     inet_parse:ntoa(IP);
 fmt_ip(undefined) ->
     "0.0.0.0";
