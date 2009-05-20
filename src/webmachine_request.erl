@@ -31,6 +31,7 @@
 	 path/0,
 	 raw_path/0,
 	 req_headers/0,
+	 req_body/0,
 	 headers/0,
 	 resp_headers/0,
 	 out_headers/0,
@@ -56,7 +57,7 @@
 	 get_metadata/1,
 	 get_path_info/0,
 	 get_path_info/1,
-	 load_dispatch_data/4,
+	 load_dispatch_data/5,
 	 get_path_tokens/0,
 	 get_app_root/0,
 	 parse_cookie/0,
@@ -91,6 +92,8 @@ raw_path() -> call(raw_path).
 
 req_headers() -> call(req_headers).
 headers() -> req_headers().
+
+req_body() -> call(req_body).
 
 resp_headers() -> call(resp_headers).
 out_headers() -> resp_headers().
@@ -167,7 +170,7 @@ get_path_tokens() -> path_tokens().
 app_root() -> call(app_root).
 get_app_root() -> app_root().
 
-load_dispatch_data(Bindings, PathTokens, AppRoot, DispPath) ->
-    call({load_dispatch_data, Bindings, PathTokens, AppRoot, DispPath}).
+load_dispatch_data(Bindings, PathTokens, AppRoot, DispPath, Req) ->
+    call({load_dispatch_data, Bindings, PathTokens, AppRoot, DispPath, Req}).
 
 log_data() -> call(log_data).

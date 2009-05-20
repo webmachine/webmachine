@@ -16,7 +16,7 @@
 -module(wrq).
 -author('Justin Sheehy <justin@basho.com>').
 
--export([create/4,load_dispatch_data/5]).
+-export([create/4,load_dispatch_data/6]).
 -export([method/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,path_info/1,
          response_code/1,req_cookie/1,req_qs/1,req_headers/1,req_body/1,
          resp_redirect/1,resp_headers/1,resp_body/1,
@@ -33,11 +33,12 @@
 create(Method,Version,RawPath,Headers) ->
     create(#wm_reqdata{method=Method,version=Version,
                        raw_path=RawPath,req_headers=Headers,
+      wmreq=defined_in_load_dispatch_data,
       path="defined_in_create",
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
-      req_body=defined_in_wm_req_srv_init,
+      req_body=not_fetched_yet,
       app_root="defined_in_load_dispatch_data",
       path_info=dict:new(),
       path_tokens=defined_in_load_dispatch_data,
@@ -53,9 +54,9 @@ create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
     ReqQS = mochiweb_util:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
-load_dispatch_data(PathInfo, PathTokens, AppRoot, DispPath, RD) ->
+load_dispatch_data(PathInfo, PathTokens, AppRoot, DispPath, WMReq, RD) ->
     RD#wm_reqdata{path_info=PathInfo,path_tokens=PathTokens,
-                 app_root=AppRoot,disp_path=DispPath}.
+                 app_root=AppRoot,disp_path=DispPath,wmreq=WMReq}.
 
 method(_RD = #wm_reqdata{method=Method}) -> Method.
 
@@ -86,8 +87,7 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS. % string
 
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
-req_body(_RD = #wm_reqdata{req_body=undefined}) -> undefined;
-req_body(_RD = #wm_reqdata{req_body=ReqB}) when is_binary(ReqB) -> ReqB.
+req_body(_RD = #wm_reqdata{wmreq=WMReq}) -> WMReq:req_body().
 
 resp_redirect(_RD = #wm_reqdata{resp_redirect=true}) -> true;
 resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
@@ -164,4 +164,4 @@ get_qs_value(Key, RD) when is_list(Key) -> % string
 get_qs_value(Key, Default, RD) when is_list(Key) ->
     proplists:get_value(Key, req_qs(RD), Default).
 
-% --
+

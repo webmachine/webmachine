@@ -51,8 +51,7 @@ init([Socket, Method, RawPath, Version, Headers]) ->
     %% client IP address but it will do for now.
     {Peer, State} = get_peer(#state{socket=Socket,
          reqdata=wrq:create(Method,Version,RawPath,Headers)}),
-    BodyState = do_recv_body(State#state{
-                               reqdata=wrq:set_peer(Peer,State#state.reqdata)}),
+    PeerState = State#state{reqdata=wrq:set_peer(Peer,State#state.reqdata)},
     LogData = #wm_log_data{start_time=now(),
 			   method=Method,
 			   headers=Headers,
@@ -61,7 +60,7 @@ init([Socket, Method, RawPath, Version, Headers]) ->
 			   version=Version,
 			   response_code=404,
 			   response_length=0},
-    {ok, BodyState#state{log_data=LogData}}.
+    {ok, PeerState#state{log_data=LogData}}.
 
 handle_call(socket, _From, State) ->
     Reply = State#state.socket,
@@ -78,6 +77,16 @@ handle_call(raw_path, _From, State) ->
     {reply, wrq:raw_path(State#state.reqdata), State};
 handle_call(req_headers, _From, State) ->
     {reply, wrq:req_headers(State#state.reqdata), State};
+handle_call(req_body, _From, State=#state{reqdata=RD}) ->
+    {Body, FinalState} = case RD#wm_reqdata.req_body of
+        not_fetched_yet ->
+            NewState = do_recv_body(State),
+            NewRD = NewState#state.reqdata,
+            {NewRD#wm_reqdata.req_body, NewState};
+        X ->
+            {X, State}
+    end,
+    {reply, Body, FinalState};
 handle_call(resp_headers, _From, State) ->
     {reply, wrq:resp_headers(State#state.reqdata), State};
 handle_call(resp_redirect, _From, State) ->
@@ -179,11 +188,11 @@ handle_call(req_cookie, _From, State) ->
     {reply, wrq:req_cookie(State#state.reqdata), State};
 handle_call(req_qs, _From, State) ->
     {reply, wrq:req_qs(State#state.reqdata), State};
-handle_call({load_dispatch_data, PathProps, PathTokens, AppRoot, DispPath},
+handle_call({load_dispatch_data, PathProps,PathTokens,AppRoot,DispPath,WMReq},
             _From, State) ->
     PathInfo = dict:from_list(PathProps),
     NewState = State#state{reqdata=wrq:load_dispatch_data(
-                 PathInfo, PathTokens, AppRoot, DispPath, State#state.reqdata)},
+               PathInfo,PathTokens,AppRoot,DispPath,WMReq,State#state.reqdata)},
     {reply, ok, NewState};
 handle_call(log_data, _From, State) -> {reply, State#state.log_data, State}.
 
@@ -295,14 +304,13 @@ body_length(State) ->
             {unknown_transfer_encoding, Unknown}
     end.
 
-%% @spec do_recv_body(state()) -> binary()
+%% @spec do_recv_body(state()) -> state()
 %% @doc Receive the body of the HTTP request (defined by Content-Length).
 %%      Will only receive up to the default max-body length
 do_recv_body(State=#state{reqdata=RD}) ->
     State#state{reqdata=wrq:set_req_body(
                              do_recv_body(State, ?MAX_RECV_BODY), RD)}.
 
-%% @spec do_recv_body(state(), integer()) -> {binary(), state()}
 %% @doc Receive the body of the HTTP request (defined by Content-Length).
 %%      Will receive up to MaxBody bytes. 
 do_recv_body(State = #state{reqdata=RD}, MaxBody) ->
