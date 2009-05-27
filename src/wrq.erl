@@ -19,7 +19,7 @@
 -export([create/4,load_dispatch_data/6]).
 -export([method/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,path_info/1,
          response_code/1,req_cookie/1,req_qs/1,req_headers/1,req_body/1,
-         resp_redirect/1,resp_headers/1,resp_body/1,
+         stream_req_body/2,resp_redirect/1,resp_headers/1,resp_body/1,
         app_root/1,path_tokens/1]).
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
@@ -87,7 +87,16 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS. % string
 
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
-req_body(_RD = #wm_reqdata{wmreq=WMReq}) -> WMReq:req_body().
+req_body(_RD = #wm_reqdata{wmreq=WMReq}) ->
+    case WMReq:req_body() of
+        stream_conflict ->
+            erlang:error("wrq:req_body called after wrq:stream_req_body");
+        Body ->
+            Body
+    end.
+
+stream_req_body(_RD = #wm_reqdata{wmreq=WMReq}, MaxHunk) ->
+    WMReq:stream_req_body(MaxHunk).
 
 resp_redirect(_RD = #wm_reqdata{resp_redirect=true}) -> true;
 resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.

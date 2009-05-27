@@ -38,6 +38,7 @@
 		range=undefined,
 		peer=undefined,
                 reqdata=undefined,
+                bodyfetch=standard, % set to 'stream' if streaming body
 		log_data=#wm_log_data{}
 	       }).
 
@@ -77,7 +78,7 @@ handle_call(raw_path, _From, State) ->
     {reply, wrq:raw_path(State#state.reqdata), State};
 handle_call(req_headers, _From, State) ->
     {reply, wrq:req_headers(State#state.reqdata), State};
-handle_call(req_body, _From, State=#state{reqdata=RD}) ->
+handle_call(req_body, _From, State=#state{reqdata=RD,bodyfetch=standard}) ->
     {Body, FinalState} = case RD#wm_reqdata.req_body of
         not_fetched_yet ->
             NewState = do_recv_body(State),
@@ -87,6 +88,10 @@ handle_call(req_body, _From, State=#state{reqdata=RD}) ->
             {X, State}
     end,
     {reply, Body, FinalState};
+handle_call(req_body, _From, State=#state{bodyfetch=stream}) ->
+    {reply, stream_conflict, State};
+handle_call({stream_req_body, MaxHunk}, _From, State=#state{reqdata=RD}) ->
+    {reply, do_stream_body(State, MaxHunk), State#state{bodyfetch=stream}};
 handle_call(resp_headers, _From, State) ->
     {reply, wrq:resp_headers(State#state.reqdata), State};
 handle_call(resp_redirect, _From, State) ->
@@ -350,7 +355,7 @@ stream_chunked_body(Socket, MaxHunk) ->
         ChunkLength -> stream_chunked_body(Socket,MaxHunk,ChunkLength)
     end.
 stream_chunked_body(Socket, MaxHunk, LeftInChunk) ->
-    case MaxHunk > LeftInChunk of
+    case MaxHunk >= LeftInChunk of
         true ->
             {ok,Data1} = gen_tcp:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
             {Data1,

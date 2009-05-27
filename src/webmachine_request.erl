@@ -32,6 +32,7 @@
 	 raw_path/0,
 	 req_headers/0,
 	 req_body/0,
+	 stream_req_body/1,
 	 headers/0,
 	 resp_headers/0,
 	 out_headers/0,
@@ -94,6 +95,7 @@ req_headers() -> call(req_headers).
 headers() -> req_headers().
 
 req_body() -> call(req_body).
+stream_req_body(MaxHunk) -> call({stream_req_body, MaxHunk}).
 
 resp_headers() -> call(resp_headers).
 out_headers() -> resp_headers().
