@@ -293,15 +293,11 @@ body_length(State) ->
     case get_header_value("transfer-encoding", State) of
         {undefined, _} ->
             case get_header_value("content-length", State) of
-                {undefined, _} -> 
-                    undefined;
-                {Length, _} ->
-                    list_to_integer(Length)
+                {undefined, _} -> undefined;
+                {Length, _} -> list_to_integer(Length)
             end;
-        {"chunked", _} -> 
-            chunked;
-        Unknown ->
-            {unknown_transfer_encoding, Unknown}
+        {"chunked", _} -> chunked;
+        Unknown -> {unknown_transfer_encoding, Unknown}
     end.
 
 %% @spec do_recv_body(state()) -> state()
@@ -309,11 +305,16 @@ body_length(State) ->
 %%      Will only receive up to the default max-body length
 do_recv_body(State=#state{reqdata=RD}) ->
     State#state{reqdata=wrq:set_req_body(
-                             do_recv_body(State, ?MAX_RECV_BODY), RD)}.
+          read_whole_stream(do_stream_body(State, ?MAX_RECV_BODY), []), RD)}.
 
-%% @doc Receive the body of the HTTP request (defined by Content-Length).
-%%      Will receive up to MaxBody bytes. 
-do_recv_body(State = #state{reqdata=RD}, MaxBody) ->
+read_whole_stream({Hunk,Next}, Acc0) ->
+    Acc = [Hunk|Acc0],
+    case Next of
+        done -> iolist_to_binary(lists:reverse(Acc));
+        _ -> read_whole_stream(Next(), Acc)
+    end.
+
+do_stream_body(State = #state{reqdata=RD}, MaxHunkSize) ->
     case get_header_value("expect", State) of
 	{"100-continue", _} ->
 	    send(State#state.socket, 
@@ -322,36 +323,61 @@ do_recv_body(State = #state{reqdata=RD}, MaxBody) ->
 	_Else ->
 	    ok
     end,
-    Body = case body_length(State) of
-               undefined ->
-                   undefined;
-               {unknown_transfer_encoding, Unknown} -> 
-                   exit({unknown_transfer_encoding, Unknown});
-               0 ->
-                   <<>>;
-               Length when is_integer(Length), Length =< MaxBody ->
-                   recv(State, Length);
-               Length ->
-                   exit({body_too_large, Length})
-           end,
-    Body.
+    case body_length(State) of
+        {unknown_transfer_encoding, X} -> exit({unknown_transfer_encoding, X});
+        undefined -> {<<>>, done};
+        0 -> {<<>>, done};
+        chunked -> stream_chunked_body(State#state.socket, MaxHunkSize);
+        Length -> stream_unchunked_body(State#state.socket, MaxHunkSize, Length)
+    end.
 
-%% @spec recv(state(), integer()) -> binary()
-%% @doc Receive Length bytes from the client as a binary, with the default
-%%      idle timeout.
-recv(State, Length) -> recv(State, Length, ?IDLE_TIMEOUT).
+stream_unchunked_body(Socket, MaxHunk, DataLeft) ->
+    case MaxHunk >= DataLeft of
+        true ->
+            {ok,Data1} = gen_tcp:recv(Socket,DataLeft,?IDLE_TIMEOUT),
+            {Data1, done};
+        false ->
+            {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {Data2,
+             fun() -> stream_unchunked_body(
+                        Socket, MaxHunk, DataLeft-MaxHunk)
+             end}
+    end.
+    
+stream_chunked_body(Socket, MaxHunk) ->
+    case read_chunk_length(Socket) of
+        0 -> {<<>>, done};
+        ChunkLength -> stream_chunked_body(Socket,MaxHunk,ChunkLength)
+    end.
+stream_chunked_body(Socket, MaxHunk, LeftInChunk) ->
+    case MaxHunk > LeftInChunk of
+        true ->
+            {ok,Data1} = gen_tcp:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
+            {Data1,
+             fun() -> stream_chunked_body(Socket, MaxHunk)
+             end};
+        false ->
+            {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {Data2,
+             fun() -> stream_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
+             end}
+    end.
 
-%% @spec recv(state(), integer(), integer()) -> binary()
-%% @doc Receive Length bytes from the client as a binary, with the given
-%%      Timeout in msec.
-recv(State, Length, Timeout) ->
-    Socket = State#state.socket,
-    case gen_tcp:recv(Socket, Length, Timeout) of
-	{ok, Data} ->
-	    Data;
-	_R ->
-	    io:format("got socket error ~p~n", [_R]),
-	    exit(normal)
+read_chunk_length(Socket) ->
+    inet:setopts(Socket, [{packet, line}]),
+    case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
+        {ok, Header} ->
+            inet:setopts(Socket, [{packet, raw}]),
+            Splitter = fun (C) ->
+                               C =/= $\r andalso C =/= $\n andalso C =/= $
+                       end,
+            {Hex, _Rest} = lists:splitwith(Splitter, binary_to_list(Header)),
+            case Hex of
+                [] -> 0;
+                _ -> erlang:list_to_integer(Hex, 16)
+            end;
+        _ ->
+            exit(normal)
     end.
 
 get_range(State) ->
