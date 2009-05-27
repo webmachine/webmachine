@@ -38,7 +38,7 @@
 		range=undefined,
 		peer=undefined,
                 reqdata=undefined,
-                bodyfetch=standard, % set to 'stream' if streaming body
+                bodyfetch=undefined,
 		log_data=#wm_log_data{}
 	       }).
 
@@ -78,19 +78,21 @@ handle_call(raw_path, _From, State) ->
     {reply, wrq:raw_path(State#state.reqdata), State};
 handle_call(req_headers, _From, State) ->
     {reply, wrq:req_headers(State#state.reqdata), State};
-handle_call(req_body, _From, State=#state{reqdata=RD,bodyfetch=standard}) ->
+handle_call(req_body, _From, State=#state{bodyfetch=stream}) ->
+    {reply, stream_conflict, State};
+handle_call(req_body, _From, State=#state{reqdata=RD}) ->
     {Body, FinalState} = case RD#wm_reqdata.req_body of
         not_fetched_yet ->
             NewState = do_recv_body(State),
             NewRD = NewState#state.reqdata,
-            {NewRD#wm_reqdata.req_body, NewState};
+            {NewRD#wm_reqdata.req_body, NewState#state{bodyfetch=standard}};
         X ->
-            {X, State}
+            {X, State#state{bodyfetch=standard}}
     end,
     {reply, Body, FinalState};
-handle_call(req_body, _From, State=#state{bodyfetch=stream}) ->
+handle_call({stream_req_body,_}, _From, State=#state{bodyfetch=standard}) ->
     {reply, stream_conflict, State};
-handle_call({stream_req_body, MaxHunk}, _From, State=#state{reqdata=RD}) ->
+handle_call({stream_req_body, MaxHunk}, _From, State) ->
     {reply, do_stream_body(State, MaxHunk), State#state{bodyfetch=stream}};
 handle_call(resp_headers, _From, State) ->
     {reply, wrq:resp_headers(State#state.reqdata), State};

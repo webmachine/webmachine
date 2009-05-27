@@ -88,15 +88,18 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS. % string
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
 req_body(_RD = #wm_reqdata{wmreq=WMReq}) ->
-    case WMReq:req_body() of
-        stream_conflict ->
-            erlang:error("wrq:req_body called after wrq:stream_req_body");
-        Body ->
-            Body
-    end.
+    maybe_conflict_body(WMReq:req_body()).
 
 stream_req_body(_RD = #wm_reqdata{wmreq=WMReq}, MaxHunk) ->
-    WMReq:stream_req_body(MaxHunk).
+    maybe_conflict_body(WMReq:stream_req_body(MaxHunk)).
+
+maybe_conflict_body(BodyResponse) ->
+    case BodyResponse of
+        stream_conflict ->
+            erlang:error("wrq:req_body and wrq:stream_req_body conflict");
+        _ ->
+            BodyResponse
+    end.
 
 resp_redirect(_RD = #wm_reqdata{resp_redirect=true}) -> true;
 resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
