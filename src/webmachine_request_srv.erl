@@ -93,7 +93,7 @@ handle_call(req_body, _From, State=#state{reqdata=RD}) ->
 handle_call({stream_req_body,_}, _From, State=#state{bodyfetch=standard}) ->
     {reply, stream_conflict, State};
 handle_call({stream_req_body, MaxHunk}, _From, State) ->
-    {reply, do_stream_body(State, MaxHunk), State#state{bodyfetch=stream}};
+    {reply, recv_stream_body(State, MaxHunk), State#state{bodyfetch=stream}};
 handle_call(resp_headers, _From, State) ->
     {reply, wrq:resp_headers(State#state.reqdata), State};
 handle_call(resp_redirect, _From, State) ->
@@ -247,11 +247,28 @@ get_outheader_value(K, State) ->
       wrq:resp_headers(State#state.reqdata)), State}.
 
 send(Socket, Data) ->
-    case gen_tcp:send(Socket, Data) of
+    case gen_tcp:send(Socket, iolist_to_binary(Data)) of
 	ok -> ok;
 	{error,closed} -> ok;
 	_ -> exit(normal)
     end.
+
+send_stream_body(Socket, X) -> send_stream_body(Socket, X, 0).
+send_stream_body(Socket, {Data, done}, SoFar) ->
+    Size = send_chunk(Socket, Data),
+    send_chunk(Socket, <<>>),
+    Size + SoFar;
+send_stream_body(Socket, {Data, Next}, SoFar) ->
+    Size = send_chunk(Socket, Data),
+    send_stream_body(Socket, Next(), Size + SoFar).
+
+send_chunk(Socket, Data) ->
+    Size = iolist_size(Data),
+    send(Socket, mochihex:to_hex(Size)),
+    send(Socket, <<"\r\n">>),
+    send(Socket, Data),
+    send(Socket, <<"\r\n">>),
+    Size.
 
 send_ok_response(200, InitState) ->
     RD0 = InitState#state.reqdata,
@@ -279,18 +296,26 @@ send_ok_response(200, InitState) ->
     end.
 
 send_response(Code, State=#state{reqdata=RD}) ->
-    Length = iolist_size([wrq:resp_body(RD)]),
+    Body0 = wrq:resp_body(RD),
+    {Body,Length} = case Body0 of
+        {stream, StreamBody} -> {StreamBody, chunked};
+        _ -> {Body0, iolist_size([Body0])}
+    end,
     send(State#state.socket,
 	 [make_version(wrq:version(RD)),
           make_code(Code), <<"\r\n">> | 
          make_headers(Code, Length, RD)]),
-    case wrq:method(RD) of 
-	'HEAD' -> ok;
-	_ -> send(State#state.socket, [wrq:resp_body(RD)])
+    FinalLength = case wrq:method(RD) of 
+	'HEAD' -> Length;
+	_ -> 
+            case Length of
+                chunked -> send_stream_body(State#state.socket, Body);
+                _ -> send(State#state.socket, Body), Length
+            end
     end,
     InitLogData = State#state.log_data,
     FinalLogData = InitLogData#wm_log_data{response_code=Code,
-					   response_length=Length},
+					   response_length=FinalLength},
     {ok, State#state{reqdata=wrq:set_response_code(Code, RD),
                      log_data=FinalLogData}}.
 
@@ -312,7 +337,7 @@ body_length(State) ->
 %%      Will only receive up to the default max-body length
 do_recv_body(State=#state{reqdata=RD}) ->
     State#state{reqdata=wrq:set_req_body(
-          read_whole_stream(do_stream_body(State, ?MAX_RECV_BODY), []), RD)}.
+          read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), []), RD)}.
 
 read_whole_stream({Hunk,Next}, Acc0) ->
     Acc = [Hunk|Acc0],
@@ -321,7 +346,7 @@ read_whole_stream({Hunk,Next}, Acc0) ->
         _ -> read_whole_stream(Next(), Acc)
     end.
 
-do_stream_body(State = #state{reqdata=RD}, MaxHunkSize) ->
+recv_stream_body(State = #state{reqdata=RD}, MaxHunkSize) ->
     case get_header_value("expect", State) of
 	{"100-continue", _} ->
 	    send(State#state.socket, 
@@ -334,11 +359,11 @@ do_stream_body(State = #state{reqdata=RD}, MaxHunkSize) ->
         {unknown_transfer_encoding, X} -> exit({unknown_transfer_encoding, X});
         undefined -> {<<>>, done};
         0 -> {<<>>, done};
-        chunked -> stream_chunked_body(State#state.socket, MaxHunkSize);
-        Length -> stream_unchunked_body(State#state.socket, MaxHunkSize, Length)
+        chunked -> recv_chunked_body(State#state.socket, MaxHunkSize);
+        Length -> recv_unchunked_body(State#state.socket, MaxHunkSize, Length)
     end.
 
-stream_unchunked_body(Socket, MaxHunk, DataLeft) ->
+recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
     case MaxHunk >= DataLeft of
         true ->
             {ok,Data1} = gen_tcp:recv(Socket,DataLeft,?IDLE_TIMEOUT),
@@ -346,27 +371,27 @@ stream_unchunked_body(Socket, MaxHunk, DataLeft) ->
         false ->
             {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
-             fun() -> stream_unchunked_body(
+             fun() -> recv_unchunked_body(
                         Socket, MaxHunk, DataLeft-MaxHunk)
              end}
     end.
     
-stream_chunked_body(Socket, MaxHunk) ->
+recv_chunked_body(Socket, MaxHunk) ->
     case read_chunk_length(Socket) of
         0 -> {<<>>, done};
-        ChunkLength -> stream_chunked_body(Socket,MaxHunk,ChunkLength)
+        ChunkLength -> recv_chunked_body(Socket,MaxHunk,ChunkLength)
     end.
-stream_chunked_body(Socket, MaxHunk, LeftInChunk) ->
+recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
     case MaxHunk >= LeftInChunk of
         true ->
             {ok,Data1} = gen_tcp:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
             {Data1,
-             fun() -> stream_chunked_body(Socket, MaxHunk)
+             fun() -> recv_chunked_body(Socket, MaxHunk)
              end};
         false ->
             {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
-             fun() -> stream_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
+             fun() -> recv_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
              end}
     end.
 
@@ -413,6 +438,10 @@ range_parts({file, IoDevice}, Ranges) ->
                            end,
                            LocNums, Data),
     {Bodies, Size};
+
+range_parts({stream, {Hunk,Next}}, Ranges) ->
+    % for now, streamed bodies are read in full for range requests
+    range_parts(read_whole_stream({Hunk,Next}, []), Ranges);
 
 range_parts(Body0, Ranges) ->
     Body = iolist_to_binary(Body0),
@@ -535,8 +564,16 @@ make_headers(Code, Length, RD) ->
         304 ->
             mochiweb_headers:make(wrq:resp_headers(RD));
         _ -> 
-            mochiweb_headers:enter("Content-Length",integer_to_list(Length),
-                 mochiweb_headers:make(wrq:resp_headers(RD)))
+            case Length of
+                chunked ->
+                    mochiweb_headers:enter(
+                      "Transfer-Encoding","chunked",
+                      mochiweb_headers:make(wrq:resp_headers(RD)));
+                _ ->
+                    mochiweb_headers:enter(
+                      "Content-Length",integer_to_list(Length),
+                      mochiweb_headers:make(wrq:resp_headers(RD)))
+            end
     end,
     ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")",
     WithSrv = mochiweb_headers:enter("Server", ServerHeader, Hdrs0),

@@ -490,7 +490,7 @@ decision(v3o18) ->
         {halt, Code} -> respond(Code);
         nop -> d(v3o18b);
         _ -> wrcall({set_resp_body,
-                     encode_body(iolist_to_binary(FinalBody))}),
+                     encode_body(FinalBody)}),
              d(v3o18b)
     end;
 
@@ -545,7 +545,18 @@ encode_body(Body) ->
     ChosenEnc = wrcall({get_metadata, 'content-encoding'}),
     Encoder = hd([Fun || {Enc,Fun} <- resource_call(encodings_provided),
                          ChosenEnc =:= Enc]),
-    Encoder(Charsetter(Body)).
+    case Body of
+        {stream, StreamBody} ->
+            {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        _ ->
+            Encoder(Charsetter(iolist_to_binary(Body)))
+    end.
+
+make_encoder_stream(Encoder, Charsetter, {Body, done}) ->
+    {Encoder(Charsetter(Body)), done};
+make_encoder_stream(Encoder, Charsetter, {Body, Next}) ->
+    {Encoder(Charsetter(Body)),
+     fun() -> make_encoder_stream(Encoder, Charsetter, Next()) end}.
             
 choose_encoding(AccEncHdr) ->
     Encs = [Enc || {Enc,_Fun} <- resource_call(encodings_provided)],
