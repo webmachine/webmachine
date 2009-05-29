@@ -68,8 +68,16 @@ handle_call(socket, _From, State) ->
     {reply, Reply, State};
 handle_call(get_reqdata, _From, State) ->
     {reply, State#state.reqdata, State};
-handle_call({set_reqdata, RD}, _From, State) ->
-    {reply, ok, State#state{reqdata=RD}};
+handle_call({set_reqdata, RD=#wm_reqdata{req_body=RBody}}, _From, State) ->
+    TheRD = case RBody of
+        not_fetched_yet ->
+            OldRD = State#state.reqdata,
+            OldBody = OldRD#wm_reqdata.req_body,
+            RD#wm_reqdata{req_body=OldBody};
+        _ ->
+            RD
+    end,
+    {reply, ok, State#state{reqdata=TheRD}};
 handle_call(method, _From, State) ->
     {reply, wrq:method(State#state.reqdata), State};
 handle_call(version, _From, State) ->
@@ -83,9 +91,9 @@ handle_call(req_body, _From, State=#state{bodyfetch=stream}) ->
 handle_call(req_body, _From, State=#state{reqdata=RD}) ->
     {Body, FinalState} = case RD#wm_reqdata.req_body of
         not_fetched_yet ->
-            NewState = do_recv_body(State),
-            NewRD = NewState#state.reqdata,
-            {NewRD#wm_reqdata.req_body, NewState#state{bodyfetch=standard}};
+            NewBody = do_recv_body(State),
+            NewRD = RD#wm_reqdata{req_body=NewBody},
+            {NewBody, State#state{bodyfetch=standard,reqdata=NewRD}};
         X ->
             {X, State#state{bodyfetch=standard}}
     end,
@@ -332,12 +340,11 @@ body_length(State) ->
         Unknown -> {unknown_transfer_encoding, Unknown}
     end.
 
-%% @spec do_recv_body(state()) -> state()
+%% @spec do_recv_body(state()) -> binary()
 %% @doc Receive the body of the HTTP request (defined by Content-Length).
 %%      Will only receive up to the default max-body length
-do_recv_body(State=#state{reqdata=RD}) ->
-    State#state{reqdata=wrq:set_req_body(
-          read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), []), RD)}.
+do_recv_body(State) ->
+    read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), []).
 
 read_whole_stream({Hunk,Next}, Acc0) ->
     Acc = [Hunk|Acc0],
