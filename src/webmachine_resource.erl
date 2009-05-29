@@ -216,7 +216,22 @@ resource_call(M, F, ReqData, ModState, File) ->
 log_call(File, Type, M, F, Data) ->
     io:format(File,
               "{~p, ~p, ~p,~n ~p}.~n",
-              [Type, M, F, Data]).
+              [Type, M, F, escape_trace_data(Data)]).
+
+escape_trace_data(Fun) when is_function(Fun) ->
+    {'WMTRACE_ESCAPED_FUN',
+     [erlang:fun_info(Fun, module),
+      erlang:fun_info(Fun, name),
+      erlang:fun_info(Fun, arity),
+      erlang:fun_info(Fun, type)]};
+escape_trace_data(Pid) when is_pid(Pid) ->
+    {'WMTRACE_ESCAPED_PID', pid_to_list(Pid)};
+escape_trace_data(List) when is_list(List) ->
+    [ escape_trace_data(E) || E <- List ];
+escape_trace_data(Tuple) when is_tuple(Tuple) ->
+    list_to_tuple(escape_trace_data(tuple_to_list(Tuple)));
+escape_trace_data(Other) ->
+    Other.
 
 log_decision(File, DecisionID) ->
     io:format(File, "{decision, ~p}.~n", [DecisionID]).
