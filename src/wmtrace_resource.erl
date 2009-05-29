@@ -280,13 +280,15 @@ base_decision_name(Decision) ->
             D
     end.
 
-encode_request(ReqData) ->
+encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
     {struct, [{"method", atom_to_list(
                            wrq:method(ReqData))},
               {"path", wrq:raw_path(ReqData)},
               {"headers", encode_headers(wrq:req_headers(ReqData))},
-              {"body", case wrq:req_body(ReqData) of
+              {"body", case ReqData#wm_reqdata.req_body of
                            undefined -> [];
+                           Body when is_atom(Body) ->
+                               atom_to_list(Body);
                            Body -> lists:flatten(io_lib:format("~s", [Body]))
                        end}]}.
     
