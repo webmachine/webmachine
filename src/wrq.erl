@@ -96,7 +96,9 @@ stream_req_body(_RD = #wm_reqdata{wmreq=WMReq}, MaxHunk) ->
 maybe_conflict_body(BodyResponse) ->
     case BodyResponse of
         stream_conflict ->
-            erlang:error("wrq:req_body and wrq:stream_req_body conflict");
+            exit("wrq:req_body and wrq:stream_req_body conflict");
+        {error, req_body_too_large} ->
+            exit("request body too large");
         _ ->
             BodyResponse
     end.

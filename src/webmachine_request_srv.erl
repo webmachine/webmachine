@@ -344,13 +344,21 @@ body_length(State) ->
 %% @doc Receive the body of the HTTP request (defined by Content-Length).
 %%      Will only receive up to the default max-body length
 do_recv_body(State) ->
-    read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), []).
+    read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), [], 0).
 
-read_whole_stream({Hunk,Next}, Acc0) ->
-    Acc = [Hunk|Acc0],
-    case Next of
-        done -> iolist_to_binary(lists:reverse(Acc));
-        _ -> read_whole_stream(Next(), Acc)
+read_whole_stream({Hunk,_}, _, SizeAcc)
+  when SizeAcc + byte_size(Hunk) > ?MAX_RECV_BODY -> 
+    {error, req_body_too_large};
+read_whole_stream({Hunk,Next}, Acc0, SizeAcc) ->
+    HunkSize = byte_size(Hunk),
+    if SizeAcc + HunkSize > ?MAX_RECV_BODY -> 
+            {error, req_body_too_large};
+       true ->
+            Acc = [Hunk|Acc0],
+            case Next of
+                done -> iolist_to_binary(lists:reverse(Acc));
+                _ -> read_whole_stream(Next(), Acc, SizeAcc + HunkSize)
+            end
     end.
 
 recv_stream_body(State = #state{reqdata=RD}, MaxHunkSize) ->
@@ -448,7 +456,7 @@ range_parts({file, IoDevice}, Ranges) ->
 
 range_parts({stream, {Hunk,Next}}, Ranges) ->
     % for now, streamed bodies are read in full for range requests
-    range_parts(read_whole_stream({Hunk,Next}, []), Ranges);
+    range_parts(read_whole_stream({Hunk,Next}, [], 0), Ranges);
 
 range_parts(Body0, Ranges) ->
     Body = iolist_to_binary(Body0),
