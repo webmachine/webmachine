@@ -26,6 +26,7 @@
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
          merge_resp_headers/2,remove_resp_header/2,
          append_to_resp_body/2,append_to_response_body/2,
+         max_recv_body/1,set_max_recv_body/2,
          get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2]).
 
 -include_lib("include/wm_reqdata.hrl").
@@ -39,6 +40,7 @@ create(Method,Version,RawPath,Headers) ->
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
       req_body=not_fetched_yet,
+      max_recv_body=(50*(1024*1024)),
       app_root="defined_in_load_dispatch_data",
       path_info=dict:new(),
       path_tokens=defined_in_load_dispatch_data,
@@ -87,11 +89,15 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS. % string
 
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
-req_body(_RD = #wm_reqdata{wmreq=WMReq}) ->
-    maybe_conflict_body(WMReq:req_body()).
+req_body(_RD = #wm_reqdata{wmreq=WMReq,max_recv_body=MRB}) ->
+    maybe_conflict_body(WMReq:req_body(MRB)).
 
 stream_req_body(_RD = #wm_reqdata{wmreq=WMReq}, MaxHunk) ->
     maybe_conflict_body(WMReq:stream_req_body(MaxHunk)).
+
+max_recv_body(_RD = #wm_reqdata{max_recv_body=X}) when is_integer(X) -> X.
+
+set_max_recv_body(X, RD) when is_integer(X) -> RD#wm_reqdata{max_recv_body=X}.
 
 maybe_conflict_body(BodyResponse) ->
     case BodyResponse of

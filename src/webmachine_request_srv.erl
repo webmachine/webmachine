@@ -28,9 +28,6 @@
 -define(WMVSN, "1.3").
 -define(QUIP, "scale automagically into the cloud").
 
-% Maximum recv_body() length of 50MB
--define(MAX_RECV_BODY, (50*(1024*1024))).
-
 % 120 second default idle timeout
 -define(IDLE_TIMEOUT, infinity).
 -record(state, {socket=undefined,
@@ -88,7 +85,9 @@ handle_call(req_headers, _From, State) ->
     {reply, wrq:req_headers(State#state.reqdata), State};
 handle_call(req_body, _From, State=#state{bodyfetch=stream}) ->
     {reply, stream_conflict, State};
-handle_call(req_body, _From, State=#state{reqdata=RD}) ->
+handle_call({req_body, MaxRecvBody}, _From, State0=#state{reqdata=RD0}) ->
+    RD=RD0#wm_reqdata{max_recv_body=MaxRecvBody},
+    State=State0#state{reqdata=RD},
     {Body, FinalState} = case RD#wm_reqdata.req_body of
         not_fetched_yet ->
             NewBody = do_recv_body(State),
@@ -285,8 +284,7 @@ send_ok_response(200, InitState) ->
 	X when X =:= undefined; X =:= fail ->
 	    send_response(200, State);
 	Ranges ->
-	    {PartList, Size} = range_parts(
-                   wrq:resp_body(RD0), Ranges),
+	    {PartList, Size} = range_parts(RD0, Ranges),
 	    case PartList of
 		[] -> %% no valid ranges
 		    %% could be 416, for now we'll just return 200
@@ -343,21 +341,23 @@ body_length(State) ->
 %% @spec do_recv_body(state()) -> binary()
 %% @doc Receive the body of the HTTP request (defined by Content-Length).
 %%      Will only receive up to the default max-body length
-do_recv_body(State) ->
-    read_whole_stream(recv_stream_body(State, ?MAX_RECV_BODY), [], 0).
+do_recv_body(State=#state{reqdata=RD}) ->
+    MRB = RD#wm_reqdata.max_recv_body,
+    read_whole_stream(recv_stream_body(State, MRB), [], MRB, 0).
 
-read_whole_stream({Hunk,_}, _, SizeAcc)
-  when SizeAcc + byte_size(Hunk) > ?MAX_RECV_BODY -> 
+read_whole_stream({Hunk,_}, _, MaxRecvBody, SizeAcc)
+  when SizeAcc + byte_size(Hunk) > MaxRecvBody -> 
     {error, req_body_too_large};
-read_whole_stream({Hunk,Next}, Acc0, SizeAcc) ->
+read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
     HunkSize = byte_size(Hunk),
-    if SizeAcc + HunkSize > ?MAX_RECV_BODY -> 
+    if SizeAcc + HunkSize > MaxRecvBody -> 
             {error, req_body_too_large};
        true ->
             Acc = [Hunk|Acc0],
             case Next of
                 done -> iolist_to_binary(lists:reverse(Acc));
-                _ -> read_whole_stream(Next(), Acc, SizeAcc + HunkSize)
+                _ -> read_whole_stream(Next(), Acc,
+                                       MaxRecvBody, SizeAcc + HunkSize)
             end
     end.
 
@@ -436,7 +436,7 @@ get_range(State) ->
 	    {Range, State#state{range=Range}}
     end.
 
-range_parts({file, IoDevice}, Ranges) ->
+range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
     Size = iodevice_size(IoDevice),
     F = fun (Spec, Acc) ->
                 case range_skip_length(Spec, Size) of
@@ -454,11 +454,12 @@ range_parts({file, IoDevice}, Ranges) ->
                            LocNums, Data),
     {Bodies, Size};
 
-range_parts({stream, {Hunk,Next}}, Ranges) ->
+range_parts(RD=#wm_reqdata{resp_body={stream, {Hunk,Next}}}, Ranges) ->
     % for now, streamed bodies are read in full for range requests
-    range_parts(read_whole_stream({Hunk,Next}, [], 0), Ranges);
+    MRB = RD#wm_reqdata.max_recv_body,
+    range_parts(read_whole_stream({Hunk,Next}, [], MRB, 0), Ranges);
 
-range_parts(Body0, Ranges) ->
+range_parts(_RD=#wm_reqdata{resp_body=Body0}, Ranges) ->
     Body = iolist_to_binary(Body0),
     Size = size(Body),
     F = fun(Spec, Acc) ->
