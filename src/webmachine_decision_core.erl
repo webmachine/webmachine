@@ -25,9 +25,9 @@
 -export([do_log/1]).
 -include("webmachine_logger.hrl").
 
-handle_request(Req, Pid) ->
+handle_request(Req, Resource) ->
     put(req, Req),
-    put(pid, Pid),
+    put(resource, Resource),
     try
         d(v3b13)
     catch
@@ -49,6 +49,7 @@ d(DecisionID) ->
     decision(DecisionID).
     
 respond(Code) ->
+    Resource = get(resource),
     EndTime = now(),
     case Code of
 	404 ->
@@ -80,7 +81,7 @@ respond(Code) ->
     LogData = LogData0#wm_log_data{resource_module=RMod,
 				   end_time=EndTime},
     spawn(fun() -> do_log(LogData) end),
-    webmachine_resource:stop(get(pid)),
+    Resource:stop(),
     Req = get(req),
     Req:stop().
 
@@ -127,9 +128,15 @@ do_log(LogData) ->
 	    ignore
     end.
 
-resource_call(Fun) -> webmachine_resource:do(Fun, get()).
+resource_call(Fun) ->
+    Resource = get(resource),
+    {Reply, NewResource} = Resource:do(Fun,get()),
+    put(resource, NewResource),
+    Reply.
 
-log_decision(DecisionID) -> webmachine_resource:log_d(DecisionID,get()).
+log_decision(DecisionID) -> 
+    Resource = get(resource),
+    Resource:log_d(DecisionID).
 
 %% "Service Available"
 decision(v3b13) ->	

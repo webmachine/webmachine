@@ -64,10 +64,11 @@ loop(MochiReq) ->
 	    spawn(LogModule, log_access, [LogData]),
 	    Req:stop();
         {Mod, ModOpts, PathTokens, Bindings, AppRoot, StringPath} ->
-            {ok, Pid} = webmachine_resource:start_link(Mod, ModOpts),
+            BootstrapResource = webmachine_resource:new(x,x,x,x),
+            {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
 	    Req:load_dispatch_data(Bindings,PathTokens,AppRoot,StringPath,Req),
 	    Req:set_metadata('resource_module', Mod),
-            webmachine_decision_core:handle_request(Req, Pid)
+            webmachine_decision_core:handle_request(Req, Resource)
     end.
 
 get_option(Option, Options) ->

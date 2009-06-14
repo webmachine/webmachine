@@ -14,19 +14,11 @@
 %%    See the License for the specific language governing permissions and
 %%    limitations under the License.
 
--module(webmachine_resource).
+-module(webmachine_resource, [R_Mod, R_ModState, R_ModExports, R_Trace]).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--behaviour(gen_server).
--export([behaviour_info/1]).
--export([start_link/1, start_link/2, stop/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
--export([do/2,log_d/2]).
--define(TIMEOUT, 150000). %% this is just the internal gen_server timeout
--record(state, {mod, modstate, modexports, trace=false}).
-
-behaviour_info(callbacks) -> [{ping, 2}].
+-export([wrap/2]).
+-export([do/2,log_d/1,stop/0]).
 
 default(ping) ->
     no_default;
@@ -106,113 +98,79 @@ default(finish_request) ->
 default(_) ->
     no_default.
           
-start_link(Mod) ->
-    start_link(Mod, []).
-
-start_link(Mod, Args) ->
-    gen_server:start_link(?MODULE, [Mod, Args], []).
-
-%% @private
-init([Mod, Args]) ->
+wrap(Mod, Args) ->
     case Mod:init(Args) of
-	{ok, State} ->
-	    {ok, #state{mod=Mod, modstate=State, 
-			modexports=dict:from_list(Mod:module_info(exports))}};
-        {{trace, Dir}, State} ->
+	{ok, ModState} ->
+	    {ok, webmachine_resource:new(Mod, ModState, 
+                           dict:from_list(Mod:module_info(exports)), false)};
+        {{trace, Dir}, ModState} ->
             {ok, File} = open_log_file(Dir, Mod),
             log_decision(File, v3b14),
             log_call(File, attempt, Mod, init, Args),
-            log_call(File, result, Mod, init, {{trace, Dir}, State}),
-            {ok, #state{mod=Mod, modstate=State, trace=File,
-			modexports=dict:from_list(Mod:module_info(exports))}};
+            log_call(File, result, Mod, init, {{trace, Dir}, ModState}),
+            {ok, webmachine_resource:new(Mod, ModState,
+			dict:from_list(Mod:module_info(exports)), File)};
 	_ ->
 	    {stop, bad_init_arg}
     end.
 
 do(Fun, ReqProps) when is_atom(Fun) andalso is_list(ReqProps) ->
-    gen_server:call(proplists:get_value(pid, ReqProps), 
-		    {do, Fun, ReqProps}, ?TIMEOUT).
-
-log_d(DecisionID, ReqProps) ->
-    gen_server:cast(proplists:get_value(pid, ReqProps), 
-		    {log_d, DecisionID}).
-
-stop(Pid) ->
-    gen_server:cast(Pid, stop).
-
-%% @private
-handle_call({do, Fun, ReqProps}, _From, 
-	    State=#state{modstate=ModState, mod=Mod}) ->
+    Self = proplists:get_value(resource, ReqProps),
     Req = proplists:get_value(req, ReqProps),
     RD0 = Req:get_reqdata(),
-    {Reply, RD1, NewModState} =
-        handle_wm_call({Fun, ReqProps, RD0}, Mod, ModState, State),
+    {Reply, RD1, NewModState} = handle_wm_call(Fun, RD0),
     case Reply of
-        {error, Err} -> {reply, Err, State};
+        {error, Err} -> {Err, Self};
         _ -> 
             Req:set_reqdata(RD1),
-            {reply,Reply,State#state{modstate=NewModState}}
+            {Reply,
+            webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace)}
     end.
 
-%% @private
-handle_cast(stop, State) ->
-    close_log_file(State#state.trace),
-    {stop, normal, State};
-handle_cast({log_d, DecisionID}, State) ->
-    case State#state.trace of
-        false -> nop;
-        File -> log_decision(File, DecisionID)
-    end,
-    {noreply, State};
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-%% @private
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-%% @private
-terminate(_Reason, State) ->
-    close_log_file(State#state.trace),
-    ok.
-
-%% @private
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-handle_wm_call({Fun, _ReqProps, ReqData}, Mod, ModState, State) ->
-    ModExports = State#state.modexports,
+handle_wm_call(Fun, ReqData) ->
     case default(Fun) of
         no_default ->
-            resource_call(Mod, Fun, ReqData, ModState, State#state.trace);
+            resource_call(Fun, ReqData);
         Default ->
-            case dict:is_key(Fun, ModExports) of
+            case dict:is_key(Fun, R_ModExports) of % XXX SLOW PROBABLY
                 true ->
-                    resource_call(Mod, Fun, ReqData, ModState,
-                                  State#state.trace);
+                    resource_call(Fun, ReqData);
                 false ->
-                    if is_pid(State#state.trace) ->
-                            log_call(State#state.trace,
+                    if is_pid(R_Trace) ->
+                            log_call(R_Trace,
                                      not_exported,
-                                     Mod, Fun, [ReqData, ModState]);
+                                     R_Mod, Fun, [ReqData, R_ModState]);
                        true -> ok
                     end,
-                    {Default, ReqData, ModState}
+                    {Default, ReqData, R_ModState}
             end
     end.
 
-resource_call(M, F, ReqData, ModState, false) ->
-    try
-        apply(M, F, [ReqData, ModState])
+resource_call(F, ReqData) ->
+    case R_Trace of
+        false -> nop;
+        _ -> log_call(R_Trace, attempt, R_Mod, F, [ReqData, R_ModState])
+    end,
+    Result = try
+        apply(R_Mod, F, [ReqData, R_ModState])
     catch C:R ->
 	    Reason = {C, R, erlang:get_stacktrace()},
-            {{error, Reason}, ReqData, ModState}
-    end;
-resource_call(M, F, ReqData, ModState, File) ->
-    log_call(File, attempt, M, F, [ReqData, ModState]),
-    Result = resource_call(M, F, ReqData, ModState, false),
-    log_call(File, result, M, F, Result),
+            {{error, Reason}, ReqData, R_ModState}
+    end,
+        case R_Trace of
+        false -> nop;
+        _ -> log_call(R_Trace, result, R_Mod, F, Result)
+    end,
     Result.
 
+log_d(DecisionID) ->
+    case R_Trace of
+        false -> nop;
+        _ -> log_decision(R_Trace, DecisionID)
+    end.
+
+stop() -> close_log_file(R_Trace).
+    
 log_call(File, Type, M, F, Data) ->
     io:format(File,
               "{~p, ~p, ~p,~n ~p}.~n",
