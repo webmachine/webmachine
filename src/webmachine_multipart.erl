@@ -55,7 +55,7 @@ get_all_parts(Body, Boundary) when is_binary(Body), is_list(Boundary) ->
 % @spec stream_parts(wm_stream(), boundary()) ->
 %                                    'done_parts' | {fpart(), function()}
 stream_parts(StreamStruct, Boundary) ->
-    stream_form(StreamStruct, Boundary, []).
+    stream_form(StreamStruct, "--" ++ Boundary, []).
 
 stream_form(_, _, [<<"----\n">>|_]) -> done_parts;
 stream_form(_, _, [<<"--\n">>|_]) -> done_parts;
@@ -78,6 +78,8 @@ stream_parts([]) -> done_parts;
 % browsers are fun, and terminate posts slightly differently from each other:
 stream_parts([<<"----\n">>]) -> done_parts;
 stream_parts([<<"--\n">>]) -> done_parts;
+stream_parts([<<"----\r\n">>]) -> done_parts;
+stream_parts([<<"--\r\n">>]) -> done_parts;
 stream_parts([<<"--\r\n--\n">>]) -> done_parts;
 stream_parts([<<"--\r\n--\r\n">>]) -> done_parts;
 stream_parts([H|T]) -> {make_part(H), fun() -> stream_parts(T) end}.
