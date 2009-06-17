@@ -25,11 +25,17 @@
 
 -export([render_error/3]).
 
-render_error(404, Req, _Reason) ->
+render_error(Code, Req, Reason) ->
+    case Req:has_response_body() of
+        true -> Req:response_body();
+        false -> render_error_body(Code, Req, Reason)
+    end.
+
+render_error_body(404, Req, _Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
     <<"<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD><BODY><H1>Not Found</H1>The requested document was not found on this server.<P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></BODY></HTML>">>;
 
-render_error(500, Req, Reason) ->
+render_error_body(500, Req, Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
     error_logger:error_msg("webmachine error: path=~p~n~p~n", [Req:path(), Reason]),
     STString = io_lib:format("~p", [Reason]),
@@ -38,7 +44,7 @@ render_error(500, Req, Reason) ->
     ErrorIOList = [ErrorStart,STString,ErrorEnd],
     erlang:iolist_to_binary(ErrorIOList);
 
-render_error(501, Req, _Reason) ->
+render_error_body(501, Req, _Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
     error_logger:error_msg("Webmachine does not support method ~p~n",
                            [Req:method()]),
@@ -50,7 +56,7 @@ render_error(501, Req, _Reason) ->
                              [Req:method()]),
     erlang:iolist_to_binary(ErrorStr);
 
-render_error(503, Req, _Reason) ->
+render_error_body(503, Req, _Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
     error_logger:error_msg("Webmachine cannot fulfill"
                            "the request at this time"),
