@@ -1,4 +1,5 @@
 %% @author Justin Sheehy <justin@basho.com>
+%% @author Andy Gross <andy@basho.com>
 %% @copyright 2009 Basho Technologies
 
 %% @doc Utility for parsing multipart form bodies.
@@ -17,7 +18,8 @@
 
 -module(webmachine_multipart).
 -author('Justin Sheehy <justin@basho.com>').
--export([get_all_parts/2,stream_parts/2]).
+-author('Andy Gross <andy@basho.com>').
+-export([get_all_parts/2,stream_parts/2, find_boundary/1]).
 -export([test_body/0,test_body2/0]).
 
 % @type incoming_req_body() = binary().
@@ -40,6 +42,13 @@
 
 % @type fcontent() = binary().
 % The body content within a form part.
+
+% @doc Find the multipart boundary for a request.
+% @spec find_boundary(wrq:wm_reqdata()) -> boundary()
+find_boundary(ReqData) ->
+    ContentType = wrq:get_req_header("content-type", ReqData),
+    string:substr(ContentType, string:str(ContentType, "boundary=") 
+                  + length("boundary=")).
 
 % @doc Turn a multipart form into component parts.
 % @spec get_all_parts(incoming_req_body(), boundary()) -> [fpart()]
