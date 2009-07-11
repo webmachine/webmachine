@@ -118,10 +118,10 @@ media_type_match(Req,Prov) ->
 	Prov ->
 	    true;
 	_ ->
-	    [R1,R2] = string:tokens(Req,"/"),
+	    [R1|R2] = string:tokens(Req,"/"),
 	    [P1,_P2] = string:tokens(Prov,"/"),
 	    case R2 of
-		"*" ->
+		["*"] ->
 		    case R1 of
 			P1 -> true;
 			_ -> false
