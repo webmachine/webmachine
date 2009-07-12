@@ -12,7 +12,7 @@ erl:
 	  -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 edoc:
-	@erl -noshell -run edoc_run application '$(APP)' '"."' '[]'
+	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
 
 clean: 
 	@echo "removing:"
