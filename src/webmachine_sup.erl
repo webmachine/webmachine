@@ -48,7 +48,7 @@ start_perf_logger(BaseDir) ->
     ChildSpec = 
 	{webmachine_perf_logger,
 	 {webmachine_perf_logger, start_link, [BaseDir]},
-	 permanent, 5000, worker, dynamic},
+	 permanent, 5000, worker, [webmachine_perf_logger]},
     supervisor:start_child(?MODULE, ChildSpec).
 
 %% @spec upgrade() -> ok
