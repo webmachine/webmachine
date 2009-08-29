@@ -13,8 +13,10 @@
     webmachine_resource,
     webmachine_request,
     webmachine_request_srv,
+    webmachine_skel,
     webmachine_sup,
     webmachine_mochiweb,
+    webmachine_multipart,
     webmachine_util,
     wrq,
     wmtrace_resource
