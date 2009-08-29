@@ -25,7 +25,7 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqdata.hrl").
 
--define(WMVSN, "1.4").
+-define(WMVSN, "1.5").
 -define(QUIP, "our dis is finally out").
 
 % 120 second default idle timeout
