@@ -48,8 +48,6 @@ refresh(Time) ->
 log_access(#wm_log_data{}=D) ->
     gen_server:call(?MODULE, {log_access, D}).
 
-handle_call(get_modules, _From, State) ->
-    {reply, [?MODULE], State};
 handle_call({log_access, LogData}, _From, State) ->
     NewState = maybe_rotate(State, now()),
     Msg = format_req(LogData),
@@ -59,8 +57,11 @@ handle_call({log_access, LogData}, _From, State) ->
 handle_cast({refresh, Time}, State) ->
     {noreply, maybe_rotate(State, Time)}.
 
+handle_info({_Label, {From, MRef}, get_modules}, State) ->
+    From ! {MRef, [?MODULE]},
+    {noreply, State};
 handle_info(_Info, State) ->
-    {ok, State}.
+    {noreply, State}.
 
 terminate(_Reason, _State) ->
     ok.
