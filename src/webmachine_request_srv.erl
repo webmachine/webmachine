@@ -26,7 +26,7 @@
 -include_lib("include/wm_reqdata.hrl").
 
 -define(WMVSN, "1.5").
--define(QUIP, "our dis is finally out").
+-define(QUIP, "hack the charles gibson").
 
 % 120 second default idle timeout
 -define(IDLE_TIMEOUT, infinity).
