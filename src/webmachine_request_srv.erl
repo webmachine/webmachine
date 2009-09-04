@@ -265,6 +265,10 @@ send_stream_body(Socket, {Data, done}, SoFar) ->
     Size = send_chunk(Socket, Data),
     send_chunk(Socket, <<>>),
     Size + SoFar;
+send_stream_body(Socket, {<<>>, Next}, SoFar) ->
+    send_stream_body(Socket, Next(), SoFar);
+send_stream_body(Socket, {[], Next}, SoFar) ->
+    send_stream_body(Socket, Next(), SoFar);
 send_stream_body(Socket, {Data, Next}, SoFar) ->
     Size = send_chunk(Socket, Data),
     send_stream_body(Socket, Next(), Size + SoFar).
