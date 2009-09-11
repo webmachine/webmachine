@@ -417,7 +417,9 @@ decision(v3n11) ->
             end;
         _ ->
             case resource_call(process_post) of
-                true -> stage1_ok;
+                true -> 
+                    encode_body_if_set(),
+                    stage1_ok;
                 {halt, Code} -> respond(Code);
                 Err -> error_response(Err)
             end
@@ -539,7 +541,21 @@ accept_helper() ->
         [] -> {respond,415};
         AcceptedContentList ->
             F = hd(AcceptedContentList),
-            resource_call(F)
+            case resource_call(F) of
+                true ->
+                    encode_body_if_set(),
+                    true;
+                Result -> Result
+            end
+    end.
+
+encode_body_if_set() ->
+    case wrcall(has_resp_body) of
+        true ->
+            Body = wrcall(resp_body),
+            wrcall({set_resp_body, encode_body(Body)}),
+            true;
+        _ -> false
     end.
 
 encode_body(Body) ->
