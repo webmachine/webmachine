@@ -59,7 +59,7 @@ render_error_body(501, Req, _Reason) ->
 render_error_body(503, Req, _Reason) ->
     Req:add_response_header("Content-Type", "text/html"),
     error_logger:error_msg("Webmachine cannot fulfill"
-                           "the request at this time"),
+                           " the request at this time"),
     ErrorStr = "<html><head><title>503 Service Unavailable</title>"
                "</head><body><h1>Service Unavailable</h1>"
                "The server is currently unable to handle "
