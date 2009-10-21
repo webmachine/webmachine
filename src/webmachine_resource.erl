@@ -185,11 +185,20 @@ escape_trace_data(Fun) when is_function(Fun) ->
 escape_trace_data(Pid) when is_pid(Pid) ->
     {'WMTRACE_ESCAPED_PID', pid_to_list(Pid)};
 escape_trace_data(List) when is_list(List) ->
-    [ escape_trace_data(E) || E <- List ];
+    escape_trace_list(List, []);
 escape_trace_data(Tuple) when is_tuple(Tuple) ->
     list_to_tuple(escape_trace_data(tuple_to_list(Tuple)));
 escape_trace_data(Other) ->
     Other.
+
+escape_trace_list([Head|Tail], Acc) ->
+    escape_trace_list(Tail, [escape_trace_data(Head)|Acc]);
+escape_trace_list([], Acc) ->
+    %% proper, nil-terminated list
+    lists:reverse(Acc);
+escape_trace_list(Final, Acc) ->
+    %% non-nil-terminated list, like the dict module uses
+    lists:reverse(tl(Acc))++[hd(Acc)|escape_trace_data(Final)].
 
 log_decision(File, DecisionID) ->
     io:format(File, "{decision, ~p}.~n", [DecisionID]).
