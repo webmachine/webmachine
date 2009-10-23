@@ -58,7 +58,7 @@
 	 get_metadata/1,
 	 get_path_info/0,
 	 get_path_info/1,
-	 load_dispatch_data/5,
+	 load_dispatch_data/7,
 	 get_path_tokens/0,
 	 get_app_root/0,
 	 parse_cookie/0,
@@ -172,7 +172,9 @@ get_path_tokens() -> path_tokens().
 app_root() -> call(app_root).
 get_app_root() -> app_root().
 
-load_dispatch_data(Bindings, PathTokens, AppRoot, DispPath, Req) ->
-    call({load_dispatch_data, Bindings, PathTokens, AppRoot, DispPath, Req}).
+load_dispatch_data(Bindings, HostTokens, Port, PathTokens,
+                   AppRoot, DispPath, Req) ->
+    call({load_dispatch_data, Bindings, HostTokens, Port,
+          PathTokens, AppRoot, DispPath, Req}).
 
 log_data() -> call(log_data).

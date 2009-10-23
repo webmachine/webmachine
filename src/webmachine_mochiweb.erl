@@ -49,8 +49,12 @@ stop() ->
 loop(MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
     {ok, DispatchList} = application:get_env(webmachine, dispatch_list),
-    case webmachine_dispatcher:dispatch(Req:path(), DispatchList) of
-        {no_dispatch_match, _UnmatchedPathTokens} ->
+    Host = case host_headers(Req) of
+               [H|_] -> H;
+               [] -> []
+           end,
+    case webmachine_dispatcher:dispatch(Host, Req:path(), DispatchList) of
+        {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
 	    ErrorHTML = ErrorHandler:render_error(404, Req, {none, none, []}),
 	    Req:append_to_response_body(ErrorHTML),
@@ -63,10 +67,12 @@ loop(MochiReq) ->
 		end,
 	    spawn(LogModule, log_access, [LogData]),
 	    Req:stop();
-        {Mod, ModOpts, PathTokens, Bindings, AppRoot, StringPath} ->
+        {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
+         AppRoot, StringPath} ->
             BootstrapResource = webmachine_resource:new(x,x,x,x),
             {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
-	    Req:load_dispatch_data(Bindings,PathTokens,AppRoot,StringPath,Req),
+	    Req:load_dispatch_data(Bindings,HostTokens,Port,PathTokens,
+                                   AppRoot,StringPath,Req),
 	    Req:set_metadata('resource_module', Mod),
             webmachine_decision_core:handle_request(Req, Resource)
     end.
@@ -74,3 +80,10 @@ loop(MochiReq) ->
 get_option(Option, Options) ->
     {proplists:get_value(Option, Options), proplists:delete(Option, Options)}.
 
+host_headers(Req) ->
+    [ V || V <- [Req:get_header_value(H)
+                 || H <- ["x-forwarded-for",
+                          "x-forwarded-host",
+                          "x-forwarded-server",
+                          "host"]],
+           V /= undefined].

@@ -202,11 +202,13 @@ handle_call(req_cookie, _From, State) ->
     {reply, wrq:req_cookie(State#state.reqdata), State};
 handle_call(req_qs, _From, State) ->
     {reply, wrq:req_qs(State#state.reqdata), State};
-handle_call({load_dispatch_data, PathProps,PathTokens,AppRoot,DispPath,WMReq},
+handle_call({load_dispatch_data, PathProps,HostTokens,Port,
+             PathTokens,AppRoot,DispPath,WMReq},
             _From, State) ->
     PathInfo = dict:from_list(PathProps),
     NewState = State#state{reqdata=wrq:load_dispatch_data(
-               PathInfo,PathTokens,AppRoot,DispPath,WMReq,State#state.reqdata)},
+               PathInfo,HostTokens,Port,PathTokens,AppRoot,
+               DispPath,WMReq,State#state.reqdata)},
     {reply, ok, NewState};
 handle_call(log_data, _From, State) -> {reply, State#state.log_data, State}.
 
