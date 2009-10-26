@@ -56,7 +56,10 @@ split_host_port(HostAsString) ->
         [HostPart, PortPart] ->
             {split_host(HostPart), list_to_integer(PortPart)};
         [HostPart] ->
-            {split_host(HostPart), 80}
+            {split_host(HostPart), 80};
+        [] ->
+            %% no host header
+            {[], 80}
     end.
 
 split_host(HostAsString) ->
