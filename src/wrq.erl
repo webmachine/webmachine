@@ -29,6 +29,7 @@
          max_recv_body/1,set_max_recv_body/2,
          get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2]).
 
+% @type reqdata(). The opaque data type used for req/resp data structures.
 -include_lib("include/wm_reqdata.hrl").
 
 create(Method,Version,RawPath,Headers) ->
@@ -91,7 +92,8 @@ response_code(_RD = #wm_reqdata{response_code=C}) when is_integer(C) -> C.
 
 req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C. % string
 
-req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS. % string
+%% @spec req_qs(reqdata()) -> [{Key, Value}]
+req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 

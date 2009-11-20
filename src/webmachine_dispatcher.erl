@@ -65,22 +65,22 @@ split_host_port(HostAsString) ->
 split_host(HostAsString) ->
     string:tokens(HostAsString, ".").
 
-%% @type matchterm() = hostmatchterm() | pathmatchterm()
+%% @type matchterm() = hostmatchterm() | pathmatchterm().
 % The dispatch configuration is a list of these terms, and the
 % first one whose host and path terms match the input is used.
 % Using a pathmatchterm() here is equivalent to using a hostmatchterm()
 % of the form {{['*'],'*'}, [pathmatchterm()]}.
 
-%% @type hostmatchterm() = {hostmatch(), [pathmatchterm()]}
+%% @type hostmatchterm() = {hostmatch(), [pathmatchterm()]}.
 % The dispatch configuration contains a list of these terms, and the
 % first one whose host and one pathmatchterm match is used.
 
-%% @type hostmatch() = [hostterm()] | {[hostterm()], portterm()}
+%% @type hostmatch() = [hostterm()] | {[hostterm()], portterm()}.
 % A host header (Host, X-Forwarded-For, etc.) will be matched against
 % this term.  Using a raws [hostterm()] list is equivalent to using
 % {[hostterm()], '*'}.
 
-%% @type hostterm() = '*' | string() | atom()
+%% @type hostterm() = '*' | string() | atom().
 % A list of hostterms is matched against a '.'-separated hostname.
 % The '*' hosterm matches all remaining tokens, and is only allowed at
 % the head of the list.
@@ -88,7 +88,7 @@ split_host(HostAsString) ->
 % Any atom hostterm other than '*' will match any token and will
 % create a binding in the result if a complete match occurs.
 
-%% @type portterm() = '*' | integer() | atom()
+%% @type portterm() = '*' | integer() | atom().
 % A portterm is matched against the integer port after any ':' in
 % the hostname, or 80 if no port is found.
 % The '*' portterm patches any port
