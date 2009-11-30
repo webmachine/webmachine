@@ -192,6 +192,8 @@ escape_trace_data(Fun) when is_function(Fun) ->
       erlang:fun_info(Fun, type)]};
 escape_trace_data(Pid) when is_pid(Pid) ->
     {'WMTRACE_ESCAPED_PID', pid_to_list(Pid)};
+escape_trace_data(Port) when is_port(Port) ->
+    {'WMTRACE_ESCAPED_PORT', erlang:port_to_list(Port)};
 escape_trace_data(List) when is_list(List) ->
     escape_trace_list(List, []);
 escape_trace_data(Tuple) when is_tuple(Tuple) ->
