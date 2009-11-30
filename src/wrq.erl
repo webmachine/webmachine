@@ -16,7 +16,7 @@
 -module(wrq).
 -author('Justin Sheehy <justin@basho.com>').
 
--export([create/4,load_dispatch_data/8]).
+-export([create/4,load_dispatch_data/7]).
 -export([method/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,path_info/1,
          response_code/1,req_cookie/1,req_qs/1,req_headers/1,req_body/1,
          stream_req_body/2,resp_redirect/1,resp_headers/1,resp_body/1,
@@ -31,11 +31,12 @@
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include_lib("include/wm_reqdata.hrl").
+-include_lib("include/wm_reqstate.hrl").
 
 create(Method,Version,RawPath,Headers) ->
     create(#wm_reqdata{method=Method,version=Version,
                        raw_path=RawPath,req_headers=Headers,
-      wmreq=defined_in_load_dispatch_data,
+      wm_state=defined_on_call,
       path="defined_in_create",
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
@@ -58,10 +59,10 @@ create(RD = #wm_reqdata{raw_path=RawPath}) ->
     ReqQS = mochiweb_util:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
 load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
-                   DispPath, WMReq, RD) ->
+                   DispPath, RD) ->
     RD#wm_reqdata{path_info=PathInfo,host_tokens=HostTokens,
                   port=Port,path_tokens=PathTokens,
-                  app_root=AppRoot,disp_path=DispPath,wmreq=WMReq}.
+                  app_root=AppRoot,disp_path=DispPath}.
 
 method(_RD = #wm_reqdata{method=Method}) -> Method.
 
@@ -97,11 +98,16 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
-req_body(_RD = #wm_reqdata{wmreq=WMReq,max_recv_body=MRB}) ->
-    maybe_conflict_body(WMReq:req_body(MRB)).
+req_body(_RD = #wm_reqdata{wm_state=ReqState0,max_recv_body=MRB}) ->
+    {ReqResp, ReqState} = {webmachine_request, ReqState0}:req_body(MRB),
+    put(tmp_reqstate, ReqState),
+    maybe_conflict_body(ReqResp).
 
-stream_req_body(_RD = #wm_reqdata{wmreq=WMReq}, MaxHunk) ->
-    maybe_conflict_body(WMReq:stream_req_body(MaxHunk)).
+stream_req_body(_RD = #wm_reqdata{wm_state=ReqState0}, MaxHunk) ->
+    {ReqResp, ReqState} =
+        {webmachine_request, ReqState0}:stream_req_body(MaxHunk),
+    put(tmp_reqstate, ReqState),
+    maybe_conflict_body(ReqResp).
 
 max_recv_body(_RD = #wm_reqdata{max_recv_body=X}) when is_integer(X) -> X.
 

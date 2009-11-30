@@ -20,6 +20,9 @@
 -export([wrap/2]).
 -export([do/2,log_d/1,stop/0]).
 
+-include_lib("include/wm_reqdata.hrl").
+-include_lib("include/wm_reqstate.hrl").
+
 default(ping) ->
     no_default;
 default(service_available) ->
@@ -116,15 +119,20 @@ wrap(Mod, Args) ->
 
 do(Fun, ReqProps) when is_atom(Fun) andalso is_list(ReqProps) ->
     Self = proplists:get_value(resource, ReqProps),
-    Req = proplists:get_value(req, ReqProps),
-    RD0 = Req:get_reqdata(),
-    {Reply, RD1, NewModState} = handle_wm_call(Fun, RD0),
+    RState0 = proplists:get_value(reqstate, ReqProps),
+    put(tmp_reqstate, empty),
+    {Reply, ReqData, NewModState} = handle_wm_call(Fun, 
+                    (RState0#reqstate.reqdata)#wm_reqdata{wm_state=RState0}),
     case Reply of
         {error, Err} -> {Err, Self};
-        _ -> 
-            Req:set_reqdata(RD1),
+        _ ->
+            ReqState = case get(tmp_reqstate) of
+                empty -> RState0;
+                X -> X
+            end,
             {Reply,
-            webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace)}
+            webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace),
+            ReqState#reqstate{reqdata=ReqData}}
     end.
 
 handle_wm_call(Fun, ReqData) ->
@@ -132,7 +140,7 @@ handle_wm_call(Fun, ReqData) ->
         no_default ->
             resource_call(Fun, ReqData);
         Default ->
-            case dict:is_key(Fun, R_ModExports) of % XXX SLOW PROBABLY
+            case dict:is_key(Fun, R_ModExports) of
                 true ->
                     resource_call(Fun, ReqData);
                 false ->

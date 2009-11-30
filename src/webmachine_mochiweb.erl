@@ -53,37 +53,41 @@ loop(MochiReq) ->
                [H|_] -> H;
                [] -> []
            end,
-    case webmachine_dispatcher:dispatch(Host, Req:path(), DispatchList) of
+    {Path, _} = Req:path(),
+    case webmachine_dispatcher:dispatch(Host, Path, DispatchList) of
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-	    ErrorHTML = ErrorHandler:render_error(404, Req, {none, none, []}),
-	    Req:append_to_response_body(ErrorHTML),
-	    Req:send_response(404),
-	    LogData = Req:log_data(),
-	    LogModule = 
-                case application:get_env(webmachine,webmachine_logger_module) of
-		    {ok, Val} -> Val;
-		    _ -> webmachine_logger
-		end,
-	    spawn(LogModule, log_access, [LogData]),
-	    Req:stop();
+	    {ErrorHTML,ReqState1} = 
+                ErrorHandler:render_error(404, Req, {none, none, []}),
+            Req1 = {webmachine_request,ReqState1},
+	    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
+            Req2 = {webmachine_request,ReqState2},
+	    {ok,ReqState3} = Req2:send_response(404),
+            Req3 = {webmachine_request,ReqState3},
+	    {LogData,_ReqState4} = Req3:log_data(),
+            case application:get_env(webmachine,webmachine_logger_module) of
+                {ok, LogModule} ->
+                    spawn(LogModule, log_access, [LogData]);
+                _ -> nop
+            end;
         {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
          AppRoot, StringPath} ->
             BootstrapResource = webmachine_resource:new(x,x,x,x),
             {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
-	    Req:load_dispatch_data(Bindings,HostTokens,Port,PathTokens,
-                                   AppRoot,StringPath,Req),
-	    Req:set_metadata('resource_module', Mod),
-            webmachine_decision_core:handle_request(Req, Resource)
+            {ok,RS1} = Req:load_dispatch_data(Bindings,HostTokens,Port,
+                                              PathTokens,AppRoot,StringPath),
+            XReq1 = {webmachine_request,RS1},
+            {ok,RS2} = XReq1:set_metadata('resource_module', Mod),
+            webmachine_decision_core:handle_request(Resource, RS2)
     end.
 
 get_option(Option, Options) ->
     {proplists:get_value(Option, Options), proplists:delete(Option, Options)}.
 
 host_headers(Req) ->
-    [ V || V <- [Req:get_header_value(H)
-                 || H <- ["x-forwarded-for",
-                          "x-forwarded-host",
-                          "x-forwarded-server",
-                          "host"]],
+    [ V || {V,_ReqState} <- [Req:get_header_value(H)
+                             || H <- ["x-forwarded-for",
+                                      "x-forwarded-host",
+                                      "x-forwarded-server",
+                                      "host"]],
            V /= undefined].
