@@ -99,13 +99,14 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
 req_body(_RD = #wm_reqdata{wm_state=ReqState0,max_recv_body=MRB}) ->
-    {ReqResp, ReqState} = {webmachine_request, ReqState0}:req_body(MRB),
+    Req = webmachine_request:new(ReqState0),
+    {ReqResp, ReqState} = Req:req_body(MRB),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
 stream_req_body(_RD = #wm_reqdata{wm_state=ReqState0}, MaxHunk) ->
-    {ReqResp, ReqState} =
-        {webmachine_request, ReqState0}:stream_req_body(MaxHunk),
+    Req = webmachine_request:new(ReqState0),
+    {ReqResp, ReqState} = Req:stream_req_body(MaxHunk),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
