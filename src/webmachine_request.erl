@@ -260,6 +260,24 @@ send_stream_body(Socket, {Data, Next}, SoFar) ->
     Size = send_chunk(Socket, Data),
     send_stream_body(Socket, Next(), Size + SoFar).
 
+send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
+    put(bytes_written, 0),
+    Writer = fun(Data) ->
+        Size = send_chunk(Socket, Encoder(Charsetter(Data))),
+        put(bytes_written, get(bytes_written) + Size),
+        Size
+    end,
+    try
+        BodyFun(Writer)
+    catch
+        Type:Error ->
+            io:format("Error writing body: {~p, ~p}~n", [Type, Error]),
+            io:format("Stack: ~p~n", [erlang:get_stacktrace()]),
+            exit(normal)
+    end,
+    send_chunk(Socket, <<>>),
+    get(bytes_written).
+
 send_chunk(Socket, Data) ->
     Size = iolist_size(Data),
     send(Socket, mochihex:to_hex(Size)),
@@ -295,7 +313,8 @@ send_response(Code) -> send_response(Code,ReqState).
 send_response(Code, PassedState=#reqstate{reqdata=RD}) ->
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
-        {stream, StreamBody} -> {StreamBody, chunked};
+        {stream, StreamBody} -> {{stream, StreamBody}, chunked};
+        {writer, WriteBody} -> {{writer, WriteBody}, chunked};
         _ -> {Body0, iolist_size([Body0])}
     end,
     send(PassedState#reqstate.socket,
@@ -305,9 +324,14 @@ send_response(Code, PassedState=#reqstate{reqdata=RD}) ->
     FinalLength = case wrq:method(RD) of 
 	'HEAD' -> Length;
 	_ -> 
-            case Length of
-                chunked -> send_stream_body(PassedState#reqstate.socket, Body);
-                _ -> send(PassedState#reqstate.socket, Body), Length
+            case Body of
+                {stream, Body2} ->
+                    send_stream_body(PassedState#reqstate.socket, Body2);
+                {writer, Body2} ->
+                    send_writer_body(PassedState#reqstate.socket, Body2);
+                _ ->
+                    send(PassedState#reqstate.socket, Body),
+                    Length
             end
     end,
     InitLogData = PassedState#reqstate.log_data,

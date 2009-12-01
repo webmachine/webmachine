@@ -574,6 +574,8 @@ encode_body(Body) ->
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        {writer, BodyFun} ->
+            {writer, make_writer_stream(Encoder, Charsetter, BodyFun)};
         _ ->
             Encoder(Charsetter(iolist_to_binary(Body)))
     end.
@@ -583,7 +585,10 @@ make_encoder_stream(Encoder, Charsetter, {Body, done}) ->
 make_encoder_stream(Encoder, Charsetter, {Body, Next}) ->
     {Encoder(Charsetter(Body)),
      fun() -> make_encoder_stream(Encoder, Charsetter, Next()) end}.
-            
+
+make_writer_stream(Encoder, Charsetter, BodyFun) ->
+    {Encoder, Charsetter, BodyFun}.
+
 choose_encoding(AccEncHdr) ->
     Encs = [Enc || {Enc,_Fun} <- resource_call(encodings_provided)],
     case webmachine_util:choose_encoding(Encs, AccEncHdr) of
