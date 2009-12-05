@@ -81,6 +81,10 @@ guess_mime(File) ->
 	    "application/x-gzip";
         ".htc" ->
             "text/x-component";
+	".manifest" ->
+	    "text/cache-manifest";
+        ".svg" ->
+            "image/svg+xml";
 	_ ->
 	    "text/plain"
     end.
