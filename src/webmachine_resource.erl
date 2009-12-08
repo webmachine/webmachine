@@ -191,6 +191,10 @@ escape_trace_data(Port) when is_port(Port) ->
     {'WMTRACE_ESCAPED_PORT', erlang:port_to_list(Port)};
 escape_trace_data(List) when is_list(List) ->
     escape_trace_list(List, []);
+escape_trace_data(R=#reqstate{}) ->
+    list_to_tuple(
+      escape_trace_data(
+        tuple_to_list(R#reqstate{reqdata='WMTRACE_NESTED_REQDATA'})));
 escape_trace_data(Tuple) when is_tuple(Tuple) ->
     list_to_tuple(escape_trace_data(tuple_to_list(Tuple)));
 escape_trace_data(Other) ->
