@@ -267,14 +267,7 @@ send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
         put(bytes_written, get(bytes_written) + Size),
         Size
     end,
-    try
-        BodyFun(Writer)
-    catch
-        Type:Error ->
-            io:format("Error writing body: {~p, ~p}~n", [Type, Error]),
-            io:format("Stack: ~p~n", [erlang:get_stacktrace()]),
-            exit(normal)
-    end,
+    BodyFun(Writer),
     send_chunk(Socket, <<>>),
     get(bytes_written).
 
