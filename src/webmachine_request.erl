@@ -79,7 +79,7 @@
 -include_lib("include/wm_reqdata.hrl").
 
 -define(WMVSN, "1.5.1").
--define(QUIP, "hack the charles gibson").
+-define(QUIP, "that tip is the fix").
 -define(IDLE_TIMEOUT, infinity).
 
 get_peer() ->
