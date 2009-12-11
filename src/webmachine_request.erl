@@ -26,6 +26,7 @@
 
 % actual interface for resource functions
 -export([
+         trim_state/0,
          get_reqdata/0,
          set_reqdata/1,
 	 socket/0,
@@ -81,6 +82,10 @@
 -define(WMVSN, "1.5.1").
 -define(QUIP, "that tip is the fix").
 -define(IDLE_TIMEOUT, infinity).
+
+trim_state() ->
+    TrimData = (ReqState#reqstate.reqdata)#wm_reqdata{wm_state='WMSTATE'},
+    webmachine_request:new(ReqState#reqstate{reqdata=TrimData}).
 
 get_peer() ->
     case ReqState#reqstate.peer of

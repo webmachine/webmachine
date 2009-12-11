@@ -149,6 +149,12 @@ handle_wm_call(Fun, ReqData) ->
             end
     end.
 
+trim_trace([{M,F,[RD = #wm_reqdata{},S]}|STRest]) ->
+    TrimState = (RD#wm_reqdata.wm_state)#reqstate{reqdata='REQDATA'},
+    TrimRD = RD#wm_reqdata{wm_state=TrimState},
+    [{M,F,[TrimRD,S]}|STRest];
+trim_trace(X) -> X.
+
 resource_call(F, ReqData) ->
     case R_Trace of
         false -> nop;
@@ -157,7 +163,7 @@ resource_call(F, ReqData) ->
     Result = try
         apply(R_Mod, F, [ReqData, R_ModState])
     catch C:R ->
-	    Reason = {C, R, erlang:get_stacktrace()},
+	    Reason = {C, R, trim_trace(erlang:get_stacktrace())},
             {{error, Reason}, ReqData, R_ModState}
     end,
         case R_Trace of
