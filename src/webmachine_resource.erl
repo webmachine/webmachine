@@ -121,14 +121,14 @@ do(Fun, ReqProps) when is_atom(Fun) andalso is_list(ReqProps) ->
     RState0 = proplists:get_value(reqstate, ReqProps),
     put(tmp_reqstate, empty),
     {Reply, ReqData, NewModState} = handle_wm_call(Fun, 
-                    (RState0#reqstate.reqdata)#wm_reqdata{wm_state=RState0}),
+                    (RState0#wm_reqstate.reqdata)#wm_reqdata{wm_state=RState0}),
     ReqState = case get(tmp_reqstate) of
                    empty -> RState0;
                    X -> X
                end,
     {Reply,
      webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace),
-     ReqState#reqstate{reqdata=ReqData}}.
+     ReqState#wm_reqstate{reqdata=ReqData}}.
 
 handle_wm_call(Fun, ReqData) ->
     case default(Fun) of
@@ -150,7 +150,7 @@ handle_wm_call(Fun, ReqData) ->
     end.
 
 trim_trace([{M,F,[RD = #wm_reqdata{},S]}|STRest]) ->
-    TrimState = (RD#wm_reqdata.wm_state)#reqstate{reqdata='REQDATA'},
+    TrimState = (RD#wm_reqdata.wm_state)#wm_reqstate{reqdata='REQDATA'},
     TrimRD = RD#wm_reqdata{wm_state=TrimState},
     [{M,F,[TrimRD,S]}|STRest];
 trim_trace(X) -> X.
@@ -197,10 +197,10 @@ escape_trace_data(Port) when is_port(Port) ->
     {'WMTRACE_ESCAPED_PORT', erlang:port_to_list(Port)};
 escape_trace_data(List) when is_list(List) ->
     escape_trace_list(List, []);
-escape_trace_data(R=#reqstate{}) ->
+escape_trace_data(R=#wm_reqstate{}) ->
     list_to_tuple(
       escape_trace_data(
-        tuple_to_list(R#reqstate{reqdata='WMTRACE_NESTED_REQDATA'})));
+        tuple_to_list(R#wm_reqstate{reqdata='WMTRACE_NESTED_REQDATA'})));
 escape_trace_data(Tuple) when is_tuple(Tuple) ->
     list_to_tuple(escape_trace_data(tuple_to_list(Tuple)));
 escape_trace_data(Other) ->
