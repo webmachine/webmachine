@@ -130,9 +130,15 @@ call({req_body, MaxRecvBody}) ->
             {ReqState#wm_reqstate.reqbody, ReqState};
         undefined ->
             RD=(ReqState#wm_reqstate.reqdata)#wm_reqdata{
-                                      max_recv_body=MaxRecvBody},
+                 max_recv_body=MaxRecvBody},
             NewReqState=ReqState#wm_reqstate{reqdata=RD},
-            NewBody = do_recv_body(NewReqState),
+            NewBody = case get(req_body) of
+                undefined ->
+                    NewB = do_recv_body(NewReqState),
+                    put(req_body, NewB),
+                    NewB;
+                B -> B
+            end,
             NewRD = RD#wm_reqdata{req_body=NewBody},
             {NewBody, NewReqState#wm_reqstate{
                         bodyfetch=standard,reqdata=NewRD,reqbody=NewBody}}
