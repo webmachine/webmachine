@@ -672,12 +672,18 @@ range() -> call(range).
 
 req_cookie() -> call(req_cookie).
 parse_cookie() -> req_cookie().
-get_cookie_value(Key) -> proplists:get_value(Key, req_cookie()).
+get_cookie_value(Key) ->
+    {ReqCookie, NewReqState} = req_cookie(),
+    {proplists:get_value(Key, ReqCookie), NewReqState}.
 
 req_qs() -> call(req_qs).
 parse_qs() -> req_qs().
-get_qs_value(Key) -> proplists:get_value(Key, req_qs()).
-get_qs_value(Key, Default) -> proplists:get_value(Key, req_qs(), Default).
+get_qs_value(Key) ->
+    {ReqQS, NewReqState} = req_qs(),
+    {proplists:get_value(Key, ReqQS), NewReqState}.
+get_qs_value(Key, Default) ->
+    {ReqQS, NewReqState} = req_qs(),
+    {proplists:get_value(Key, ReqQS, Default), NewReqState}.
 
 set_resp_body(Body) -> call({set_resp_body, Body}).
 resp_body() -> call(resp_body).
