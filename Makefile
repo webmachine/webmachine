@@ -20,3 +20,7 @@ clean:
 
 ebin/$(APP).app: src/$(APP).app
 	@cp -v src/$(APP).app $@
+
+test: erl
+	scripts/run_tests.escript ebin | tee test.log
+

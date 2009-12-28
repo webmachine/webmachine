@@ -22,6 +22,7 @@
 -author('Bryan Fink <bryan@basho.com>').
 
 -export([dispatch/2, dispatch/3]).
+-include_lib("eunit/include/eunit.hrl").
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
@@ -201,3 +202,40 @@ reconstitute(UnmatchedTokens) -> string:join(UnmatchedTokens, [?SEPARATOR]).
 calculate_app_root(1) -> ".";
 calculate_app_root(N) when N > 1 ->
     string:join(lists:duplicate(N, ".."), [?SEPARATOR]).
+
+%%
+%% TEST
+%%
+
+app_root_test() ->
+    ?assertEqual(".",           calculate_app_root(1)),
+    ?assertEqual("../..",       calculate_app_root(2)),
+    ?assertEqual("../../..",    calculate_app_root(3)),
+    ?assertEqual("../../../..", calculate_app_root(4)).
+
+reconstitute_test() ->
+    ?assertEqual("",            reconstitute([])),
+    ?assertEqual("foo",         reconstitute(["foo"])),
+    ?assertEqual("foo/bar",     reconstitute(["foo","bar"])),
+    ?assertEqual("foo/bar/baz", reconstitute(["foo","bar","baz"])).
+
+split_host_test() ->
+    ?assertEqual(["foo","bar","baz"], split_host("foo.bar.baz")).
+
+split_host_port_test() ->
+    ?assertEqual({[], 80}, split_host_port("")),
+    ?assertEqual({["foo","bar","baz"], 80},
+                 split_host_port("foo.bar.baz:80")),
+    ?assertEqual({["foo","bar","baz"], 1234},
+                 split_host_port("foo.bar.baz:1234")).
+
+bind_empty_test() ->
+    ?assertEqual({ok, [], [], 0}, bind([], [], [], 0)),
+    ?assertEqual({ok, [], [{x,"a"}], 1},
+                 bind([], [], [{x,"a"}], 1)).
+
+bind_simple_matchall_test() ->
+    ?assertEqual({ok, [], [], 1},
+                 bind([?MATCH_ALL], [], [], 1)),
+    ?assertEqual({ok, ["a","b"], [], 2},
+                 bind([?MATCH_ALL], ["a","b"], [], 0)).
