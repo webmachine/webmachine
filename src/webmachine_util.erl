@@ -152,6 +152,9 @@ prioritize_media(Type,Params,Acc) ->
 		    QVal = case Val of
 			"1" ->
 			    1;
+                        [$.|_] ->
+                            %% handle strange FeedBurner Accept
+                            list_to_float([$0|Val]); 
 			_ -> list_to_float(Val)
 		    end,
 		    {QVal, Type, Rest ++ Acc};
@@ -255,6 +258,9 @@ build_conneg_list([Acc|AccRest], Result) ->
             case PrioStr of
                 "0" -> {0.0, Choice};
                 "1" -> {1.0, Choice};
+                [$.|_] ->
+                    %% handle strange FeedBurner Accept
+                    {list_to_float([$0|PrioStr]), Choice};
                 _ -> {list_to_float(PrioStr), Choice}
             end;
         {Choice} ->
@@ -301,3 +307,16 @@ choose_media_type_test() ->
       || I <- ShouldMatch ],
     [ ?assertEqual(none, choose_media_type([Provided], I))
       || I <- WantNone ].
+
+choose_media_type_qval_test() ->
+    Provided = ["text/html", "image/jpeg"],
+    HtmlMatch = ["image/jpeg;q=0.5, text/html",
+                 "text/html, image/jpeg; q=0.5",
+                 "text/*; q=0.8, image/*;q=0.7",
+                 "text/*;q=.8, image/*;q=.7"], %% strange FeedBurner format
+    JpgMatch = ["image/*;q=1, text/html;q=0.9",
+                "image/png, image/*;q=0.3"],
+    [ ?assertEqual("text/html", choose_media_type(Provided, I))
+      || I <- HtmlMatch ],
+    [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
+      || I <- JpgMatch ].
