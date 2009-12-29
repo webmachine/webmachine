@@ -26,7 +26,8 @@
 -export([unquote_header/1]).
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1]).
--export([test/0]).
+
+-include_lib("eunit/include/eunit.hrl").
 
 convert_request_date(Date) ->
     try 
@@ -288,14 +289,15 @@ now_diff_milliseconds({M,S,U}, {M,S1,U1}) ->
 now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
     ((M-M1)*1000000+(S-S1))*1000 + ((U-U1) div 1000).
 
-test() ->
-    test_choose_media_type(),
-    ok.
+%%
+%% TEST
+%%
 
-test_choose_media_type() ->
+choose_media_type_test() ->
     Provided = "text/html",
     ShouldMatch = ["*", "*/*", "text/*", "text/html"],
     WantNone = ["foo", "text/xml", "application/*", "foo/bar/baz"],
-    [ Provided = choose_media_type([Provided], I) || I <- ShouldMatch ],
-    [ none = choose_media_type([Provided], I) || I <- WantNone ],
-    ok.
+    [ ?assertEqual(Provided, choose_media_type([Provided], I))
+      || I <- ShouldMatch ],
+    [ ?assertEqual(none, choose_media_type([Provided], I))
+      || I <- WantNone ].
