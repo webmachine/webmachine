@@ -320,3 +320,40 @@ choose_media_type_qval_test() ->
       || I <- HtmlMatch ],
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
+
+convert_request_date_test() ->
+    ?assertMatch({{_,_,_},{_,_,_}},
+                 convert_request_date("Wed, 30 Dec 2009 14:39:02 GMT")),
+    ?assertMatch(bad_date,
+                 convert_request_date(<<"does not handle binaries">>)).
+
+compare_ims_dates_test() ->
+    Late = {{2009,12,30},{14,39,02}},
+    Early = {{2009,12,30},{13,39,02}},
+    ?assertEqual(true, compare_ims_dates(Late, Early)),
+    ?assertEqual(false, compare_ims_dates(Early, Late)).
+
+guess_mime_test() ->
+    TextTypes = [".html",".css",".htc",".manifest",".txt"],
+    AppTypes = [".xhtml",".xml",".js",".swf",".zip",".bz2",
+                ".gz",".tar",".tgz"],
+    ImgTypes = [".jpg",".jpeg",".gif",".png",".ico",".svg"],
+    ?assertEqual([], [ T || T <- TextTypes,
+                            1 /= string:str(guess_mime(T),"text/") ]),
+    ?assertEqual([], [ T || T <- AppTypes,
+                            1 /= string:str(guess_mime(T),"application/") ]),
+    ?assertEqual([], [ T || T <- ImgTypes,
+                            1 /= string:str(guess_mime(T),"image/") ]).
+
+unquote_header_test() ->
+    ?assertEqual("hello", unquote_header("hello")),
+    ?assertEqual("hello", unquote_header("\"hello\"")),
+    ?assertEqual("hello", unquote_header("\"hello")),
+    ?assertEqual("hello", unquote_header("\"\\h\\e\\l\\l\\o\"")).
+
+now_diff_milliseconds_test() ->
+    Late = {10, 10, 10},
+    Early1 = {10, 9, 9},
+    Early2 = {9, 9, 9},
+    ?assertEqual(1000, now_diff_milliseconds(Late, Early1)),
+    ?assertEqual(1000001000, now_diff_milliseconds(Late, Early2)).
