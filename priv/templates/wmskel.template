@@ -62,8 +62,6 @@
        "{{prefix}}/apps/webmachine/src/webmachine_util.erl", false}.
 {file, "{{webmachine}}/src/webmachine_sup.erl",
        "{{prefix}}/apps/webmachine/src/webmachine_sup.erl", false}.
-{file, "{{webmachine}}/src/webmachine_skel.erl",
-       "{{prefix}}/apps/webmachine/src/webmachine_skel.erl", false}.
 {file, "{{webmachine}}/src/webmachine_resource.erl",
        "{{prefix}}/apps/webmachine/src/webmachine_resource.erl", false}.
 {file, "{{webmachine}}/src/webmachine_request.erl",
