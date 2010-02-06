@@ -1,0 +1,143 @@
+%%-*- mode: erlang -*-
+%% Basic Webmachine application skeleton
+
+%% Variables:
+%%   appid: name of the application to build
+%%          default = "wmskel"
+%%   webmachine: path to webmachine from this template
+%%               default = "../.."
+%%   prefix: path where the application should be created
+%%           default = "."
+{variables, [{appid, "wmskel"},
+             {webmachine, "../.."},
+             {prefix, "."}]}.
+
+%% main project files
+{file, "README", "{{prefix}}/README"}.
+{file, "Makefile", "{{prefix}}/Makefile"}.
+{file, "rebar.config", "{{prefix}}/rebar.config"}.
+{file, "{{webmachine}}/rebar", "{{prefix}}/rebar", false}.
+{chmod, 8#744, "{{prefix}}/rebar"}.
+{file, "start.sh", "{{prefix}}/start.sh"}.
+{chmod, 8#744, "{{prefix}}/start.sh"}.
+{file, "start-dev.sh", "{{prefix}}/start-dev.sh"}.
+{chmod, 8#744, "{{prefix}}/start-dev.sh"}.
+
+{file, "ebin/wmskel.app", "{{prefix}}/ebin/{{appid}}.app"}.
+
+{file, "src/wmskel.erl", "{{prefix}}/src/{{appid}}.erl"}.
+{file, "src/wmskel_app.erl", "{{prefix}}/src/{{appid}}_app.erl"}.
+{file, "src/wmskel_sup.erl", "{{prefix}}/src/{{appid}}_sup.erl"}.
+{file, "src/wmskel_resource.erl", "{{prefix}}/src/{{appid}}_resource.erl"}.
+
+{file, "priv/dispatch.conf", "{{prefix}}/priv/dispatch.conf"}.
+{dir, "{{prefix}}/priv/www"}.
+
+%% dependencies
+{dir, "{{prefix}}/apps"}.
+
+%% Webmachine
+{file, "{{webmachine}}/ebin/webmachine.app",
+       "{{prefix}}/apps/webmachine/ebin/webmachine.app", false}.
+
+{file, "{{webmachine}}/include/webmachine.hrl",
+       "{{prefix}}/apps/webmachine/include/webmachine.hrl", false}.
+{file, "{{webmachine}}/include/wm_reqdata.hrl",
+       "{{prefix}}/apps/webmachine/include/wm_reqdata.hrl", false}.
+{file, "{{webmachine}}/include/wm_reqstate.hrl",
+       "{{prefix}}/apps/webmachine/include/wm_reqstate.hrl", false}.
+
+{file, "{{webmachine}}/priv/trace/wmtrace.css",
+       "{{prefix}}/apps/webmachine/priv/trace/wmtrace.css", false}.
+{file, "{{webmachine}}/priv/trace/wmtrace.js",
+       "{{prefix}}/apps/webmachine/priv/trace/wmtrace.js", false}.
+{file, "{{webmachine}}/priv/trace/http-headers-status-v3.png",
+       "{{prefix}}/apps/webmachine/priv/trace/http-headers-status-v3.png", false}.
+
+{file, "{{webmachine}}/src/wrq.erl",
+       "{{prefix}}/apps/webmachine/src/wrq.erl", false}.
+{file, "{{webmachine}}/src/wmtrace_resource.erl",
+       "{{prefix}}/apps/webmachine/src/wmtrace_resource.erl", false}.
+{file, "{{webmachine}}/src/webmachine_util.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_util.erl", false}.
+{file, "{{webmachine}}/src/webmachine_sup.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_sup.erl", false}.
+{file, "{{webmachine}}/src/webmachine_skel.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_skel.erl", false}.
+{file, "{{webmachine}}/src/webmachine_resource.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_resource.erl", false}.
+{file, "{{webmachine}}/src/webmachine_request.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_request.erl", false}.
+{file, "{{webmachine}}/src/webmachine_perf_logger.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_perf_logger.erl", false}. 
+{file, "{{webmachine}}/src/webmachine_multipart.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_multipart.erl", false}.
+{file, "{{webmachine}}/src/webmachine_mochiweb.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_mochiweb.erl", false}.
+{file, "{{webmachine}}/src/webmachine_logger.hrl",
+       "{{prefix}}/apps/webmachine/src/webmachine_logger.hrl", false}.
+{file, "{{webmachine}}/src/webmachine_logger.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_logger.erl", false}.
+{file, "{{webmachine}}/src/webmachine_error_handler.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_error_handler.erl", false}.
+{file, "{{webmachine}}/src/webmachine_dispatcher.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_dispatcher.erl", false}.
+{file, "{{webmachine}}/src/webmachine_deps.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_deps.erl", false}.
+{file, "{{webmachine}}/src/webmachine_decision_core.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_decision_core.erl", false}.
+{file, "{{webmachine}}/src/webmachine_app.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine_app.erl", false}.
+{file, "{{webmachine}}/src/webmachine.erl",
+       "{{prefix}}/apps/webmachine/src/webmachine.erl", false}.
+
+%% Mochiweb
+{file, "{{webmachine}}/deps/mochiweb/ebin/mochiweb.app",
+       "{{prefix}}/apps/mochiweb/ebin/mochiweb.app", false}.
+
+{file, "{{webmachine}}/deps/mochiweb/src/reloader.erl",
+       "{{prefix}}/apps/mochiweb/src/reloader.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_util.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_util.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_sup.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_sup.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_socket_server.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_socket_server.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_skel.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_skel.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_response.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_response.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_request.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_request.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_multipart.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_multipart.erl", false}. 
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_http.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_http.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_html.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_html.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_headers.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_headers.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_echo.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_echo.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_cookies.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_cookies.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_charref.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_charref.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb_app.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb_app.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochiweb.erl",
+       "{{prefix}}/apps/mochiweb/src/mochiweb.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochinum.erl",
+       "{{prefix}}/apps/mochiweb/src/mochinum.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochijson2.erl",
+       "{{prefix}}/apps/mochiweb/src/mochijson2.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochijson.erl",
+       "{{prefix}}/apps/mochiweb/src/mochijson.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochihex.erl",
+       "{{prefix}}/apps/mochiweb/src/mochihex.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochifmt_std.erl",
+       "{{prefix}}/apps/mochiweb/src/mochifmt_std.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochifmt_records.erl",
+       "{{prefix}}/apps/mochiweb/src/mochifmt_records.erl", false}.
+{file, "{{webmachine}}/deps/mochiweb/src/mochifmt.erl",
+       "{{prefix}}/apps/mochiweb/src/mochifmt.erl", false}.

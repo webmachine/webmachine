@@ -1,9 +1,9 @@
 %% @author author <author@example.com>
 %% @copyright YYYY author.
 
-%% @doc Supervisor for the skel application.
+%% @doc Supervisor for the {{appid}} application.
 
--module(skel_sup).
+-module({{appid}}_sup).
 -author('author <author@example.com>').
 
 -behaviour(supervisor).
@@ -54,4 +54,4 @@ init([]) ->
 	   {webmachine_mochiweb, start, [WebConfig]},
 	   permanent, 5000, worker, dynamic},
     Processes = [Web],
-    {ok, {{one_for_one, 10, 10}, Processes}}.
+    {ok, { {one_for_one, 10, 10}, Processes} }.

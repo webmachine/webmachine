@@ -2,7 +2,7 @@
 %% @copyright YYYY author.
 %% @doc Example webmachine_resource.
 
--module(skel_resource).
+-module({{appid}}_resource).
 -export([init/1, to_html/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").

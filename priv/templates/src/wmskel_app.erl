@@ -1,9 +1,9 @@
 %% @author author <author@example.com>
 %% @copyright YYYY author.
 
-%% @doc Callbacks for the skel application.
+%% @doc Callbacks for the {{appid}} application.
 
--module(skel_app).
+-module({{appid}}_app).
 -author('author <author@example.com>').
 
 -behaviour(application).
@@ -13,8 +13,7 @@
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for skel.
 start(_Type, _StartArgs) ->
-    skel_deps:ensure(),
-    skel_sup:start_link().
+    {{appid}}_sup:start_link().
 
 %% @spec stop(_State) -> ServerRet
 %% @doc application stop callback for skel.

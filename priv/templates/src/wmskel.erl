@@ -1,9 +1,9 @@
 %% @author author <author@example.com>
 %% @copyright YYYY author.
 
-%% @doc TEMPLATE.
+%% @doc {{appid}} startup code
 
--module(skel).
+-module({{appid}}).
 -author('author <author@example.com>').
 -export([start/0, start_link/0, stop/0]).
 
@@ -18,27 +18,28 @@ ensure_started(App) ->
 %% @spec start_link() -> {ok,Pid::pid()}
 %% @doc Starts the app for inclusion in a supervisor tree
 start_link() ->
-    skel_deps:ensure(),
     ensure_started(crypto),
+    ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module, 
                         webmachine_logger),
     ensure_started(webmachine),
-    skel_sup:start_link().
+    {{appid}}_sup:start_link().
 
 %% @spec start() -> ok
 %% @doc Start the skel server.
 start() ->
-    skel_deps:ensure(),
     ensure_started(crypto),
+    ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module, 
                         webmachine_logger),
     ensure_started(webmachine),
-    application:start(skel).
+    application:start({{appid}}).
 
 %% @spec stop() -> ok
 %% @doc Stop the skel server.
 stop() ->
-    Res = application:stop(skel),
+    Res = application:stop({{appid}}),
     application:stop(webmachine),
+    application:stop(mochiweb),
     application:stop(crypto),
     Res.
