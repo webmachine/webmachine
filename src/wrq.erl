@@ -42,7 +42,7 @@ create(Method,Version,RawPath,Headers) ->
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
       req_body=not_fetched_yet,
-      max_recv_body=(50*(1024*1024)),
+      max_recv_body=(1024*(1024*1024)),
       app_root="defined_in_load_dispatch_data",
       path_info=dict:new(),
       path_tokens=defined_in_load_dispatch_data,
