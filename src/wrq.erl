@@ -32,6 +32,8 @@
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include_lib("include/wm_reqdata.hrl").
 -include_lib("include/wm_reqstate.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
 
 create(Method,Version,RawPath,Headers) ->
     create(#wm_reqdata{method=Method,version=Version,
@@ -203,4 +205,36 @@ get_qs_value(Key, RD) when is_list(Key) -> % string
 get_qs_value(Key, Default, RD) when is_list(Key) ->
     proplists:get_value(Key, req_qs(RD), Default).
 
+make_wrq(Method, RawPath, Headers) ->
+    create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
 
+accessor_test() ->
+    R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
+    R = set_peer("127.0.0.1", R0),
+    ?assertEqual('GET', method(R)),
+    ?assertEqual({1,1}, version(R)),
+    ?assertEqual("/foo", path(R)),
+    ?assertEqual("/foo?a=1&b=2", raw_path(R)),     
+    ?assertEqual([{"a", "1"}, {"b", "2"}], req_qs(R)),
+    ?assertEqual({"1", "2"}, {get_qs_value("a", R), get_qs_value("b", R)}),
+    ?assertEqual("3", get_qs_value("c", "3", R)),
+    ?assertEqual([{"foo", "bar"}], req_cookie(R)),
+    ?assertEqual("bar", get_cookie_value("foo", R)),
+    ?assertEqual("127.0.0.1", peer(R)).
+
+    
+simple_dispatch_test() ->
+    R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
+    R1 = set_peer("127.0.0.1", R0),    
+    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} = 
+        webmachine_dispatcher:dispatch("127.0.0.1", "/foo", 
+                                       [{["foo"], foo_resource, []}]),
+    R = load_dispatch_data(Bindings,
+                           HostTokens,
+                           Port,
+                           PathTokens,
+                           AppRoot,
+                           StringPath,
+                           R1),
+    ?assertEqual(".", app_root(R)),
+    ?assertEqual(80, port(R)).
