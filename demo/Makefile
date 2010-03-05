@@ -1,19 +1,11 @@
-ERL          ?= erl
-EBIN_DIRS    := $(wildcard webmachine/ebin)
-APP          := webmachine_demo
+ERL ?= erl
+APP := webmachine_demo
 
-all: erl ebin/$(APP).app
+all:
+	@../rebar compile
 
-erl:
-	@$(ERL) -pa $(EBIN_DIRS) -noinput +B \
-	  -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
+clean:
+	@../rebar clean
 
 docs:
 	@erl -noshell -run edoc_run application '$(APP)' '"."' '[]'
-
-clean: 
-	@echo "removing:"
-	@rm -fv ebin/*.beam ebin/*.app
-
-ebin/$(APP).app: src/$(APP).app
-	@cp -v src/$(APP).app $@
