@@ -26,7 +26,7 @@ start_link() ->
     {{appid}}_sup:start_link().
 
 %% @spec start() -> ok
-%% @doc Start the skel server.
+%% @doc Start the {{appid}} server.
 start() ->
     ensure_started(crypto),
     ensure_started(mochiweb),
@@ -36,7 +36,7 @@ start() ->
     application:start({{appid}}).
 
 %% @spec stop() -> ok
-%% @doc Stop the skel server.
+%% @doc Stop the {{appid}} server.
 stop() ->
     Res = application:stop({{appid}}),
     application:stop(webmachine),
