@@ -41,23 +41,12 @@
 add_dispatch_rule(BasePath, TracePath) when is_list(BasePath),
                                             is_list(TracePath) ->
     Parts = string:tokens(BasePath, "/"),
-    set_dispatch_list(
-      [{Parts++['*'], ?MODULE, [{trace_dir, TracePath}]}
-       |get_dispatch_list()]).
+    webmachine_router:add_pathspec({Parts ++ ['*'], ?MODULE, [{trace_dir, TracePath}]}).
 
 %% @spec remove_dispatch_rules() -> ok
 %% @doc Remove all dispatch rules pointing to wmtrace_resource.
 remove_dispatch_rules() ->
-    set_dispatch_list(
-      [ D || D={_,M,_} <- get_dispatch_list(),
-             M /= ?MODULE ]).
-
-get_dispatch_list() ->
-    {ok, Dispatch} = application:get_env(webmachine, dispatch_list),
-    Dispatch.
-
-set_dispatch_list(NewList) when is_list(NewList) ->
-    application:set_env(webmachine, dispatch_list, NewList).
+    webmachine_router:remove_resource(?MODULE).
 
 %%
 %% Resource
@@ -294,7 +283,7 @@ encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
                                atom_to_list(Body);
                            Body -> lists:flatten(io_lib:format("~s", [Body]))
                        end}]}.
-    
+
 encode_response(ReqData) ->
     {struct, [{"code", integer_to_list(
                          wrq:response_code(ReqData))},
