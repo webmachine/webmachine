@@ -41,7 +41,7 @@
 add_dispatch_rule(BasePath, TracePath) when is_list(BasePath),
                                             is_list(TracePath) ->
     Parts = string:tokens(BasePath, "/"),
-    webmachine_router:add_pathspec({Parts ++ ['*'], ?MODULE, [{trace_dir, TracePath}]}).
+    webmachine_router:add_route({Parts ++ ['*'], ?MODULE, [{trace_dir, TracePath}]}).
 
 %% @spec remove_dispatch_rules() -> ok
 %% @doc Remove all dispatch rules pointing to wmtrace_resource.
