@@ -72,5 +72,8 @@ upgrade() ->
 %% @spec init([]) -> SupervisorTree
 %% @doc supervisor callback.
 init([]) ->
-    Processes = [],
+    Router = {webmachine_router,
+              {webmachine_router, start_link, []},
+              permanent, 5000, worker, [webmachine_router]},
+    Processes = [Router],
     {ok, {{one_for_one, 9, 10}, Processes}}.
