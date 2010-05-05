@@ -22,5 +22,7 @@
   ]},
   {registered, []},
   {mod, {webmachine_app, []}},
-  {env, []},
+  {env, [
+         {dispatch_list, []}
+        ]},
   {applications, [kernel, stdlib, crypto]}]}.
