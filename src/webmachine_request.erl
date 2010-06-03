@@ -79,7 +79,7 @@
 -include_lib("include/wm_reqstate.hrl").
 -include_lib("include/wm_reqdata.hrl").
 
--define(WMVSN, "1.6").
+-define(WMVSN, "1.6.1").
 -define(QUIP, "eat around the stinger").
 -define(IDLE_TIMEOUT, infinity).
 
