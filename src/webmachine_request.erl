@@ -78,6 +78,7 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqstate.hrl").
 -include_lib("include/wm_reqdata.hrl").
+-include_lib("mochiweb/internal.hrl").
 
 -define(WMVSN, "1.6.1").
 -define(QUIP, "eat around the stinger").
@@ -249,7 +250,7 @@ get_outheader_value(K) ->
       wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
 
 send(Socket, Data) ->
-    case gen_tcp:send(Socket, iolist_to_binary(Data)) of
+    case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of
 	ok -> ok;
 	{error,closed} -> ok;
 	_ -> exit(normal)
@@ -402,10 +403,10 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
 recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
     case MaxHunk >= DataLeft of
         true ->
-            {ok,Data1} = gen_tcp:recv(Socket,DataLeft,?IDLE_TIMEOUT),
+            {ok,Data1} = mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT),
             {Data1, done};
         false ->
-            {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
              fun() -> recv_unchunked_body(
                         Socket, MaxHunk, DataLeft-MaxHunk)
@@ -420,22 +421,22 @@ recv_chunked_body(Socket, MaxHunk) ->
 recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
     case MaxHunk >= LeftInChunk of
         true ->
-            {ok,Data1} = gen_tcp:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
+            {ok,Data1} = mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
             {Data1,
              fun() -> recv_chunked_body(Socket, MaxHunk)
              end};
         false ->
-            {ok,Data2} = gen_tcp:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
              fun() -> recv_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
              end}
     end.
 
 read_chunk_length(Socket) ->
-    inet:setopts(Socket, [{packet, line}]),
-    case gen_tcp:recv(Socket, 0, ?IDLE_TIMEOUT) of
+    mochiweb_socket:setopts(Socket, [{packet, line}]),
+    case mochiweb_socket:recv(Socket, 0, ?IDLE_TIMEOUT) of
         {ok, Header} ->
-            inet:setopts(Socket, [{packet, raw}]),
+            mochiweb_socket:setopts(Socket, [{packet, raw}]),
             Splitter = fun (C) ->
                                C =/= $\r andalso C =/= $\n andalso C =/= $
                        end,
@@ -458,7 +459,7 @@ get_range() ->
     end.
 
 range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
-    Size = iodevice_size(IoDevice),
+    Size = mochiweb_io:iodevice_size(IoDevice),
     F = fun (Spec, Acc) ->
                 case range_skip_length(Spec, Size) of
                     invalid_range ->
@@ -544,8 +545,9 @@ parts_to_body([{Start, End, Body}], Size) ->
     HeaderList = [{"Content-Type", ContentType},
                   {"Content-Range",
                    ["bytes ",
-                    make_io(Start), "-", make_io(End),
-                    "/", make_io(Size)]}],
+                    mochiweb_util:make_io(Start), "-", 
+                    mochiweb_util:make_io(End),
+                    "/", mochiweb_util:make_io(Size)]}],
     {HeaderList, Body};
 parts_to_body(BodyList, Size) when is_list(BodyList) ->
     %% return
@@ -571,22 +573,10 @@ multipart_body([{Start, End, Body} | BodyList], ContentType, Boundary, Size) ->
     ["--", Boundary, "\r\n",
      "Content-Type: ", ContentType, "\r\n",
      "Content-Range: ",
-         "bytes ", make_io(Start), "-", make_io(End),
-             "/", make_io(Size), "\r\n\r\n",
+         "bytes ", mochiweb_util:make_io(Start), "-",mochiweb_util:make_io(End),
+             "/", mochiweb_util:make_io(Size), "\r\n\r\n",
      Body, "\r\n"
      | multipart_body(BodyList, ContentType, Boundary, Size)].
-
-iodevice_size(IoDevice) ->
-    {ok, Size} = file:position(IoDevice, eof),
-    {ok, 0} = file:position(IoDevice, bof),
-    Size.
-
-make_io(Atom) when is_atom(Atom) ->
-    atom_to_list(Atom);
-make_io(Integer) when is_integer(Integer) ->
-    integer_to_list(Integer);
-make_io(Io) when is_list(Io); is_binary(Io) ->
-    Io.
 
 make_code(X) when is_integer(X) ->
     [integer_to_list(X), [" " | httpd_util:reason_phrase(X)]];
@@ -623,7 +613,7 @@ make_headers(Code, Length, RD) ->
 	    WithSrv
     end,
     F = fun({K, V}, Acc) ->
-		[make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
+		[mochiweb_util:make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
 	end,
     lists:foldl(F, [<<"\r\n">>], mochiweb_headers:to_list(Hdrs)).
 
