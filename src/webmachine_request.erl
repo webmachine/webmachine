@@ -78,7 +78,7 @@
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqstate.hrl").
 -include_lib("include/wm_reqdata.hrl").
--include_lib("mochiweb/internal.hrl").
+-include_lib("mochiweb/include/internal.hrl").
 
 -define(WMVSN, "1.6.1").
 -define(QUIP, "eat around the stinger").
