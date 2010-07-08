@@ -7,4 +7,5 @@ deps/mochiweb/ebin/mochiweb.app
 ebin/webmachine.app
 test\.log
 test/*
+.eunit/*
 

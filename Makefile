@@ -19,5 +19,5 @@ edoc:
 	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
 
 test: all
-	scripts/run_tests.escript ebin | tee test.log
+	@(./rebar skip_deps=true eunit)
 
