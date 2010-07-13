@@ -123,9 +123,7 @@ decision_flow(X, TestResult) when is_integer(X) ->
     if X >= 500 -> error_response(X, TestResult);
        true -> respond(X)
     end;
-decision_flow(X, _TestResult) when is_atom(X) -> d(X);
-decision_flow({ErrCode, Reason}, _TestResult) when is_integer(ErrCode) ->
-    error_response(ErrCode, Reason).
+decision_flow(X, _TestResult) when is_atom(X) -> d(X).
 
 do_log(LogData) ->
     case application:get_env(webmachine, webmachine_logger_module) of

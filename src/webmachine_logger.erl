@@ -122,9 +122,8 @@ format_req(#wm_log_data{method=Method,
     fmt_alog(Time, Peer, User, fmt_method(Method), Path, Version,
 	     Status, Length, Referer, UserAgent).
 
-fmt_method(M) when is_atom(M) -> atom_to_list(M);
-fmt_method(M) when is_list(M) -> M.
-    
+fmt_method(M) when is_atom(M) -> atom_to_list(M).
+
 
 %% Seek backwards to the last valid log entry
 fix_log(_FD, 0) ->

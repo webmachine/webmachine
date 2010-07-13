@@ -217,7 +217,6 @@ call(has_resp_body) ->
     Reply = case wrq:resp_body(ReqState#wm_reqstate.reqdata) of
                 undefined -> false;
                 <<>> -> false;
-                [] -> false;
                 _ -> true
             end,
     {Reply, ReqState};
@@ -481,7 +480,7 @@ range_parts(RD=#wm_reqdata{resp_body={stream, {Hunk,Next}}}, Ranges) ->
     MRB = RD#wm_reqdata.max_recv_body,
     range_parts(read_whole_stream({Hunk,Next}, [], MRB, 0), Ranges);
 
-range_parts(_RD=#wm_reqdata{resp_body=Body0}, Ranges) ->
+range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
     Body = iolist_to_binary(Body0),
     Size = size(Body),
     F = fun(Spec, Acc) ->
@@ -647,8 +646,8 @@ get_out_header(HeaderName) -> get_resp_header(HeaderName).
 
 has_resp_header(HeaderName) ->
     case get_out_header(HeaderName) of
-        undefined -> false;
-        _ -> true
+        {undefined, _} -> false;
+        {_, _}         -> true
     end.
 has_out_header(HeaderName) -> has_resp_header(HeaderName).
 
@@ -697,9 +696,9 @@ merge_response_headers(Hdrs) -> merge_resp_headers(Hdrs).
 
 append_to_response_body(Data) -> call({append_to_response_body, Data}).
 
-do_redirect() -> call({do_redirect}).
+do_redirect() -> call(do_redirect).
 
-resp_redirect() -> call({resp_redirect}).
+resp_redirect() -> call(resp_redirect).
 
 get_metadata(Key) -> call({get_metadata, Key}).
 
