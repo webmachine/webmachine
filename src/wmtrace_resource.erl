@@ -5,8 +5,7 @@
 -export([add_dispatch_rule/2,
          remove_dispatch_rules/0]).
 
--export([start_link/1,
-         ping/2,
+-export([ping/2,
          init/1,
          resource_exists/2,
          content_types_provided/2,
@@ -51,9 +50,6 @@ remove_dispatch_rules() ->
 %%
 %% Resource
 %%
-
-start_link(Args) ->
-    webmachine_resource:start_link(?MODULE, [Args]).
 
 ping(ReqData, State) ->
     {pong, ReqData, State}.
