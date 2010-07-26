@@ -38,10 +38,10 @@ deps_on_path() ->
 new_siblings(Module) ->
     Existing = deps_on_path(),
     SiblingEbin = [ X || X <- filelib:wildcard(local_path(["deps", "*", "ebin"], Module)),
-			 filename:basename(filename:dirname(X)) /=  %% don't include self
-			     filename:basename(filename:dirname(
-						 filename:dirname(
-						   filename:dirname(X)))) ],
+                         filename:basename(filename:dirname(X)) /=  %% don't include self
+                             filename:basename(filename:dirname(
+                                                 filename:dirname(
+                                                   filename:dirname(X)))) ],
     Siblings = [filename:dirname(X) || X <- SiblingEbin,
                            ordsets:is_element(
                              filename:basename(filename:dirname(X)),

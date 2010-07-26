@@ -56,9 +56,9 @@ create(Method,Version,RawPath,Headers) ->
 create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
     Cookie = case get_req_header("cookie", RD) of
-	undefined -> [];
-	Value -> mochiweb_cookies:parse_cookie(Value)
-    end,
+                 undefined -> [];
+                 Value -> mochiweb_cookies:parse_cookie(Value)
+             end,
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
     ReqQS = mochiweb_util:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
@@ -190,12 +190,12 @@ merge_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH}) ->
 append_to_resp_body(Data, RD) -> append_to_response_body(Data, RD).
 append_to_response_body(Data, RD=#wm_reqdata{resp_body=RespB}) ->
     case is_binary(Data) of
-	true ->
-	    Data0 = RespB,
-	    Data1 = <<Data0/binary,Data/binary>>,
-	    RD#wm_reqdata{resp_body=Data1};
-	false -> % MUST BE an iolist! else, fail.
-	    append_to_response_body(iolist_to_binary(Data), RD)
+        true ->
+            Data0 = RespB,
+            Data1 = <<Data0/binary,Data/binary>>,
+            RD#wm_reqdata{resp_body=Data1};
+        false -> % MUST BE an iolist! else, fail.
+            append_to_response_body(iolist_to_binary(Data), RD)
     end.
 
 get_cookie_value(Key, RD) when is_list(Key) -> % string

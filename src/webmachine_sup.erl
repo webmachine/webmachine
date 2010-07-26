@@ -45,9 +45,9 @@ start_logger(BaseDir) ->
 
 start_perf_logger(BaseDir) ->
     ChildSpec = 
-	{webmachine_perf_logger,
-	 {webmachine_perf_logger, start_link, [BaseDir]},
-	 permanent, 5000, worker, [webmachine_perf_logger]},
+        {webmachine_perf_logger,
+         {webmachine_perf_logger, start_link, [BaseDir]},
+         permanent, 5000, worker, [webmachine_perf_logger]},
     supervisor:start_child(?MODULE, ChildSpec).
 
 %% @spec upgrade() -> ok
@@ -56,15 +56,15 @@ upgrade() ->
     {ok, {_, Specs}} = init([]),
 
     Old = sets:from_list(
-	    [Name || {Name, _, _, _} <- supervisor:which_children(?MODULE)]),
+            [Name || {Name, _, _, _} <- supervisor:which_children(?MODULE)]),
     New = sets:from_list([Name || {Name, _, _, _, _, _} <- Specs]),
     Kill = sets:subtract(Old, New),
 
     sets:fold(fun (Id, ok) ->
-		      supervisor:terminate_child(?MODULE, Id),
-		      supervisor:delete_child(?MODULE, Id),
-		      ok
-	      end, ok, Kill),
+                      supervisor:terminate_child(?MODULE, Id),
+                      supervisor:delete_child(?MODULE, Id),
+                      ok
+              end, ok, Kill),
 
     [supervisor:start_child(?MODULE, Spec) || Spec <- Specs],
     ok.

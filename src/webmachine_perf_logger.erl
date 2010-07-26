@@ -86,32 +86,32 @@ log_close({?MODULE, Name, FD}) ->
 maybe_rotate(State, Time) ->
     ThisHour = datehour(Time),
     if ThisHour == State#state.hourstamp ->
-	    State;
+            State;
        true ->
-	    defer_refresh(),
-	    log_close(State#state.handle),
-	    Handle = log_open(State#state.filename, ThisHour),
-	    State#state{hourstamp=ThisHour, handle=Handle}
+            defer_refresh(),
+            log_close(State#state.handle),
+            Handle = log_open(State#state.filename, ThisHour),
+            State#state{hourstamp=ThisHour, handle=Handle}
     end.    
 
 format_req(#wm_log_data{resource_module=Mod,
-			start_time=StartTime,
-			method=Method, 
-			peer=Peer, 
-			path=Path,
-			version=Version,
-			response_code=ResponseCode,
-			response_length=ResponseLength,
-		        end_time=EndTime,
-		        finish_time=FinishTime}) ->
+                        start_time=StartTime,
+                        method=Method, 
+                        peer=Peer, 
+                        path=Path,
+                        version=Version,
+                        response_code=ResponseCode,
+                        response_length=ResponseLength,
+                        end_time=EndTime,
+                        finish_time=FinishTime}) ->
     Time = fmtnow(),
     Status = integer_to_list(ResponseCode),
     Length = integer_to_list(ResponseLength),
     TTPD = webmachine_util:now_diff_milliseconds(EndTime, StartTime),
     TTPS = webmachine_util:now_diff_milliseconds(FinishTime, EndTime),
     fmt_plog(Time, Peer, atom_to_list(Method), Path, Version,
-	     Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
-	     integer_to_list(TTPS)).
+             Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
+             integer_to_list(TTPS)).
 
 %% Seek backwards to the last valid log entry
 fix_log(_FD, 0) ->
@@ -121,10 +121,10 @@ fix_log(FD, 1) ->
     ok;
 fix_log(FD, Location) ->
     case file:pread(FD, Location - 1, 1) of
-	{ok, [$\n | _]} ->
-	    ok;
-	{ok, _} ->
-	    fix_log(FD, Location - 1)
+        {ok, [$\n | _]} ->
+            ok;
+        {ok, _} ->
+            fix_log(FD, Location - 1)
     end.
 
 defer_refresh() ->
@@ -207,4 +207,4 @@ fmt_ip(HostName) ->
 fmtnow() ->
     {{Year, Month, Date}, {Hour, Min, Sec}} = calendar:local_time(),
     io_lib:format("[~2..0w/~s/~4..0w:~2..0w:~2..0w:~2..0w ~s]",
-		  [Date,month(Month),Year, Hour, Min, Sec, zone()]).
+                  [Date,month(Month),Year, Hour, Min, Sec, zone()]).

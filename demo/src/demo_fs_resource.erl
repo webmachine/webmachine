@@ -6,16 +6,16 @@
 -module(demo_fs_resource).
 -export([init/1]).
 -export([allowed_methods/2,
-	 resource_exists/2,
-	 last_modified/2,
-	 content_types_provided/2,
-	 content_types_accepted/2,
+         resource_exists/2,
+         last_modified/2,
+         content_types_provided/2,
+         content_types_accepted/2,
          delete_resource/2,
          post_is_create/2,
          create_path/2,
-	 provide_content/2,
-	 accept_content/2,
-	 generate_etag/2]).
+         provide_content/2,
+         accept_content/2,
+         generate_etag/2]).
 
 -record(context, {root,response_body=undefined,metadata=[]}).
 
@@ -39,18 +39,18 @@ file_path(Context, Name) ->
 file_exists(Context, Name) ->
     NamePath = file_path(Context, Name),
     case filelib:is_regular(NamePath) of 
-	true ->
-	    {true, NamePath};
-	false ->
-	    false
+        true ->
+            {true, NamePath};
+        false ->
+            false
     end.
 
 resource_exists(ReqData, Context) ->
     Path = wrq:disp_path(ReqData),
     case file_exists(Context, Path) of 
-	{true, _} ->
-	    {true, ReqData, Context};
-	_ ->
+        {true, _} ->
+            {true, ReqData, Context};
+        _ ->
             case Path of
                 "p" -> {true, ReqData, Context};
                 _ -> {false, ReqData, Context}
@@ -60,16 +60,16 @@ resource_exists(ReqData, Context) ->
 maybe_fetch_object(Context, Path) ->
     % if returns {true, NewContext} then NewContext has response_body
     case Context#context.response_body of
-	undefined ->
-	    case file_exists(Context, Path) of 
-		{true, FullPath} ->
-		    {ok, Value} = file:read_file(FullPath),
-		    {true, Context#context{response_body=Value}};
-		false ->
-		    {false, Context}
-	    end;
-	_Body ->
-	    {true, Context}
+        undefined ->
+            case file_exists(Context, Path) of 
+                {true, FullPath} ->
+                    {ok, Value} = file:read_file(FullPath),
+                    {true, Context#context{response_body=Value}};
+                false ->
+                    {false, Context}
+            end;
+        _Body ->
+            {true, Context}
     end.
 
 content_types_provided(ReqData, Context) ->
@@ -91,9 +91,9 @@ accept_content(ReqData, Context) ->
     FP = file_path(Context, Path),
     ok = filelib:ensure_dir(filename:dirname(FP)),
     ReqData1 = case file_exists(Context, Path) of 
-	{true, _} ->
+        {true, _} ->
             ReqData;
-	_ ->
+        _ ->
             LOC = "http://" ++
                    wrq:get_req_header("host", ReqData) ++
                    "/fs/" ++ Path,
@@ -129,11 +129,11 @@ delete_resource(ReqData, Context) ->
 
 provide_content(ReqData, Context) ->
     case maybe_fetch_object(Context, wrq:disp_path(ReqData)) of 
-	{true, NewContext} ->
-	    Body = NewContext#context.response_body,
-	    {Body, ReqData, Context};
-	{false, NewContext} ->
-	    {error, ReqData, NewContext}
+        {true, NewContext} ->
+            Body = NewContext#context.response_body,
+            {Body, ReqData, Context};
+        {false, NewContext} ->
+            {error, ReqData, NewContext}
     end.
 
 last_modified(ReqData, Context) ->
