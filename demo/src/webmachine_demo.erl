@@ -5,12 +5,12 @@
 
 ensure_started(App) ->
     case application:start(App) of
-	ok ->
-	    ok;
-	{error, {already_started, App}} ->
-	    ok
+        ok ->
+            ok;
+        {error, {already_started, App}} ->
+            ok
     end.
-	
+
 %% @spec start() -> ok
 %% @doc Start the webmachine_demo server.
 start() ->

@@ -90,37 +90,37 @@ log_close({?MODULE, Name, FD}) ->
 maybe_rotate(State, Time) ->
     ThisHour = datehour(Time),
     if ThisHour == State#state.hourstamp ->
-	    State;
+            State;
        true ->
-	    defer_refresh(),
-	    log_close(State#state.handle),
-	    Handle = log_open(State#state.filename, ThisHour),
-	    State#state{hourstamp=ThisHour, handle=Handle}
+            defer_refresh(),
+            log_close(State#state.handle),
+            Handle = log_open(State#state.filename, ThisHour),
+            State#state{hourstamp=ThisHour, handle=Handle}
     end.    
 
 format_req(#wm_log_data{method=Method, 
-			headers=Headers, 
-			peer=Peer, 
-			path=Path,
-			version=Version,
-			response_code=ResponseCode,
-			response_length=ResponseLength}) ->
+                        headers=Headers, 
+                        peer=Peer, 
+                        path=Path,
+                        version=Version,
+                        response_code=ResponseCode,
+                        response_length=ResponseLength}) ->
     User = "-",
     Time = fmtnow(),
     Status = integer_to_list(ResponseCode),
     Length = integer_to_list(ResponseLength),
     Referer = 
-	case mochiweb_headers:get_value("Referer", Headers) of
-	    undefined -> "";
-	    R -> R
-	end,
+        case mochiweb_headers:get_value("Referer", Headers) of
+            undefined -> "";
+            R -> R
+        end,
     UserAgent = 
-	case mochiweb_headers:get_value("User-Agent", Headers) of
-	    undefined -> "";
-	    U -> U
-	end,
+        case mochiweb_headers:get_value("User-Agent", Headers) of
+            undefined -> "";
+            U -> U
+        end,
     fmt_alog(Time, Peer, User, fmt_method(Method), Path, Version,
-	     Status, Length, Referer, UserAgent).
+             Status, Length, Referer, UserAgent).
 
 fmt_method(M) when is_atom(M) -> atom_to_list(M).
 
@@ -133,10 +133,10 @@ fix_log(FD, 1) ->
     ok;
 fix_log(FD, Location) ->
     case file:pread(FD, Location - 1, 1) of
-	{ok, [$\n | _]} ->
-	    ok;
-	{ok, _} ->
-	    fix_log(FD, Location - 1)
+        {ok, [$\n | _]} ->
+            ok;
+        {ok, _} ->
+            fix_log(FD, Location - 1)
     end.
 
 defer_refresh() ->
@@ -168,7 +168,7 @@ suffix({Y, M, D, H}) ->
     lists:flatten([$., YS, $_, MS, $_, DS, $_, HS]).
 
 fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
-	 Status,  Length, Referrer, UserAgent) ->
+         Status,  Length, Referrer, UserAgent) ->
     [fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, [$\s,$"], Referrer,
@@ -221,4 +221,4 @@ fmt_ip(HostName) ->
 fmtnow() ->
     {{Year, Month, Date}, {Hour, Min, Sec}} = calendar:local_time(),
     io_lib:format("[~2..0w/~s/~4..0w:~2..0w:~2..0w:~2..0w ~s]",
-		  [Date,month(Month),Year, Hour, Min, Sec, zone()]).
+                  [Date,month(Month),Year, Hour, Min, Sec, zone()]).

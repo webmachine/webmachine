@@ -29,51 +29,51 @@
          trim_state/0,
          get_reqdata/0,
          set_reqdata/1,
-	 socket/0,
-	 method/0,
-	 version/0,
+         socket/0,
+         method/0,
+         version/0,
          disp_path/0,
-	 path/0,
-	 raw_path/0,
+         path/0,
+         raw_path/0,
          get_req_header/1,
-	 req_headers/0,
-	 req_body/1,
-	 stream_req_body/1,
-	 headers/0,
-	 resp_headers/0,
-	 out_headers/0,
-	 get_out_header/1,
-	 has_out_header/1,
-	 peer/0,
-	 get_header_value/1,
-	 add_response_header/2,
-	 add_response_headers/1,
-	 remove_response_header/1,
-	 merge_response_headers/1,
-	 append_to_response_body/1,
-	 send_response/1,
-	 response_code/0,
-	 set_response_code/1,
+         req_headers/0,
+         req_body/1,
+         stream_req_body/1,
+         headers/0,
+         resp_headers/0,
+         out_headers/0,
+         get_out_header/1,
+         has_out_header/1,
+         peer/0,
+         get_header_value/1,
+         add_response_header/2,
+         add_response_headers/1,
+         remove_response_header/1,
+         merge_response_headers/1,
+         append_to_response_body/1,
+         send_response/1,
+         response_code/0,
+         set_response_code/1,
          set_resp_body/1,
-	 response_body/0,
-	 has_response_body/0,
+         response_body/0,
+         has_response_body/0,
          do_redirect/0,
          resp_redirect/0,
-	 set_metadata/2,
-	 get_metadata/1,
-	 get_path_info/0,
-	 get_path_info/1,
-	 load_dispatch_data/6,
-	 get_path_tokens/0,
-	 get_app_root/0,
-	 parse_cookie/0,
-	 get_cookie_value/1,
-	 parse_qs/0,
-	 get_qs_value/1,
-	 get_qs_value/2,
+         set_metadata/2,
+         get_metadata/1,
+         get_path_info/0,
+         get_path_info/1,
+         load_dispatch_data/6,
+         get_path_tokens/0,
+         get_app_root/0,
+         parse_cookie/0,
+         get_cookie_value/1,
+         parse_qs/0,
+         get_qs_value/1,
+         get_qs_value/2,
          range/0,
-	 log_data/0
-	 ]).
+         log_data/0
+        ]).
 
 -include("webmachine_logger.hrl").
 -include_lib("include/wm_reqstate.hrl").
@@ -90,30 +90,30 @@ trim_state() ->
 
 get_peer() ->
     case ReqState#wm_reqstate.peer of
-	undefined ->
+        undefined ->
             Socket = ReqState#wm_reqstate.socket,
-	    Peer = case inet:peername(Socket) of 
-		{ok, {Addr={10, _, _, _}, _Port}} ->
-		    case get_header_value("x-forwarded-for") of
-			{undefined, _} ->
-			    inet_parse:ntoa(Addr);
-			{Hosts, _} ->
-			    string:strip(lists:last(string:tokens(Hosts, ",")))
-		    end;
-		{ok, {{127, 0, 0, 1}, _Port}} ->
-		    case get_header_value("x-forwarded-for") of
-			{undefined, _} ->
-			    "127.0.0.1";
-			{Hosts, _} ->
-			    string:strip(lists:last(string:tokens(Hosts, ",")))
-		    end;
-		{ok, {Addr, _Port}} ->
-		    inet_parse:ntoa(Addr)
+            Peer = case inet:peername(Socket) of 
+                {ok, {Addr={10, _, _, _}, _Port}} ->
+                    case get_header_value("x-forwarded-for") of
+                        {undefined, _} ->
+                            inet_parse:ntoa(Addr);
+                        {Hosts, _} ->
+                            string:strip(lists:last(string:tokens(Hosts, ",")))
+                    end;
+                {ok, {{127, 0, 0, 1}, _Port}} ->
+                    case get_header_value("x-forwarded-for") of
+                        {undefined, _} ->
+                            "127.0.0.1";
+                        {Hosts, _} ->
+                            string:strip(lists:last(string:tokens(Hosts, ",")))
+                    end;
+                {ok, {Addr, _Port}} ->
+                    inet_parse:ntoa(Addr)
             end,
             NewReqState = ReqState#wm_reqstate{peer=Peer},
-	    {Peer, NewReqState};
-	_ ->
-	    {ReqState#wm_reqstate.peer, ReqState}
+            {Peer, NewReqState};
+        _ ->
+            {ReqState#wm_reqstate.peer, ReqState}
     end.
 
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
@@ -200,12 +200,12 @@ call(do_redirect) ->
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
 call({send_response, Code}) ->
     {Reply, NewState} = 
-	case Code of
-	    200 ->
-		    send_ok_response();
-	    _ ->
-		    send_response(Code)
-	end,
+        case Code of
+            200 ->
+                send_ok_response();
+            _ ->
+                send_response(Code)
+        end,
     LogData = NewState#wm_reqstate.log_data,
     NewLogData = LogData#wm_log_data{finish_time=now()},
     {Reply, NewState#wm_reqstate{log_data=NewLogData}};
@@ -222,9 +222,9 @@ call(has_resp_body) ->
     {Reply, ReqState};
 call({get_metadata, Key}) ->
     Reply = case dict:find(Key, ReqState#wm_reqstate.metadata) of
-		{ok, Value} -> Value;
-		error -> undefined
-	    end,
+                {ok, Value} -> Value;
+                error -> undefined
+            end,
     {Reply, ReqState};
 call({set_metadata, Key, Value}) ->
     NewDict = dict:store(Key, Value, ReqState#wm_reqstate.metadata),
@@ -250,9 +250,9 @@ get_outheader_value(K) ->
 
 send(Socket, Data) ->
     case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of
-	ok -> ok;
-	{error,closed} -> ok;
-	_ -> exit(normal)
+        ok -> ok;
+        {error,closed} -> ok;
+        _ -> exit(normal)
     end.
 
 send_stream_body(Socket, X) -> send_stream_body(Socket, X, 0).
@@ -294,23 +294,23 @@ send_ok_response() ->
     RD0 = ReqState#wm_reqstate.reqdata,
     {Range, State} = get_range(),
     case Range of
-	X when X =:= undefined; X =:= fail ->
-	    send_response(200);
-	Ranges ->
-	    {PartList, Size} = range_parts(RD0, Ranges),
-	    case PartList of
-		[] -> %% no valid ranges
-		    %% could be 416, for now we'll just return 200
-		    send_response(200);
-		PartList ->
-		    {RangeHeaders, RangeBody} = parts_to_body(PartList, Size),
-		    RespHdrsRD = wrq:set_resp_headers(
-                        [{"Accept-Ranges", "bytes"} | RangeHeaders], RD0),
+        X when X =:= undefined; X =:= fail ->
+            send_response(200);
+        Ranges ->
+            {PartList, Size} = range_parts(RD0, Ranges),
+            case PartList of
+                [] -> %% no valid ranges
+                    %% could be 416, for now we'll just return 200
+                    send_response(200);
+                PartList ->
+                    {RangeHeaders, RangeBody} = parts_to_body(PartList, Size),
+                    RespHdrsRD = wrq:set_resp_headers(
+                             [{"Accept-Ranges", "bytes"} | RangeHeaders], RD0),
                     RespBodyRD = wrq:set_resp_body(
                                    RangeBody, RespHdrsRD),
-		    NewState = State#wm_reqstate{reqdata=RespBodyRD},
-		    send_response(206, NewState)
-	    end
+                    NewState = State#wm_reqstate{reqdata=RespBodyRD},
+                    send_response(206, NewState)
+            end
     end.
 
 send_response(Code) -> send_response(Code,ReqState).
@@ -323,12 +323,12 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}) ->
         _ -> {Body0, iolist_size([Body0])}
     end,
     send(PassedState#wm_reqstate.socket,
-	 [make_version(wrq:version(RD)),
+         [make_version(wrq:version(RD)),
           make_code(Code), <<"\r\n">> | 
          make_headers(Code, Length, RD)]),
     FinalLength = case wrq:method(RD) of 
-	'HEAD' -> Length;
-	_ -> 
+         'HEAD' -> Length;
+         _ -> 
             case Body of
                 {stream, Body2} ->
                     send_stream_body(PassedState#wm_reqstate.socket, Body2);
@@ -341,7 +341,7 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}) ->
     end,
     InitLogData = PassedState#wm_reqstate.log_data,
     FinalLogData = InitLogData#wm_log_data{response_code=Code,
-					   response_length=FinalLength},
+                                           response_length=FinalLength},
     {ok, PassedState#wm_reqstate{reqdata=wrq:set_response_code(Code, RD),
                      log_data=FinalLogData}}.
 
@@ -383,12 +383,12 @@ read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
 recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     put(mochiweb_request_recv, true),
     case get_header_value("expect") of
-	{"100-continue", _} ->
-	    send(PassedState#wm_reqstate.socket, 
-		 [make_version(wrq:version(RD)),
+        {"100-continue", _} ->
+            send(PassedState#wm_reqstate.socket, 
+                 [make_version(wrq:version(RD)),
                   make_code(100), <<"\r\n\r\n">>]);
-	_Else ->
-	    ok
+        _Else ->
+            ok
     end,
     case body_length() of
         {unknown_transfer_encoding, X} -> exit({unknown_transfer_encoding, X});
@@ -451,11 +451,11 @@ read_chunk_length(Socket) ->
 
 get_range() ->
     case get_header_value("range") of
-	{undefined, _} ->
-	    {undefined, ReqState#wm_reqstate{range=undefined}};
-	{RawRange, _} ->
-	    Range = parse_range_request(RawRange),
-	    {Range, ReqState#wm_reqstate{range=Range}}
+        {undefined, _} ->
+            {undefined, ReqState#wm_reqstate{range=undefined}};
+        {RawRange, _} ->
+            Range = parse_range_request(RawRange),
+            {Range, ReqState#wm_reqstate{range=Range}}
     end.
 
 range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
@@ -541,12 +541,12 @@ parse_range_request(RawRange) when is_list(RawRange) ->
 parts_to_body([{Start, End, Body0}], Size) ->
     %% return body for a range reponse with a single body
     ContentType = 
-	case get_outheader_value("content-type") of
-	    {undefined, _} ->
-		"text/html";
-	    {CT, _} ->
-		CT
-	end,
+        case get_outheader_value("content-type") of
+            {undefined, _} ->
+                "text/html";
+            {CT, _} ->
+                CT
+        end,
     HeaderList = [{"Content-Type", ContentType},
                   {"Content-Range",
                    ["bytes ",
@@ -564,12 +564,12 @@ parts_to_body(BodyList, Size) when is_list(BodyList) ->
     %% header Content-Type: multipart/byteranges; boundary=441934886133bdee4
     %% and multipart body
     ContentType = 
-	case get_outheader_value("content-type") of
-	    {undefined, _} ->
-		"text/html";
-	    {CT, _} ->
-		CT
-	end,
+        case get_outheader_value("content-type") of
+            {undefined, _} ->
+                "text/html";
+            {CT, _} ->
+                CT
+        end,
     Boundary = mochihex:to_hex(crypto:rand_bytes(8)),
     HeaderList = [{"Content-Type",
                    ["multipart/byteranges; ",
@@ -664,14 +664,14 @@ make_headers(Code, Length, RD) ->
     ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")",
     WithSrv = mochiweb_headers:enter("Server", ServerHeader, Hdrs0),
     Hdrs = case mochiweb_headers:get_value("date", WithSrv) of
-	undefined ->
+        undefined ->
             mochiweb_headers:enter("Date", httpd_util:rfc1123_date(), WithSrv);
-	_ ->
-	    WithSrv
+        _ ->
+            WithSrv
     end,
     F = fun({K, V}, Acc) ->
-		[mochiweb_util:make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
-	end,
+                [mochiweb_util:make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
+        end,
     lists:foldl(F, [<<"\r\n">>], mochiweb_headers:to_list(Hdrs)).
 
 get_reqdata() -> call(get_reqdata).

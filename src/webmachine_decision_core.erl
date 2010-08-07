@@ -63,10 +63,10 @@ respond(Code) ->
     Resource = get(resource),
     EndTime = now(),
     case Code of
-	404 ->
-	    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-	    Reason = {none, none, []},
-	    {ErrorHTML,ReqState} = ErrorHandler:render_error(
+        404 ->
+            {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
+            Reason = {none, none, []},
+            {ErrorHTML,ReqState} = ErrorHandler:render_error(
                           Code, {webmachine_request,get(reqstate)}, Reason),
             put(reqstate, ReqState),
             wrcall({set_resp_body, ErrorHTML});
@@ -83,7 +83,7 @@ respond(Code) ->
                            httpd_util:rfc1123_date(
                               calendar:universal_time_to_local_time(Exp))})
             end;
-	_ -> ignore
+        _ -> ignore
     end,
     put(code, Code),
     wrcall({set_response_code, Code}),
@@ -92,7 +92,7 @@ respond(Code) ->
     RMod = wrcall({get_metadata, 'resource_module'}),
     LogData0 = wrcall(log_data),
     LogData = LogData0#wm_log_data{resource_module=RMod,
-				   end_time=EndTime},
+                                   end_time=EndTime},
     spawn(fun() -> do_log(LogData) end),
     Resource:stop().
 
@@ -112,13 +112,13 @@ error_response(Reason) ->
 
 decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
     case Test of
-	{error, Reason} -> error_response(Reason);
-	{error, Reason0, Reason1} -> error_response({Reason0, Reason1});
-	{halt, Code} -> respond(Code);
-	TestVal -> decision_flow(TrueFlow, Test);
-	_ -> decision_flow(FalseFlow, Test)
+        {error, Reason} -> error_response(Reason);
+        {error, Reason0, Reason1} -> error_response({Reason0, Reason1});
+        {halt, Code} -> respond(Code);
+        TestVal -> decision_flow(TrueFlow, Test);
+        _ -> decision_flow(FalseFlow, Test)
     end.
-	    
+    
 decision_flow(X, TestResult) when is_integer(X) ->
     if X >= 500 -> error_response(X, TestResult);
        true -> respond(X)
@@ -131,10 +131,10 @@ do_log(LogData) ->
         _ -> nop
     end,
     case application:get_env(webmachine, enable_perf_logger) of
-	{ok, true} ->
-	    webmachine_perf_logger:log(LogData);
-	_ ->
-	    ignore
+        {ok, true} ->
+            webmachine_perf_logger:log(LogData);
+        _ ->
+            ignore
     end.
 
 log_decision(DecisionID) -> 
@@ -142,14 +142,14 @@ log_decision(DecisionID) ->
     Resource:log_d(DecisionID).
 
 %% "Service Available"
-decision(v3b13) ->	
+decision(v3b13) ->
     decision_test(resource_call(ping), pong, v3b13b, 503);
-decision(v3b13b) ->	
+decision(v3b13b) ->
     decision_test(resource_call(service_available), true, v3b12, 503);
 %% "Known method?"
 decision(v3b12) ->
     decision_test(lists:member(method(), resource_call(known_methods)),
-		  true, v3b11, 501);
+                  true, v3b11, 501);
 %% "URI too long?"
 decision(v3b11) ->
     decision_test(resource_call(uri_too_long), true, 414, v3b10);
@@ -157,12 +157,12 @@ decision(v3b11) ->
 decision(v3b10) ->
     Methods = resource_call(allowed_methods),
     case lists:member(method(), Methods) of
-	true ->
-	    d(v3b9);
-	false ->
-	    wrcall({set_resp_headers, [{"Allow",
-		     string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
-	    respond(405)
+        true ->
+            d(v3b9);
+        false ->
+            wrcall({set_resp_headers, [{"Allow",
+                   string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
+            respond(405)
     end;
 %% "Malformed?"
 decision(v3b9) ->
@@ -170,11 +170,11 @@ decision(v3b9) ->
 %% "Authorized?"
 decision(v3b8) ->
     case resource_call(is_authorized) of
-	true -> d(v3b7);
-	{error, Reason} ->
-	    error_response(Reason);
-	{halt, Code}  ->
-	    respond(Code);
+        true -> d(v3b7);
+        {error, Reason} ->
+            error_response(Reason);
+        {halt, Code}  ->
+            respond(Code);
         AuthHead ->
             wrcall({set_resp_header, "WWW-Authenticate", AuthHead}),
             respond(401)
@@ -194,37 +194,37 @@ decision(v3b4) ->
 %% "OPTIONS?"
 decision(v3b3) ->
     case method() of 
-	'OPTIONS' ->
-	    Hdrs = resource_call(options),
-	    respond(200, Hdrs);
-	_ ->
-	    d(v3c3)
+        'OPTIONS' ->
+            Hdrs = resource_call(options),
+            respond(200, Hdrs);
+        _ ->
+            d(v3c3)
     end;
 %% Accept exists?
 decision(v3c3) ->
     PTypes = [Type || {Type,_Fun} <- resource_call(content_types_provided)],
     case get_header_val("accept") of
-	undefined ->
-	    wrcall({set_metadata, 'content-type', hd(PTypes)}),
-	    d(v3d4);
-	_ ->
-	    d(v3c4)
+        undefined ->
+            wrcall({set_metadata, 'content-type', hd(PTypes)}),
+            d(v3d4);
+        _ ->
+            d(v3c4)
     end;
 %% Acceptable media type available?
 decision(v3c4) ->
     PTypes = [Type || {Type,_Fun} <- resource_call(content_types_provided)],
     AcceptHdr = get_header_val("accept"),
     case webmachine_util:choose_media_type(PTypes, AcceptHdr) of
-	none ->
-	    respond(406);
-	MType ->
-	    wrcall({set_metadata, 'content-type', MType}),
-	    d(v3d4)
+        none ->
+            respond(406);
+        MType ->
+            wrcall({set_metadata, 'content-type', MType}),
+            d(v3d4)
     end;
 %% Accept-Language exists?
 decision(v3d4) ->
     decision_test(get_header_val("accept-language"),
-		  undefined, v3e5, v3d5);
+                  undefined, v3e5, v3d5);
 %% Acceptable Language available? %% WMACH-46 (do this as proper conneg)
 decision(v3d5) ->
     decision_test(resource_call(language_available), true, v3e5, 406);
@@ -287,26 +287,26 @@ decision(v3h10) ->
 decision(v3h11) ->
     IUMSDate = get_header_val("if-unmodified-since"),
     decision_test(webmachine_util:convert_request_date(IUMSDate),
-		  bad_date, v3i12, v3h12);
+                  bad_date, v3i12, v3h12);
 %% "Last-Modified > I-UM-S?"
 decision(v3h12) ->
     ReqDate = get_header_val("if-unmodified-since"),
     ReqErlDate = webmachine_util:convert_request_date(ReqDate),
     ResErlDate = resource_call(last_modified),
     decision_test(ResErlDate > ReqErlDate,
-		  true, 412, v3i12);
+                  true, 412, v3i12);
 %% "Moved permanently? (apply PUT to different URI)"
 decision(v3i4) ->
     case resource_call(moved_permanently) of
-	{true, MovedURI} ->
-	    wrcall({set_resp_header, "Location", MovedURI}),
-	    respond(301);
-	false ->
-	    d(v3p3);
-	{error, Reason} ->
-	    error_response(Reason);
-	{halt, Code} ->
-	    respond(Code)
+        {true, MovedURI} ->
+            wrcall({set_resp_header, "Location", MovedURI}),
+            respond(301);
+        false ->
+            d(v3p3);
+        {error, Reason} ->
+            error_response(Reason);
+        {halt, Code} ->
+            respond(Code)
     end;
 %% PUT?
 decision(v3i7) ->
@@ -320,19 +320,19 @@ decision(v3i13) ->
 %% GET or HEAD?
 decision(v3j18) ->
     decision_test(lists:member(method(),['GET','HEAD']),
-		  true, 304, 412);
+                  true, 304, 412);
 %% "Moved permanently?"
 decision(v3k5) ->
     case resource_call(moved_permanently) of
-	{true, MovedURI} ->
-	    wrcall({set_resp_header, "Location", MovedURI}),
-	    respond(301);
-	false ->
-	    d(v3l5);
-	{error, Reason} ->
-	    error_response(Reason);
-	{halt, Code} ->
-	    respond(Code)
+        {true, MovedURI} ->
+            wrcall({set_resp_header, "Location", MovedURI}),
+            respond(301);
+        false ->
+            d(v3l5);
+        {error, Reason} ->
+            error_response(Reason);
+        {halt, Code} ->
+            respond(Code)
     end;
 %% "Previously existed?"
 decision(v3k7) ->
@@ -344,15 +344,15 @@ decision(v3k13) ->
 %% "Moved temporarily?"
 decision(v3l5) ->
     case resource_call(moved_temporarily) of
-	{true, MovedURI} ->
-	    wrcall({set_resp_header, "Location", MovedURI}),
-	    respond(307);
-	false ->
-	    d(v3m5);
-	{error, Reason} ->
-	    error_response(Reason);
-	{halt, Code} ->
-	    respond(Code)
+        {true, MovedURI} ->
+            wrcall({set_resp_header, "Location", MovedURI}),
+            respond(307);
+        false ->
+            d(v3m5);
+        {error, Reason} ->
+            error_response(Reason);
+        {halt, Code} ->
+            respond(Code)
     end;
 %% "POST?"
 decision(v3l7) ->
@@ -364,14 +364,14 @@ decision(v3l13) ->
 decision(v3l14) -> 
     IMSDate = get_header_val("if-modified-since"),
     decision_test(webmachine_util:convert_request_date(IMSDate),
-		  bad_date, v3m16, v3l15);
+                  bad_date, v3m16, v3l15);
 %% "IMS > Now?"
 decision(v3l15) ->
     NowDateTime = calendar:universal_time(),
     ReqDate = get_header_val("if-modified-since"),
     ReqErlDate = webmachine_util:convert_request_date(ReqDate),
     decision_test(ReqErlDate > NowDateTime,
-		  true, v3m16, v3l17);
+                  true, v3m16, v3l17);
 %% "Last-Modified > IMS?"
 decision(v3l17) ->
     ReqDate = get_header_val("if-modified-since"),    
@@ -596,8 +596,8 @@ make_size_encoder_stream(Encoder, Charsetter, Fun) ->
 choose_encoding(AccEncHdr) ->
     Encs = [Enc || {Enc,_Fun} <- resource_call(encodings_provided)],
     case webmachine_util:choose_encoding(Encs, AccEncHdr) of
-	none -> none;
-	ChosenEnc ->
+        none -> none;
+        ChosenEnc ->
             case ChosenEnc of
                 "identity" ->
                     nop;
@@ -605,7 +605,7 @@ choose_encoding(AccEncHdr) ->
                     wrcall({set_resp_header, "Content-Encoding",ChosenEnc})
             end,
             wrcall({set_metadata, 'content-encoding',ChosenEnc}),
-	    ChosenEnc
+            ChosenEnc
     end.
 
 choose_charset(AccCharHdr) ->
@@ -629,9 +629,9 @@ variances() ->
         _ -> ["Accept"]
     end,
     AcceptEncoding = case length(resource_call(encodings_provided)) of
-	1 -> [];
-	0 -> [];
-	_ -> ["Accept-Encoding"]
+        1 -> [];
+        0 -> [];
+        _ -> ["Accept-Encoding"]
     end,
     AcceptCharset = case resource_call(charsets_provided) of
         no_charset -> [];

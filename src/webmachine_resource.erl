@@ -103,8 +103,8 @@ default(_) ->
           
 wrap(Mod, Args) ->
     case Mod:init(Args) of
-	{ok, ModState} ->
-	    {ok, webmachine_resource:new(Mod, ModState, 
+        {ok, ModState} ->
+            {ok, webmachine_resource:new(Mod, ModState, 
                            dict:from_list(Mod:module_info(exports)), false)};
         {{trace, Dir}, ModState} ->
             {ok, File} = open_log_file(Dir, Mod),
@@ -112,9 +112,9 @@ wrap(Mod, Args) ->
             log_call(File, attempt, Mod, init, Args),
             log_call(File, result, Mod, init, {{trace, Dir}, ModState}),
             {ok, webmachine_resource:new(Mod, ModState,
-			dict:from_list(Mod:module_info(exports)), File)};
-	_ ->
-	    {stop, bad_init_arg}
+                dict:from_list(Mod:module_info(exports)), File)};
+        _ ->
+            {stop, bad_init_arg}
     end.
 
 do(Fun, ReqProps) when is_atom(Fun) andalso is_list(ReqProps) ->
@@ -163,7 +163,7 @@ resource_call(F, ReqData) ->
     Result = try
         apply(R_Mod, F, [ReqData, R_ModState])
     catch C:R ->
-	    Reason = {C, R, trim_trace(erlang:get_stacktrace())},
+            Reason = {C, R, trim_trace(erlang:get_stacktrace())},
             {{error, Reason}, ReqData, R_ModState}
     end,
         case R_Trace of

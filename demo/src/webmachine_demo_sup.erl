@@ -25,15 +25,15 @@ upgrade() ->
     {ok, {_, Specs}} = init([]),
 
     Old = sets:from_list(
-	    [Name || {Name, _, _, _} <- supervisor:which_children(?MODULE)]),
+            [Name || {Name, _, _, _} <- supervisor:which_children(?MODULE)]),
     New = sets:from_list([Name || {Name, _, _, _, _, _} <- Specs]),
     Kill = sets:subtract(Old, New),
 
     sets:fold(fun (Id, ok) ->
-		      supervisor:terminate_child(?MODULE, Id),
-		      supervisor:delete_child(?MODULE, Id),
-		      ok
-	      end, ok, Kill),
+                      supervisor:terminate_child(?MODULE, Id),
+                      supervisor:delete_child(?MODULE, Id),
+                      ok
+              end, ok, Kill),
 
     [supervisor:start_child(?MODULE, Spec) || Spec <- Specs],
     ok.
@@ -46,13 +46,13 @@ init([]) ->
                          [filename:dirname(code:which(?MODULE)),
                           "..", "priv", "dispatch.conf"])),
     WebConfig = [
-		 {ip, Ip},
+                 {ip, Ip},
                  {backlog, 1000},
-		 {port, 8000},
+                 {port, 8000},
                  {log_dir, "priv/log"},
-		 {dispatch, Dispatch}],
+                 {dispatch, Dispatch}],
     Web = {webmachine_mochiweb,
-	   {webmachine_mochiweb, start, [WebConfig]},
-	   permanent, 5000, worker, dynamic},
+           {webmachine_mochiweb, start, [WebConfig]},
+           permanent, 5000, worker, dynamic},
     Processes = [Web],
     {ok, { {one_for_one, 10, 10}, Processes} }.

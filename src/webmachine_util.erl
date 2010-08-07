@@ -31,11 +31,11 @@
 
 convert_request_date(Date) ->
     try 
-	case httpd_util:convert_request_date(Date) of
-	    ReqDate -> ReqDate
-	end
+        case httpd_util:convert_request_date(Date) of
+            ReqDate -> ReqDate
+        end
     catch
-	error:_ -> bad_date
+        error:_ -> bad_date
     end.
 
 %% returns true if D1 > D2
@@ -48,46 +48,46 @@ compare_ims_dates(D1, D2) ->
 %% @doc  Guess the mime type of a file by the extension of its filename.
 guess_mime(File) ->
     case filename:extension(File) of
-	".html" ->
-	    "text/html";
-	".xhtml" ->
-	    "application/xhtml+xml";
-	".xml" ->
-	    "application/xml";
-	".css" ->
-	    "text/css";
-	".js" ->
-	    "application/x-javascript";
-	".jpg" ->
-	    "image/jpeg";
-	".jpeg" ->
-	    "image/jpeg";
-	".gif" ->
-	    "image/gif";
-	".png" ->
-	    "image/png";
-	".ico" ->
-	    "image/x-icon";
-	".swf" ->
-	    "application/x-shockwave-flash";
-	".zip" ->
-	    "application/zip";
-	".bz2" ->
-	    "application/x-bzip2";
-	".gz" ->
-	    "application/x-gzip";
-	".tar" ->
-	    "application/x-tar";
-	".tgz" ->
-	    "application/x-gzip";
+        ".html" ->
+            "text/html";
+        ".xhtml" ->
+            "application/xhtml+xml";
+        ".xml" ->
+            "application/xml";
+        ".css" ->
+            "text/css";
+        ".js" ->
+            "application/x-javascript";
+        ".jpg" ->
+            "image/jpeg";
+        ".jpeg" ->
+            "image/jpeg";
+        ".gif" ->
+            "image/gif";
+        ".png" ->
+            "image/png";
+        ".ico" ->
+            "image/x-icon";
+        ".swf" ->
+            "application/x-shockwave-flash";
+        ".zip" ->
+            "application/zip";
+        ".bz2" ->
+            "application/x-bzip2";
+        ".gz" ->
+            "application/x-gzip";
+        ".tar" ->
+            "application/x-tar";
+        ".tgz" ->
+            "application/x-gzip";
         ".htc" ->
             "text/x-component";
-	".manifest" ->
-	    "text/cache-manifest";
+        ".manifest" ->
+            "text/cache-manifest";
         ".svg" ->
             "image/svg+xml";
-	_ ->
-	    "text/plain"
+        _ ->
+            "text/plain"
     end.
 
 choose_media_type(Provided,AcceptHead) ->
@@ -106,61 +106,61 @@ choose_media_type1(_Provided,[]) ->
 choose_media_type1(Provided,[H|T]) ->
     {_Pri,Type,Params} = H,
     case media_match({Type,Params}, Provided) of
-	[] -> choose_media_type1(Provided,T);
-	[{CT_T,CT_P}|_] -> format_content_type(CT_T,CT_P)
+        [] -> choose_media_type1(Provided,T);
+        [{CT_T,CT_P}|_] -> format_content_type(CT_T,CT_P)
     end.
 
 media_match(_,[]) -> [];
 media_match({"*/*",[]},[H|_]) -> [H];
 media_match({Type,Params},Provided) ->
     [{T1,P1} || {T1,P1} <- Provided,
-		media_type_match(Type,T1), media_params_match(Params,P1)].
+                media_type_match(Type,T1), media_params_match(Params,P1)].
 media_type_match(Req,Prov) ->
     case Req of
-	"*" -> % might as well not break for lame (Gomez) clients
-	    true;
-	"*/*" ->
-	    true;
-	Prov ->
-	    true;
-	_ ->
-	    [R1|R2] = string:tokens(Req,"/"),
-	    [P1,_P2] = string:tokens(Prov,"/"),
-	    case R2 of
-		["*"] ->
-		    case R1 of
-			P1 -> true;
-			_ -> false
-		    end;
-		_ -> false
-	    end
+        "*" -> % might as well not break for lame (Gomez) clients
+            true;
+        "*/*" ->
+            true;
+        Prov ->
+            true;
+        _ ->
+            [R1|R2] = string:tokens(Req,"/"),
+            [P1,_P2] = string:tokens(Prov,"/"),
+            case R2 of
+                ["*"] ->
+                    case R1 of
+                        P1 -> true;
+                        _ -> false
+                    end;
+                _ -> false
+            end
     end.
 media_params_match(Req,Prov) ->
-    lists:sort(Req) =:= lists:sort(Prov).	    
+    lists:sort(Req) =:= lists:sort(Prov).
 
 prioritize_media(TyParam) ->
     {Type, Params} = TyParam,
     prioritize_media(Type,Params,[]).    
 prioritize_media(Type,Params,Acc) ->
     case Params of
-	[] ->
-	    {1, Type, Acc};
-	_ ->
-	    [{Tok,Val}|Rest] = Params,
-	    case Tok of
-		"q" ->
-		    QVal = case Val of
-			"1" ->
-			    1;
-                        [$.|_] ->
-                            %% handle strange FeedBurner Accept
-                            list_to_float([$0|Val]); 
-			_ -> list_to_float(Val)
-		    end,
-		    {QVal, Type, Rest ++ Acc};
-		_ ->
-		    prioritize_media(Type,Rest,[{Tok,Val}|Acc])
-	    end
+        [] ->
+            {1, Type, Acc};
+        _ ->
+            [{Tok,Val}|Rest] = Params,
+            case Tok of
+                "q" ->
+                    QVal = case Val of
+                               "1" ->
+                                   1;
+                               [$.|_] ->
+                                   %% handle strange FeedBurner Accept
+                                   list_to_float([$0|Val]); 
+                               _ -> list_to_float(Val)
+                           end,
+                    {QVal, Type, Rest ++ Acc};
+                _ ->
+                    prioritize_media(Type,Rest,[{Tok,Val}|Acc])
+            end
     end.
 
 media_type_to_detail(MType) ->

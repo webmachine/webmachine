@@ -45,9 +45,9 @@ dispatch(HostAsString, PathAsString, DispatchList) ->
     % "deeper" than we otherwise might think as we are "inside"
     % a directory named by the last token.
     ExtraDepth = case lists:last(PathAsString) == ?SEPARATOR of
-		     true -> 1;
-		     _ -> 0
-		 end,
+                     true -> 1;
+                     _ -> 0
+                 end,
     {Host, Port} = split_host_port(HostAsString),
     try_host_binding(DispatchList, lists:reverse(Host), Port,
                      Path, ExtraDepth).
