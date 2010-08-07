@@ -574,6 +574,8 @@ encode_body(Body) ->
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        {stream, Size, Fun} ->
+            {stream, Size, make_size_encoder_stream(Encoder, Charsetter, Fun)};
         {writer, BodyFun} ->
             {writer, {Encoder, Charsetter, BodyFun}};
         _ ->
@@ -585,6 +587,11 @@ make_encoder_stream(Encoder, Charsetter, {Body, done}) ->
 make_encoder_stream(Encoder, Charsetter, {Body, Next}) ->
     {Encoder(Charsetter(Body)),
      fun() -> make_encoder_stream(Encoder, Charsetter, Next()) end}.
+
+make_size_encoder_stream(Encoder, Charsetter, Fun) ->
+    fun(Start, End) ->
+            make_encoder_stream(Encoder, Charsetter, Fun(Start, End))
+    end.
 
 choose_encoding(AccEncHdr) ->
     Encs = [Enc || {Enc,_Fun} <- resource_call(encodings_provided)],
