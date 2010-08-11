@@ -46,7 +46,7 @@ refresh(Time) ->
     gen_server:cast(?MODULE, {refresh, Time}).
 
 log(#wm_log_data{}=D) ->
-    gen_server:call(?MODULE, {log, D}).
+    gen_server:call(?MODULE, {log, D}, infinity).
 
 handle_call({log, LogData}, _From, State) ->
     NewState = maybe_rotate(State, now()),

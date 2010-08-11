@@ -69,19 +69,19 @@
 %%      be the format documented here:
 %% http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
 add_route(Route) ->
-    gen_server:call(?SERVER, {add_route, Route}).
+    gen_server:call(?SERVER, {add_route, Route}, infinity).
 
 %% @spec remove_route(hostmatchterm() | pathmatchterm()) -> ok
 %% @doc Removes a route from webamchine's route table. The route
 %%      route must be properly formatted
 %% @see add_route/2
 remove_route(Route) ->
-    gen_server:call(?SERVER, {remove_route, Route}).
+    gen_server:call(?SERVER, {remove_route, Route}, infinity).
 
 %% @spec remove_resource(atom()) -> ok
 %% @doc Removes all routes for a specific resource module.
 remove_resource(Resource) when is_atom(Resource) ->
-    gen_server:call(?SERVER, {remove_resource, Resource}).
+    gen_server:call(?SERVER, {remove_resource, Resource}, infinity).
 
 %% @spec start_link() -> {ok, pid()} | {error, any()}
 %% @doc Starts the webmachine_router gen_server.
@@ -153,7 +153,7 @@ start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
 
 get_routes() ->
-    gen_server:call(?SERVER, get_routes).
+    gen_server:call(?SERVER, get_routes, infinity).
 
 %% Tests
 add_remove_route_test() ->
