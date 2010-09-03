@@ -21,11 +21,31 @@
 -export([start/1, stop/0, loop/1]).
 
 start([{http, HttpOptions}, {common, CommonOptions}]) ->
-    start([{http, HttpOptions}, {https, undefined}, {common, CommonOptions}]);
+    do_start(is_started(webmachine_logger), CommonOptions, {http, HttpOptions});
 start([{https, HttpsOptions}, {common, CommonOptions}]) ->
-    start([{http, undefined}, {https, HttpsOptions}, {common, CommonOptions}]);
-start([{http, HttpOptions}, {https, HttpsOptions}, {common, CommonOptions}]) ->
-    {DispatchList, Options1} = get_option(dispatch, CommonOptions),
+    do_start(is_started(webmachine_logger), CommonOptions, {https, HttpsOptions});
+start(Options) ->
+    {DispatchList, Options1} = get_option(dispatch, Options),
+    {ErrorHandler0, Options2} = get_option(error_handler, Options1),
+    {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
+    {LogDir, Options4} = get_option(log_dir, Options3),
+
+    CommonOptions = [
+        {dispatch, DispatchList},
+        {error_handler, ErrorHandler0},
+        {enable_perf_logger, EnablePerfLog},
+        {log_dir, LogDir}
+    ],
+    start([{http, Options4}, {common, CommonOptions}]).
+
+do_start(false, CommonOptions, {Protocol, ProtocolOptions}) ->
+    start_common(CommonOptions),
+    start_protocol(Protocol, ProtocolOptions);
+do_start(true, _, {Protocol, ProtocolOptions}) ->
+    start_protocol(Protocol, ProtocolOptions).
+
+start_common(Options) ->
+    {DispatchList, Options1} = get_option(dispatch, Options),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
     ErrorHandler = 
@@ -44,35 +64,18 @@ start([{http, HttpOptions}, {https, HttpsOptions}, {common, CommonOptions}]) ->
             ignore
     end,
     application:set_env(webmachine, dispatch_list, DispatchList),
-    application:set_env(webmachine, error_handler, ErrorHandler),
+    application:set_env(webmachine, error_handler, ErrorHandler).
 
-    Res = case HttpOptions of
-        undefined -> undefined;
-        _ ->
-            mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | HttpOptions])
-    end,
-    case HttpsOptions of
-        undefined -> Res;
-        _ ->
-            mochiweb_http:start([{name, https_name()}, {loop, fun loop/1} | HttpsOptions])
-    end;
-start(Options) ->
-    {DispatchList, Options1} = get_option(dispatch, Options),
-    {ErrorHandler0, Options2} = get_option(error_handler, Options1),
-    {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
-    {LogDir, Options4} = get_option(log_dir, Options3),
-
-    CommonOptions = [
-        {dispatch, DispatchList},
-        {error_handler, ErrorHandler0},
-        {enable_perf_logger, EnablePerfLog},
-        {log_dir, LogDir}
-    ],
-    start([{http, Options4}, {common, CommonOptions}]).
+start_protocol(http, Options) ->
+    mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | Options]);
+start_protocol(https, Options) ->
+    mochiweb_http:start([{name, https_name()}, {loop, fun loop/1} | Options]).
 
 stop() ->
     mochiweb_http:stop(?MODULE),
     mochiweb_http:stop(https_name()).
+
+is_started(Name) -> erlang:whereis(Name) /= undefined.
 
 https_name() -> list_to_atom(atom_to_list(?MODULE) ++ "_https").
 
