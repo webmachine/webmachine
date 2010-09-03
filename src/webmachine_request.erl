@@ -91,8 +91,11 @@ trim_state() ->
 get_peer() ->
     case ReqState#wm_reqstate.peer of
 	undefined ->
-            Socket = ReqState#wm_reqstate.socket,
-	    Peer = case inet:peername(Socket) of 
+        PeerName = case ReqState#wm_reqstate.socket of
+			{ssl,SslSocket} -> ssl:peername(SslSocket);
+			_ -> inet:peername(ReqState#wm_reqstate.socket)
+		end,
+	    Peer = case PeerName of
 		{ok, {Addr={10, _, _, _}, _Port}} ->
 		    case get_header_value("x-forwarded-for") of
 			{undefined, _} ->
@@ -109,8 +112,8 @@ get_peer() ->
 		    end;
 		{ok, {Addr, _Port}} ->
 		    inet_parse:ntoa(Addr)
-            end,
-            NewReqState = ReqState#wm_reqstate{peer=Peer},
+        end,
+        NewReqState = ReqState#wm_reqstate{peer=Peer},
 	    {Peer, NewReqState};
 	_ ->
 	    {ReqState#wm_reqstate.peer, ReqState}

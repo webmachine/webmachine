@@ -20,31 +20,61 @@
 -author('Andy Gross <andy@basho.com>').
 -export([start/1, stop/0, loop/1]).
 
-start(Options) ->
-    {DispatchList, Options1} = get_option(dispatch, Options),
+start([{http, HttpOptions}, {common, CommonOptions}]) ->
+	start([{http, HttpOptions}, {https, undefined}, {common, CommonOptions}]);
+start([{https, HttpsOptions}, {common, CommonOptions}]) ->
+	start([{http, undefined}, {https, HttpsOptions}, {common, CommonOptions}]);
+start([{http, HttpOptions}, {https, HttpsOptions}, {common, CommonOptions}]) ->
+    {DispatchList, Options1} = get_option(dispatch, CommonOptions),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
     ErrorHandler = 
-	case ErrorHandler0 of 
-	    undefined ->
-		webmachine_error_handler;
-	    EH -> EH
-	end,
-    {LogDir, Options4} = get_option(log_dir, Options3),
+		case ErrorHandler0 of
+		    undefined ->
+				webmachine_error_handler;
+		    EH -> EH
+		end,
+    {LogDir, _} = get_option(log_dir, Options3),
     webmachine_sup:start_logger(LogDir),
     case EnablePerfLog of
-	true ->
-	    application:set_env(webmachine, enable_perf_logger, true),
-	    webmachine_sup:start_perf_logger(LogDir);
-	_ ->
-	    ignore
+		true ->
+		    application:set_env(webmachine, enable_perf_logger, true),
+		    webmachine_sup:start_perf_logger(LogDir);
+		_ ->
+		    ignore
     end,
     application:set_env(webmachine, dispatch_list, DispatchList),
     application:set_env(webmachine, error_handler, ErrorHandler),
-    mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | Options4]).
+
+	Res = case HttpOptions of
+		undefined -> undefined;
+		_ ->
+			mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | HttpOptions])
+	end,
+	case HttpsOptions of
+		undefined -> Res;
+		_ ->
+			mochiweb_http:start([{name, https_name()}, {loop, fun loop/1} | HttpsOptions])
+	end;
+start(Options) ->
+	{DispatchList, Options1} = get_option(dispatch, Options),
+    {ErrorHandler0, Options2} = get_option(error_handler, Options1),
+    {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
+    {LogDir, Options4} = get_option(log_dir, Options3),
+
+	CommonOptions = [
+		{dispatch, DispatchList},
+		{error_handler, ErrorHandler0},
+		{enable_perf_logger, EnablePerfLog},
+		{log_dir, LogDir}
+	],
+	start([{http, Options4}, {common, CommonOptions}]).
 
 stop() ->
-    mochiweb_http:stop(?MODULE).
+    mochiweb_http:stop(?MODULE),
+	mochiweb_http:stop(https_name()).
+
+https_name() -> list_to_atom(atom_to_list(?MODULE) ++ "_https").
 
 loop(MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
