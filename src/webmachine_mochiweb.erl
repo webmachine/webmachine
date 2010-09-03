@@ -21,58 +21,58 @@
 -export([start/1, stop/0, loop/1]).
 
 start([{http, HttpOptions}, {common, CommonOptions}]) ->
-	start([{http, HttpOptions}, {https, undefined}, {common, CommonOptions}]);
+    start([{http, HttpOptions}, {https, undefined}, {common, CommonOptions}]);
 start([{https, HttpsOptions}, {common, CommonOptions}]) ->
-	start([{http, undefined}, {https, HttpsOptions}, {common, CommonOptions}]);
+    start([{http, undefined}, {https, HttpsOptions}, {common, CommonOptions}]);
 start([{http, HttpOptions}, {https, HttpsOptions}, {common, CommonOptions}]) ->
     {DispatchList, Options1} = get_option(dispatch, CommonOptions),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
     ErrorHandler = 
-		case ErrorHandler0 of
-		    undefined ->
-				webmachine_error_handler;
-		    EH -> EH
-		end,
+        case ErrorHandler0 of
+            undefined ->
+                webmachine_error_handler;
+            EH -> EH
+        end,
     {LogDir, _} = get_option(log_dir, Options3),
     webmachine_sup:start_logger(LogDir),
     case EnablePerfLog of
-		true ->
-		    application:set_env(webmachine, enable_perf_logger, true),
-		    webmachine_sup:start_perf_logger(LogDir);
-		_ ->
-		    ignore
+        true ->
+            application:set_env(webmachine, enable_perf_logger, true),
+            webmachine_sup:start_perf_logger(LogDir);
+        _ ->
+            ignore
     end,
     application:set_env(webmachine, dispatch_list, DispatchList),
     application:set_env(webmachine, error_handler, ErrorHandler),
 
-	Res = case HttpOptions of
-		undefined -> undefined;
-		_ ->
-			mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | HttpOptions])
-	end,
-	case HttpsOptions of
-		undefined -> Res;
-		_ ->
-			mochiweb_http:start([{name, https_name()}, {loop, fun loop/1} | HttpsOptions])
-	end;
+    Res = case HttpOptions of
+        undefined -> undefined;
+        _ ->
+            mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | HttpOptions])
+    end,
+    case HttpsOptions of
+        undefined -> Res;
+        _ ->
+            mochiweb_http:start([{name, https_name()}, {loop, fun loop/1} | HttpsOptions])
+    end;
 start(Options) ->
-	{DispatchList, Options1} = get_option(dispatch, Options),
+    {DispatchList, Options1} = get_option(dispatch, Options),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
     {LogDir, Options4} = get_option(log_dir, Options3),
 
-	CommonOptions = [
-		{dispatch, DispatchList},
-		{error_handler, ErrorHandler0},
-		{enable_perf_logger, EnablePerfLog},
-		{log_dir, LogDir}
-	],
-	start([{http, Options4}, {common, CommonOptions}]).
+    CommonOptions = [
+        {dispatch, DispatchList},
+        {error_handler, ErrorHandler0},
+        {enable_perf_logger, EnablePerfLog},
+        {log_dir, LogDir}
+    ],
+    start([{http, Options4}, {common, CommonOptions}]).
 
 stop() ->
     mochiweb_http:stop(?MODULE),
-	mochiweb_http:stop(https_name()).
+    mochiweb_http:stop(https_name()).
 
 https_name() -> list_to_atom(atom_to_list(?MODULE) ++ "_https").
 
@@ -87,14 +87,14 @@ loop(MochiReq) ->
     case webmachine_dispatcher:dispatch(Host, Path, DispatchList) of
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-	    {ErrorHTML,ReqState1} = 
+        {ErrorHTML,ReqState1} =
                 ErrorHandler:render_error(404, Req, {none, none, []}),
             Req1 = {webmachine_request,ReqState1},
-	    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
+        {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
             Req2 = {webmachine_request,ReqState2},
-	    {ok,ReqState3} = Req2:send_response(404),
+        {ok,ReqState3} = Req2:send_response(404),
             Req3 = {webmachine_request,ReqState3},
-	    {LogData,_ReqState4} = Req3:log_data(),
+        {LogData,_ReqState4} = Req3:log_data(),
             case application:get_env(webmachine,webmachine_logger_module) of
                 {ok, LogModule} ->
                     spawn(LogModule, log_access, [LogData]);
