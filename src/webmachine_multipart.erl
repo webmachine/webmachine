@@ -48,8 +48,8 @@
 % @spec find_boundary(wrq:wm_reqdata()) -> boundary()
 find_boundary(ReqData) ->
     ContentType = wrq:get_req_header("content-type", ReqData),
-    string:substr(ContentType, string:str(ContentType, "boundary=") 
-                  + length("boundary=")).
+    {match,[Trimmed]} = re:run(ContentType, "boundary=(.*?[^\s;]*)", [{capture, [1], list}]),
+    Trimmed.
 
 % @doc Turn a multipart form into component parts.
 % @spec get_all_parts(incoming_req_body(), boundary()) -> [fpart()]
