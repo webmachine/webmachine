@@ -80,7 +80,7 @@
 -include_lib("include/wm_reqdata.hrl").
 -include_lib("mochiweb/include/internal.hrl").
 
--define(WMVSN, "1.7.1").
+-define(WMVSN, "1.7.2").
 -define(QUIP, "participate in the frantic").
 -define(IDLE_TIMEOUT, infinity).
 
