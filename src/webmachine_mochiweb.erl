@@ -31,20 +31,35 @@ start(Options) ->
             EH -> EH
         end,
     {LogDir, Options4} = get_option(log_dir, Options3),
-    webmachine_sup:start_logger(LogDir),
+    case whereis(webmachine_logger) of
+      undefined ->
+        webmachine_sup:start_logger(LogDir);
+      _ ->
+        ignore
+    end,
     case EnablePerfLog of
         true ->
-            application:set_env(webmachine, enable_perf_logger, true),
-            webmachine_sup:start_perf_logger(LogDir);
+          case whereis(webmachine_perf_logger) of
+            undefined ->
+              application:set_env(webmachine, enable_perf_logger, true),
+              webmachine_sup:start_perf_logger(LogDir);
+            _ ->
+              ignore
+          end;
         _ ->
             ignore
     end,
+    {PName, Options5} = case get_option(name, Options4) of
+      {undefined, _} -> {?MODULE, Options4};
+      {PN, O5} -> {PN, O5}
+    end,
     application:set_env(webmachine, dispatch_list, DispatchList),
     application:set_env(webmachine, error_handler, ErrorHandler),
-    mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | Options4]).
+    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options5]).
 
 stop() ->
-    mochiweb_http:stop(?MODULE).
+    {registered_name, PName} = process_info(self(), registered_name),
+    mochiweb_http:stop(PName).
 
 loop(MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
