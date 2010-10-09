@@ -90,30 +90,33 @@ trim_state() ->
 
 get_peer() ->
     case ReqState#wm_reqstate.peer of
-        undefined ->
-            Socket = ReqState#wm_reqstate.socket,
-            Peer = case inet:peername(Socket) of 
-                {ok, {Addr={10, _, _, _}, _Port}} ->
-                    case get_header_value("x-forwarded-for") of
-                        {undefined, _} ->
-                            inet_parse:ntoa(Addr);
-                        {Hosts, _} ->
-                            string:strip(lists:last(string:tokens(Hosts, ",")))
-                    end;
-                {ok, {{127, 0, 0, 1}, _Port}} ->
-                    case get_header_value("x-forwarded-for") of
-                        {undefined, _} ->
-                            "127.0.0.1";
-                        {Hosts, _} ->
-                            string:strip(lists:last(string:tokens(Hosts, ",")))
-                    end;
-                {ok, {Addr, _Port}} ->
-                    inet_parse:ntoa(Addr)
-            end,
-            NewReqState = ReqState#wm_reqstate{peer=Peer},
-            {Peer, NewReqState};
-        _ ->
-            {ReqState#wm_reqstate.peer, ReqState}
+    undefined ->
+        PeerName = case ReqState#wm_reqstate.socket of
+            {ssl,SslSocket} -> ssl:peername(SslSocket);
+            _ -> inet:peername(ReqState#wm_reqstate.socket)
+        end,
+        Peer = case PeerName of
+        {ok, {Addr={10, _, _, _}, _Port}} ->
+            case get_header_value("x-forwarded-for") of
+            {undefined, _} ->
+                inet_parse:ntoa(Addr);
+            {Hosts, _} ->
+                string:strip(lists:last(string:tokens(Hosts, ",")))
+            end;
+        {ok, {{127, 0, 0, 1}, _Port}} ->
+            case get_header_value("x-forwarded-for") of
+            {undefined, _} ->
+                "127.0.0.1";
+            {Hosts, _} ->
+                string:strip(lists:last(string:tokens(Hosts, ",")))
+            end;
+        {ok, {Addr, _Port}} ->
+            inet_parse:ntoa(Addr)
+        end,
+        NewReqState = ReqState#wm_reqstate{peer=Peer},
+        {Peer, NewReqState};
+    _ ->
+        {ReqState#wm_reqstate.peer, ReqState}
     end.
 
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
