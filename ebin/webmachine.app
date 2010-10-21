@@ -1,6 +1,6 @@
 {application, webmachine,
  [{description, "webmachine"},
-  {vsn, "1.7.2"},
+  {vsn, "1.7.3"},
   {modules, [
     webmachine,
     webmachine_app,
