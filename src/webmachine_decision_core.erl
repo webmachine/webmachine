@@ -90,9 +90,11 @@ respond(Code) ->
     resource_call(finish_request),
     wrcall({send_response, Code}),
     RMod = wrcall({get_metadata, 'resource_module'}),
+    Notes = wrcall(notes),
     LogData0 = wrcall(log_data),
     LogData = LogData0#wm_log_data{resource_module=RMod,
-                                   end_time=EndTime},
+                                   end_time=EndTime,
+                                   notes=Notes},
     spawn(fun() -> do_log(LogData) end),
     Resource:stop().
 

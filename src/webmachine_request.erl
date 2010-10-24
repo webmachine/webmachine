@@ -242,7 +242,8 @@ call({load_dispatch_data, PathProps, HostTokens, Port,
                         PathInfo,HostTokens,Port,PathTokens,AppRoot,
                         DispPath,ReqState#wm_reqstate.reqdata)},
     {ok, NewState};
-call(log_data) -> {ReqState#wm_reqstate.log_data, ReqState}.
+call(log_data) -> {ReqState#wm_reqstate.log_data, ReqState};
+call(notes) -> {wrq:get_notes(ReqState#wm_reqstate.reqdata), ReqState}.
 
 get_header_value(K) ->
     {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState}.

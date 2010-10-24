@@ -27,7 +27,8 @@
          merge_resp_headers/2,remove_resp_header/2,
          append_to_resp_body/2,append_to_response_body/2,
          max_recv_body/1,set_max_recv_body/2,
-         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2]).
+         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,
+         add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include_lib("include/wm_reqdata.hrl").
@@ -52,7 +53,8 @@ create(Method,Version,RawPath,Headers) ->
       path_tokens=defined_in_load_dispatch_data,
       disp_path=defined_in_load_dispatch_data,
       resp_redirect=false, resp_headers=mochiweb_headers:empty(),
-      resp_body = <<>>, response_code=500}).
+      resp_body = <<>>, response_code=500,
+      notes=[]}).
 create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
     Cookie = case get_req_header("cookie", RD) of
@@ -207,6 +209,10 @@ get_qs_value(Key, RD) when is_list(Key) -> % string
 
 get_qs_value(Key, Default, RD) when is_list(Key) ->
     proplists:get_value(Key, req_qs(RD), Default).
+
+add_note(K, V, RD) -> RD#wm_reqdata{notes=[{K, V} | RD#wm_reqdata.notes]}.
+
+get_notes(RD) -> RD#wm_reqdata.notes.
 
 make_wrq(Method, RawPath, Headers) ->
     create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
