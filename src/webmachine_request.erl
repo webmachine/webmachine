@@ -95,28 +95,30 @@ get_peer() ->
             {ssl,SslSocket} -> ssl:peername(SslSocket);
             _ -> inet:peername(ReqState#wm_reqstate.socket)
         end,
-        Peer = case PeerName of
-        {ok, {Addr={10, _, _, _}, _Port}} ->
-            case get_header_value("x-forwarded-for") of
-            {undefined, _} ->
-                inet_parse:ntoa(Addr);
-            {Hosts, _} ->
-                string:strip(lists:last(string:tokens(Hosts, ",")))
-            end;
-        {ok, {{127, 0, 0, 1}, _Port}} ->
-            case get_header_value("x-forwarded-for") of
-            {undefined, _} ->
-                "127.0.0.1";
-            {Hosts, _} ->
-                string:strip(lists:last(string:tokens(Hosts, ",")))
-            end;
-        {ok, {Addr, _Port}} ->
-            inet_parse:ntoa(Addr)
-        end,
+        Peer = peer_from_peername(PeerName),
         NewReqState = ReqState#wm_reqstate{peer=Peer},
         {Peer, NewReqState};
     _ ->
         {ReqState#wm_reqstate.peer, ReqState}
+    end.
+
+peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->  
+    x_peername(inet_parse:ntoa(Addr));
+peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}) when (Second > 15) andalso (Second < 21) ->
+    x_peername(inet_parse:ntoa(Addr));
+peer_from_peername({ok, {Addr={192, 168, _, _}, _Port}}) ->
+    x_peername(inet_parse:ntoa(Addr));
+peer_from_peername({ok, {{127, 0, 0, 1}, _Port}}) ->
+    x_peername("127.0.0.1");
+peer_from_peername({ok, {Addr, _Port}}) ->
+    inet_parse:ntoa(Addr).
+
+x_peername(Default) ->
+    case get_header_value("x-forwarded-for") of
+    {undefined, _} ->
+        Default;
+    {Hosts, _} ->
+        string:strip(lists:last(string:tokens(Hosts, ",")))
     end.
 
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
