@@ -104,7 +104,7 @@ get_peer() ->
 
 peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->  
     x_peername(inet_parse:ntoa(Addr));
-peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}) when (Second > 15) andalso (Second < 21) ->
+peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}) when (Second > 15) andalso (Second < 32) ->
     x_peername(inet_parse:ntoa(Addr));
 peer_from_peername({ok, {Addr={192, 168, _, _}, _Port}}) ->
     x_peername(inet_parse:ntoa(Addr));
