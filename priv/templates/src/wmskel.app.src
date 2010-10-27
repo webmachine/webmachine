@@ -3,12 +3,7 @@
  [
   {description, "{{appid}}"},
   {vsn, "1"},
-  {modules, [
-             {{appid}},
-             {{appid}}_app,
-             {{appid}}_sup,
-             {{appid}}_resource
-            ]},
+  {modules, []},
   {registered, []},
   {applications, [
                   kernel,
