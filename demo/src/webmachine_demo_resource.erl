@@ -46,4 +46,3 @@ is_authorized(ReqData, Context) ->
 expires(ReqData, Context) -> {{{2021,1,1},{0,0,0}}, ReqData, Context}.
 
 generate_etag(ReqData, Context) -> {wrq:raw_path(ReqData), ReqData, Context}.
-
