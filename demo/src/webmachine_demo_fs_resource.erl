@@ -3,7 +3,7 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @copyright 2008-2009 Basho Technologies, Inc.
 
--module(demo_fs_resource).
+-module(webmachine_demo_fs_resource).
 -export([init/1]).
 -export([allowed_methods/2,
          resource_exists/2,
@@ -29,6 +29,8 @@ init(ConfigProps) ->
 allowed_methods(ReqData, Context) ->
     {['HEAD', 'GET', 'PUT', 'DELETE', 'POST'], ReqData, Context}.
 
+file_path(_Context, []) ->
+    false;
 file_path(Context, Name) ->
     RelName = case hd(Name) of
         "/" -> tl(Name);

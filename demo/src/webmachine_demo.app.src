@@ -1,0 +1,17 @@
+%%-*- mode: erlang -*-
+{application, webmachine_demo,
+ [
+  {description, "demo"},
+  {vsn, "1"},
+  {modules, []},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  crypto,
+                  mochiweb,
+                  webmachine
+                 ]},
+  {mod, { webmachine_demo_app, []}},
+  {env, []}
+ ]}.

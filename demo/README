@@ -7,8 +7,6 @@ Makefile : simple make commands
 rebar : the Rebar build tool for Erlang applications
 rebar.config : configuration for Rebar
 start.sh : simple startup script for running webmachine_demo
-start-debug.sh : run webmachine_demo in "debug" mode (automatic module
-                 reloading on compilation)
 /ebin
   /webmachine_demo.app : the Erlang app specification
 /src
