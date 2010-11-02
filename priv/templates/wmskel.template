@@ -21,7 +21,7 @@
 {template, "start.sh", "{{prefix}}/start.sh"}.
 {chmod, 8#744, "{{prefix}}/start.sh"}.
 
-{template, "ebin/wmskel.app", "{{prefix}}/ebin/{{appid}}.app"}.
+{template, "src/wmskel.app.src", "{{prefix}}/src/{{appid}}.app.src"}.
 
 {template, "src/wmskel.erl", "{{prefix}}/src/{{appid}}.erl"}.
 {template, "src/wmskel_app.erl", "{{prefix}}/src/{{appid}}_app.erl"}.
