@@ -4,7 +4,6 @@
 %% @doc Supervisor for the webmachine_demo application.
 
 -module(webmachine_demo_sup).
--author('author <author@example.com>').
 
 -behaviour(supervisor).
 
@@ -47,7 +46,6 @@ init([]) ->
                           "..", "priv", "dispatch.conf"])),
     WebConfig = [
                  {ip, Ip},
-                 {backlog, 1000},
                  {port, 8000},
                  {log_dir, "priv/log"},
                  {dispatch, Dispatch}],
