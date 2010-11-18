@@ -445,6 +445,7 @@ read_chunk_length(Socket, MaybeLastChunk) ->
             mochiweb_socket:setopts(Socket, [{packet, raw}]),
             Splitter = fun (C) ->
                                C =/= $\r andalso C =/= $\n andalso C =/= $
+                                   andalso C =/= 59 % semicolon
                        end,
             {Hex, _Rest} = lists:splitwith(Splitter, binary_to_list(Header)),
             case Hex of
