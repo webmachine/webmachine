@@ -420,7 +420,7 @@ recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
     end.
     
 recv_chunked_body(Socket, MaxHunk) ->
-    case read_chunk_length(Socket) of
+    case read_chunk_length(Socket, false) of
         0 -> {<<>>, done};
         ChunkLength -> recv_chunked_body(Socket,MaxHunk,ChunkLength)
     end.
@@ -438,7 +438,7 @@ recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
              end}
     end.
 
-read_chunk_length(Socket) ->
+read_chunk_length(Socket, MaybeLastChunk) ->
     mochiweb_socket:setopts(Socket, [{packet, line}]),
     case mochiweb_socket:recv(Socket, 0, ?IDLE_TIMEOUT) of
         {ok, Header} ->
@@ -448,8 +448,15 @@ read_chunk_length(Socket) ->
                        end,
             {Hex, _Rest} = lists:splitwith(Splitter, binary_to_list(Header)),
             case Hex of
-                [] -> 0;
-                _ -> erlang:list_to_integer(Hex, 16)
+                [] ->
+                    %% skip the \r\n at the end of a chunk, or
+                    %% allow [badly formed] last chunk header to be
+                    %% empty instead of '0' explicitly
+                    if MaybeLastChunk -> 0;
+                       true -> read_chunk_length(Socket, true)
+                    end;
+                _ ->
+                    erlang:list_to_integer(Hex, 16)
             end;
         _ ->
             exit(normal)
