@@ -91,7 +91,7 @@ content_types_accepted(ReqData, Context) ->
 accept_content(ReqData, Context) ->
     Path = wrq:disp_path(ReqData),
     FP = file_path(Context, Path),
-    ok = filelib:ensure_dir(filename:dirname(FP)),
+    ok = filelib:ensure_dir(FP),
     ReqData1 = case file_exists(Context, Path) of 
         {true, _} ->
             ReqData;
