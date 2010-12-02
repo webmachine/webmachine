@@ -74,7 +74,7 @@ respond(Code) ->
             wrcall({remove_resp_header, "Content-Type"}),
             case resource_call(generate_etag) of
                 undefined -> nop;
-                ETag -> wrcall({set_resp_header, "ETag", ETag})
+                ETag -> wrcall({set_resp_header, "ETag", webmachine_util:quoted_string(ETag)})
             end,
             case resource_call(expires) of
                 undefined -> nop;
@@ -477,7 +477,7 @@ decision(v3o18) ->
         true ->
             case resource_call(generate_etag) of
                 undefined -> nop;
-                ETag -> wrcall({set_resp_header, "ETag", ETag})
+                ETag -> wrcall({set_resp_header, "ETag", webmachine_util:quoted_string(ETag)})
             end,
             CT = wrcall({get_metadata, 'content-type'}),
             case resource_call(last_modified) of

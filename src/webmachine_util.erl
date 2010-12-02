@@ -25,9 +25,15 @@
 -export([choose_encoding/2]).
 -export([unquote_header/1]).
 -export([now_diff_milliseconds/2]).
--export([media_type_to_detail/1]).
+-export([media_type_to_detail/1,
+         quoted_string/1]).
 
+-ifdef(TEST).
+-ifdef(EQC).
+-include_lib("eqc/include/eqc.hrl").
+-endif.
 -include_lib("eunit/include/eunit.hrl").
+-endif.
 
 convert_request_date(Date) ->
     try 
@@ -268,6 +274,22 @@ build_conneg_list([Acc|AccRest], Result) ->
     end,
     build_conneg_list(AccRest,[Pair|Result]).
 
+
+quoted_string([$" | _Rest] = Str) ->
+    Str;
+quoted_string(Str) ->
+    escape_quotes(Str, [$"]).                % Initialize Acc with opening quote
+
+escape_quotes([], Acc) ->
+    lists:reverse([$" | Acc]);               % Append final quote
+escape_quotes([$\\, Char | Rest], Acc) ->
+    escape_quotes(Rest, [Char, $\\ | Acc]);  % Any quoted char should be skipped
+escape_quotes([$" | Rest], Acc) ->
+    escape_quotes(Rest, [$", $\\ | Acc]);    % Unquoted quotes should be escaped
+escape_quotes([Char | Rest], Acc) ->
+    escape_quotes(Rest, [Char | Acc]).
+
+
 % (unquote_header copied from mochiweb_util since they don't export it)
 unquote_header("\"" ++ Rest) ->
     unquote_header(Rest, []);
@@ -298,6 +320,7 @@ now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
 %%
 %% TEST
 %%
+-ifdef(TEST).
 
 choose_media_type_test() ->
     Provided = "text/html",
@@ -357,3 +380,52 @@ now_diff_milliseconds_test() ->
     Early2 = {9, 9, 9},
     ?assertEqual(1000, now_diff_milliseconds(Late, Early1)),
     ?assertEqual(1000001000, now_diff_milliseconds(Late, Early2)).
+
+-ifdef(EQC).
+
+-define(QC_OUT(P),
+        eqc:on_output(fun(Str, Args) -> io:format(user, Str, Args) end, P)).
+
+prop_quoted_string() ->
+    ?FORALL(String0, non_empty(list(oneof([char(), $", [$\\, char()]]))),
+            begin
+                String = lists:flatten(String0),
+
+                Quoted = quoted_string(String),
+                case String of
+                    [$" | _] ->
+                        ?assertEqual(String, Quoted),
+                        true;
+                    _ ->
+                        %% Properties:
+                        %% * strings must begin/end with quote
+                        %% * All other quotes should be escaped
+                        ?assertEqual($", hd(Quoted)),
+                        ?assertEqual($", lists:last(Quoted)),
+                        Partial = lists:reverse(tl(lists:reverse(tl(Quoted)))),
+                        case check_quote(Partial) of
+                            true ->
+                                true;
+                            false ->
+                                io:format(user, "----\n", []),
+                                io:format(user, "In: ~p\n", [[integer_to_list(C) || C <- String]]),
+                                io:format(user, "Out: ~p\n", [[integer_to_list(C) || C <- Quoted]]),
+                                false
+                        end
+                end
+            end).
+
+check_quote([]) ->
+    true;
+check_quote([$\\, _Any | Rest]) ->
+    check_quote(Rest);
+check_quote([$" | _Rest]) ->
+    false;
+check_quote([_Any | Rest]) ->
+    check_quote(Rest).
+
+prop_quoted_string_test() ->
+    ?assert(eqc:quickcheck(?QC_OUT(prop_quoted_string()))).
+
+-endif. % EQC
+-endif. % TEST
