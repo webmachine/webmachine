@@ -121,13 +121,16 @@ decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
         _ -> decision_flow(FalseFlow, Test)
     end.
 
+decision_test_fn({error, Reason}, _TestFn, _TrueFlow, _FalseFlow) ->
+    error_response(Reason);
+decision_test_fn({error, R0, R1}, _TestFn, _TrueFlow, _FalseFlow) ->
+    error_response({R0, R1});
+decision_test_fn({halt, Code}, _TestFn, _TrueFlow, _FalseFlow) ->
+    respond(Code);
 decision_test_fn(Test,TestFn,TrueFlow,FalseFlow) ->
-    case {TestFn(Test), Test} of
-        {true, _}                -> decision_flow(TrueFlow, Test);
-        {false, {error, Reason}} -> error_response(Reason);
-        {false, {error, R0, R1}} -> error_response({R0, R1});
-        {false, {halt, Code}}    -> respond(Code);
-        {false, _}               -> decision_flow(FalseFlow, Test)
+    case TestFn(Test) of
+        true -> decision_flow(TrueFlow, Test);
+        false -> decision_flow(FalseFlow, Test)
     end.
 
 decision_flow(X, TestResult) when is_integer(X) ->
