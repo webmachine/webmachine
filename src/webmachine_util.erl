@@ -23,10 +23,10 @@
 -export([choose_media_type/2]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
--export([unquote_header/1]).
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
-         quoted_string/1]).
+         quoted_string/1,
+         split_quoted_strings/1]).
 
 -ifdef(TEST).
 -ifdef(EQC).
@@ -289,20 +289,26 @@ escape_quotes([$" | Rest], Acc) ->
 escape_quotes([Char | Rest], Acc) ->
     escape_quotes(Rest, [Char | Acc]).
 
+split_quoted_strings(Str) ->
+    split_quoted_strings(Str, []).
 
-% (unquote_header copied from mochiweb_util since they don't export it)
-unquote_header("\"" ++ Rest) ->
-    unquote_header(Rest, []);
-unquote_header(S) ->
-    S.
-unquote_header("", Acc) ->
+split_quoted_strings([], Acc) ->
     lists:reverse(Acc);
-unquote_header("\"", Acc) ->
-    lists:reverse(Acc);
-unquote_header([$\\, C | Rest], Acc) ->
-    unquote_header(Rest, [C | Acc]);
-unquote_header([C | Rest], Acc) ->
-    unquote_header(Rest, [C | Acc]).
+split_quoted_strings([$" | Rest], Acc) ->
+    {Str, Cont} = unescape_quoted_string(Rest, []),
+    split_quoted_strings(Cont, [Str | Acc]);
+split_quoted_strings([_Skip | Rest], Acc) ->
+    split_quoted_strings(Rest, Acc).
+
+unescape_quoted_string([], Acc) ->
+    {lists:reverse(Acc), []};
+unescape_quoted_string([$\\, Char | Rest], Acc) -> % Any quoted char should be unquoted
+    unescape_quoted_string(Rest, [Char | Acc]);
+unescape_quoted_string([$" | Rest], Acc) ->        % Quote indicates end of this string
+    {lists:reverse(Acc), Rest};
+unescape_quoted_string([Char | Rest], Acc) ->
+    unescape_quoted_string(Rest, [Char | Acc]).
+
 
 %% @type now() = {MegaSecs, Secs, MicroSecs}
 
@@ -368,11 +374,6 @@ guess_mime_test() ->
     ?assertEqual([], [ T || T <- ImgTypes,
                             1 /= string:str(guess_mime(T),"image/") ]).
 
-unquote_header_test() ->
-    ?assertEqual("hello", unquote_header("hello")),
-    ?assertEqual("hello", unquote_header("\"hello\"")),
-    ?assertEqual("hello", unquote_header("\"hello")),
-    ?assertEqual("hello", unquote_header("\"\\h\\e\\l\\l\\o\"")).
 
 now_diff_milliseconds_test() ->
     Late = {10, 10, 10},
