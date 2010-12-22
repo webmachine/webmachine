@@ -44,6 +44,22 @@ etag(Bin) ->
 etag_list(Bins) ->
     string:join([[$", etag(B), $"] || B <- Bins], ",").
 
+http_request(_Match, _IfVals, _NewVal, 0) ->
+    error;
+http_request(Match, IfVals, NewVal, Count) ->
+    case httpc:request(put, {"http://localhost:12000/etagtest/foo",
+                             [{Match, etag_list(IfVals)}],
+                             "binary/octet-stream",
+                             NewVal},
+                       [], []) of
+        {ok, Result} ->
+            {ok, Result};
+        {error, socket_closed_remotely} ->
+            io:format(user, "Retry!\n", []),
+            http_request(Match, IfVals, NewVal, Count-1)
+    end.
+
+
 etag_prop() ->
     ?LET({AllVals, Match}, {non_empty(list(binary())), oneof(["If-Match", "If-None-Match"])},
          ?FORALL({IfVals0, CurVal, NewVal},
@@ -51,11 +67,7 @@ etag_prop() ->
               begin
                   ets:insert(?MODULE, [{etag, etag(CurVal)}]),
                   IfVals = unique(IfVals0),
-                  {ok, Result} = httpc:request(put, {"http://localhost:12000/etagtest/foo",
-                                                     [{Match, etag_list(IfVals)}],
-                                                     "binary/octet-stream",
-                                                     NewVal},
-                                               [], []),
+                  {ok, Result} = http_request(Match, IfVals, NewVal, 3),
                   Code = element(2, element(1, Result)),
                   case {Match, lists:member(CurVal, IfVals)} of
                       {"If-Match", true} ->
@@ -81,7 +93,7 @@ etag_test() ->
     {ok, Pid} = webmachine_mochiweb:start(WebConfig),
     link(Pid),
 
-    ?assert(eqc:quickcheck(?QC_OUT(etag_prop()))).
+    ?assert(eqc:quickcheck(eqc:numtests(250, ?QC_OUT(etag_prop())))).
 
 
 init([]) ->
