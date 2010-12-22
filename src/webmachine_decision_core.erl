@@ -120,7 +120,16 @@ decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
         TestVal -> decision_flow(TrueFlow, Test);
         _ -> decision_flow(FalseFlow, Test)
     end.
-    
+
+decision_test_fn(Test,TestFn,TrueFlow,FalseFlow) ->
+    case {TestFn(Test), Test} of
+        {true, _}                -> decision_flow(TrueFlow, Test);
+        {false, {error, Reason}} -> error_response(Reason);
+        {false, {error, R0, R1}} -> error_response({R0, R1});
+        {false, {halt, Code}}    -> respond(Code);
+        {false, _}               -> decision_flow(FalseFlow, Test)
+    end.
+
 decision_flow(X, TestResult) when is_integer(X) ->
     if X >= 500 -> error_response(X, TestResult);
        true -> respond(X)
@@ -277,8 +286,10 @@ decision(v3g9) ->
     decision_test(get_header_val("if-match"), "*", v3h10, v3g11);
 %% "ETag in If-Match"
 decision(v3g11) ->
-    ReqETag = webmachine_util:unquote_header(get_header_val("if-match")),
-    decision_test(resource_call(generate_etag), ReqETag, v3h10, 412);
+    ETags = webmachine_util:split_quoted_strings(get_header_val("if-match")),
+    decision_test_fn(resource_call(generate_etag),
+                     fun(ETag) -> lists:member(ETag, ETags) end,
+                     v3h10, 412);
 %% "If-Match exists"
 %% (note: need to reflect this change at in next version of diagram)
 decision(v3h7) ->
@@ -342,8 +353,13 @@ decision(v3k7) ->
     decision_test(resource_call(previously_existed), true, v3k5, v3l7);
 %% "Etag in if-none-match?"
 decision(v3k13) ->
-    ReqETag = webmachine_util:unquote_header(get_header_val("if-none-match")),
-    decision_test(resource_call(generate_etag), ReqETag, v3j18, v3l13);
+    ETags = webmachine_util:split_quoted_strings(get_header_val("if-none-match")),
+    decision_test_fn(resource_call(generate_etag),
+                     %% Membership test is a little counter-intuitive here; if the
+                     %% provided ETag is a member, we follow the error case out
+                     %% via v3j18.
+                     fun(ETag) -> lists:member(ETag, ETags) end,
+                     v3j18, v3l13);
 %% "Moved temporarily?"
 decision(v3l5) ->
     case resource_call(moved_temporarily) of
