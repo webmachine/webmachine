@@ -19,8 +19,6 @@
 %%      the table each time webmachine restarts.
 -module(webmachine_router).
 
--include_lib("eunit/include/eunit.hrl").
-
 -behaviour(gen_server).
 
 %% API
@@ -155,7 +153,12 @@ start() ->
 get_routes() ->
     gen_server:call(?SERVER, get_routes, infinity).
 
+%%
 %% Tests
+%%
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
 add_remove_route_test() ->
     application:set_env(webmachine, dispatch_list, []),
     {ok, Pid} = start(),
@@ -187,3 +190,5 @@ no_dupe_path_test() ->
     webmachine_router:add_route(PathSpec),
     [PathSpec] = get_routes(),
     exit(Pid, kill).
+
+-endif.
