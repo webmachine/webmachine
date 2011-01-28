@@ -33,7 +33,6 @@
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include_lib("include/wm_reqdata.hrl").
 -include_lib("include/wm_reqstate.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 
 create(Method,Version,RawPath,Headers) ->
@@ -214,6 +213,13 @@ add_note(K, V, RD) -> RD#wm_reqdata{notes=[{K, V} | RD#wm_reqdata.notes]}.
 
 get_notes(RD) -> RD#wm_reqdata.notes.
 
+%%
+%% Tests
+%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
 make_wrq(Method, RawPath, Headers) ->
     create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
 
@@ -247,3 +253,5 @@ simple_dispatch_test() ->
                            R1),
     ?assertEqual(".", app_root(R)),
     ?assertEqual(80, port(R)).
+
+-endif.

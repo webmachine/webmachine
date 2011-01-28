@@ -22,7 +22,6 @@
 -author('Bryan Fink <bryan@basho.com>').
 
 -export([dispatch/2, dispatch/3]).
--include_lib("eunit/include/eunit.hrl").
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
@@ -206,6 +205,8 @@ calculate_app_root(N) when N > 1 ->
 %%
 %% TEST
 %%
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
 app_root_test() ->
     ?assertEqual(".",           calculate_app_root(1)),
@@ -394,3 +395,5 @@ dispatch_test() ->
     ?assertEqual({no_dispatch_match, {["bar","baz"],8000}, ["q","r"]},
                  dispatch("baz.bar:8000", "q/r",
                           [{{["foo","bar"],80},[{["a","b","c"],x,y}]}])).
+
+  -endif.
