@@ -1,0 +1,63 @@
+* webmachine
+** Overview
+Webmachine is an application layer that adds HTTP semantic awareness
+on top of the excellent bit-pushing and HTTP syntax-management
+provided by mochiweb, and provides a simple and clean way to connect
+that to your application's behavior.
+
+More information is available [[https://webmachine.basho.com/][here]].
+
+** Quick Start
+A shell script is provided in the =webmachine= repository to help
+users quickly and easily create a new =webmachine= application.
+
+#+BEGIN_SRC shell
+git clone git://github.com/basho/webmachine.git
+cd webmachine
+./scripts/new_webmachine.sh mydemo
+#+END_SRC
+
+A destination path can also be passed to the =new_webmachine.sh=
+script.
+
+#+BEGIN_SRC shell
+./scripts/new_webmachine.sh mydemo ~/webmachine_applications
+#+END_SRC
+
+Once a new application has been created it can be built and started.
+
+#+BEGIN_SRC shell
+cd mydemo
+make
+./start.sh
+#+END_SRC
+
+The application will be available at [[http://localhost:8000]].
+
+To learn more continue reading [[https://webmachine.basho.com/][here]].
+
+** Contributing
+   We encourage contributions to =webmachine= from the community.
+
+   1) Fork the =webmachine= repository on [[https://github.com/basho/webmachine][Github]].
+   2) Clone your fork or add the remote if you already have a clone of
+      the repository.
+#+BEGIN_SRC shell
+git clone git@github.com:yourusername/webmachine.git
+# or
+git remote add mine git@github.com:yourusername/webmachine.git
+#+END_SRC
+   3) Create a topic branch for your change.
+#+BEGIN_SRC shell
+git checkout -b some-topic-branch
+#+END_SRC
+   4) Make your change and commit. Use a clear and descriptive commit
+      message, spanning multiple lines if detailed explanation is
+      needed.
+   5) Push to your fork of the repository and then send a pull-request
+      through Github.
+#+BEGIN_SRC shell
+git push mine some-topic-branch
+#+END_SRC
+   6) A Basho engineer or community maintainer will review your patch
+      and merge it into the main repository or send you feedback.
