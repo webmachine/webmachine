@@ -35,6 +35,10 @@
          terminate/2,
          code_change/3]).
 
+%% Exported to remove compilation warnings.
+-export([start/0,
+         get_routes/0]).
+
 %% @type hostmatchterm() = {hostmatch(), [pathmatchterm()]}.
 % The dispatch configuration contains a list of these terms, and the
 % first one whose host and one pathmatchterm match is used.
