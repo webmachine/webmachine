@@ -28,6 +28,7 @@ start_link() ->
 %% @spec start() -> ok
 %% @doc Start the {{appid}} server.
 start() ->
+    inets:start(),
     ensure_started(crypto),
     ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module, 
