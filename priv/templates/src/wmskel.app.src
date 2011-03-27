@@ -8,6 +8,7 @@
   {applications, [
                   kernel,
                   stdlib,
+		  inets,
                   crypto,
                   mochiweb,
                   webmachine
