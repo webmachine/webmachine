@@ -146,6 +146,12 @@ set_dispatch_list(DispatchList) ->
     ok = application:set_env(webmachine, dispatch_list, DispatchList),
     ok.
 
+%%
+%% Tests
+%%
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
 %% For unit tests only
 start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
@@ -153,11 +159,6 @@ start() ->
 get_routes() ->
     gen_server:call(?SERVER, get_routes, infinity).
 
-%%
-%% Tests
-%%
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
 
 add_remove_route_test() ->
     application:set_env(webmachine, dispatch_list, []),
