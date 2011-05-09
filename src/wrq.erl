@@ -31,8 +31,8 @@
          add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
--include_lib("include/wm_reqdata.hrl").
--include_lib("include/wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
+-include("wm_reqstate.hrl").
 
 
 create(Method,Version,RawPath,Headers) ->
