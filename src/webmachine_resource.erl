@@ -20,8 +20,8 @@
 -export([wrap/2]).
 -export([do/2,log_d/1,stop/0]).
 
--include_lib("include/wm_reqdata.hrl").
--include_lib("include/wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
+-include("wm_reqstate.hrl").
 
 default(ping) ->
     no_default;

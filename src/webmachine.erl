@@ -21,8 +21,8 @@
 -export([new_request/2]).
 
 -include("webmachine_logger.hrl").
--include_lib("include/wm_reqstate.hrl").
--include_lib("include/wm_reqdata.hrl").
+-include("wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
 
 %% @spec start() -> ok
 %% @doc Start the webmachine server.
