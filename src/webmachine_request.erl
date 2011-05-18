@@ -737,17 +737,25 @@ req_cookie() -> call(req_cookie).
 parse_cookie() -> req_cookie().
 get_cookie_value(Key) ->
     {ReqCookie, NewReqState} = req_cookie(),
-    {proplists:get_value(Key, ReqCookie), NewReqState}.
+    case lists:keyfind(Key, 1, ReqCookie) of
+        false -> {undefined, NewReqState};
+        {Key, Value} -> {Value, NewReqState}
+    end.
 
 req_qs() -> call(req_qs).
 parse_qs() -> req_qs().
 get_qs_value(Key) ->
     {ReqQS, NewReqState} = req_qs(),
-    {proplists:get_value(Key, ReqQS), NewReqState}.
+    case lists:keyfind(Key, 1, ReqQS) of
+        false -> {undefined, NewReqState};
+        {Key, Value} -> {Value, NewReqState}
+    end.
 get_qs_value(Key, Default) ->
     {ReqQS, NewReqState} = req_qs(),
-    {proplists:get_value(Key, ReqQS, Default), NewReqState}.
-
+    case lists:keyfind(Key, 1, ReqQS) of
+        false -> {Default, NewReqState};
+        {Key, Value} -> {Value, NewReqState}
+    end.
 set_resp_body(Body) -> call({set_resp_body, Body}).
 resp_body() -> call(resp_body).
 response_body() -> resp_body().
