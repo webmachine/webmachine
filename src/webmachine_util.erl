@@ -192,6 +192,7 @@ normalize_provided1(Type) when is_list(Type) -> {Type, []};
 normalize_provided1({Type,Params}) -> {Type, Params}.
 
 format_content_type(Type,[]) -> Type;
+format_content_type(Type,[{K,V}|T]) -> format_content_type(Type ++ "; " ++ K ++ "=" ++ V, T);
 format_content_type(Type,[H|T]) -> format_content_type(Type ++ "; " ++ H, T).
 
 choose_charset(CSets, AccCharHdr) -> do_choose(CSets, AccCharHdr, "ISO-8859-1").
