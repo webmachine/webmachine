@@ -23,6 +23,7 @@
 -export([choose_media_type/2]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
+-export([format_content_type/2]).
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
