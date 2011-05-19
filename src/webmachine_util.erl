@@ -103,7 +103,7 @@ choose_media_type(Provided,AcceptHead) ->
     % AcceptHead is the value of the request's Accept header
     % Provided is a list of media types the resource can provide.
     %  each is either a string e.g. -- "text/html"
-    %   or a string and parameters e.g. -- {"text/html",[{level,1}]}
+    %   or a string and parameters e.g. -- {"text/html",[{"level","1"}]}
     % (the plain string case with no parameters is much more common)
     Requested = accept_header_to_media_types(AcceptHead),
     Prov1 = normalize_provided(Provided),
