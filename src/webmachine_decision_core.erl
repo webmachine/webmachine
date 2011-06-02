@@ -430,6 +430,16 @@ decision(v3n11) ->
                         false -> error_response("create_path not a string");
                         true ->
                             wrcall({set_disp_path, NewPath}),
+							
+							%
+							% Because there is not yet a mechanism to set the
+							% base URI for a generated Location header, we
+							% instead pretend create_path() returns a complete
+							% URI instead of just a path fragment.
+							%
+							%    xoxo, -Lil' B
+							%
+							wrcall({set_resp_header, "Location", NewPath}),
                             Res = accept_helper(),
                             case Res of
                                 {respond, Code} -> respond(Code);
