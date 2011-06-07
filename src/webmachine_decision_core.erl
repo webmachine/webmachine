@@ -431,7 +431,12 @@ decision(v3n11) ->
                         true ->
                             BaseUri = case resource_call(base_uri) of
                                 undefined -> wrcall(base_uri);
-                                Any -> Any
+                                Any ->
+                                    case lists:last(Any) of
+                                        % 47 is "/"
+                                        47 -> lists:sublist(Any, erlang:length(Any) - 1);
+                                        _ -> Any
+                                    end
                             end,
                             FullPath = filename:join([wrcall(path), NewPath]),
                             wrcall({set_disp_path, FullPath}),
