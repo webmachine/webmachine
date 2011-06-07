@@ -126,7 +126,7 @@ call(base_uri) ->
     Scheme = erlang:atom_to_list(RD#wm_reqdata.scheme),
     Host = string:join(RD#wm_reqdata.host_tokens, "."),
     PortString = port_string(Scheme, RD#wm_reqdata.port),
-    {Scheme ++ "://" ++ Host ++ PortString ++ "/",ReqState};
+    {Scheme ++ "://" ++ Host ++ PortString,ReqState};
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
 call(get_reqdata) -> {ReqState#wm_reqstate.reqdata, ReqState};
 call({set_reqdata, RD}) -> {ok, ReqState#wm_reqstate{reqdata=RD}};
