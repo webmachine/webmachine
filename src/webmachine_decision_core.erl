@@ -429,7 +429,16 @@ decision(v3n11) ->
                     case is_list(NewPath) of
                         false -> error_response("create_path not a string");
                         true ->
-                            wrcall({set_disp_path, NewPath}),
+                            BaseUri = case resource_call(base_uri) of
+                                undefined -> wrcall(base_uri);
+                                Any -> Any
+                            end,
+                            FullPath = wrcall({set_disp_path, filename:join([wrcall(path), NewPath])}),
+                            case wrcall({get_resp_header, "Location"}) of
+                                undefined -> wrcall({set_resp_header, "Location", BaseUri ++ FullPath});
+                                _ -> ok
+                            end,
+
                             Res = accept_helper(),
                             case Res of
                                 {respond, Code} -> respond(Code);
@@ -665,4 +674,3 @@ variances() ->
             end
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
-    

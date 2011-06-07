@@ -16,11 +16,11 @@
 -module(wrq).
 -author('Justin Sheehy <justin@basho.com>').
 
--export([create/4,load_dispatch_data/7]).
--export([method/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,path_info/1,
-         response_code/1,req_cookie/1,req_qs/1,req_headers/1,req_body/1,
-         stream_req_body/2,resp_redirect/1,resp_headers/1,resp_body/1,
-         app_root/1,path_tokens/1, host_tokens/1, port/1]).
+-export([create/4, create/5,load_dispatch_data/7]).
+-export([method/1,scheme/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,
+         path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
+         req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
+         resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1]).
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
@@ -36,7 +36,9 @@
 
 
 create(Method,Version,RawPath,Headers) ->
-    create(#wm_reqdata{method=Method,version=Version,
+	create(Method,http,Version,RawPath,Headers).
+create(Method,Scheme,Version,RawPath,Headers) ->
+    create(#wm_reqdata{method=Method,scheme=Scheme,version=Version,
                        raw_path=RawPath,req_headers=Headers,
       wm_state=defined_on_call,
       path="defined_in_create",
@@ -70,6 +72,8 @@ load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
                   app_root=AppRoot,disp_path=DispPath}.
 
 method(_RD = #wm_reqdata{method=Method}) -> Method.
+
+scheme(_RD = #wm_reqdata{scheme=Scheme}) -> Scheme.
 
 version(_RD = #wm_reqdata{version=Version})
   when is_tuple(Version), size(Version) == 2,

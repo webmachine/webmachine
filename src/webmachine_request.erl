@@ -121,6 +121,12 @@ x_peername(Default) ->
         string:strip(lists:last(string:tokens(Hosts, ",")))
     end.
 
+call(base_uri) ->
+    RD = ReqState#wm_reqstate.reqdata,
+    Scheme = erlang:atom_to_list(RD#wm_reqdata.scheme),
+    Host = string:join(RD#wm_reqdata.host_tokens, "."),
+    PortString = port_string(Scheme, RD#wm_reqdata.port),
+    {Scheme ++ "://" ++ Host ++ PortString ++ "/",ReqState};
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
 call(get_reqdata) -> {ReqState#wm_reqstate.reqdata, ReqState};
 call({set_reqdata, RD}) -> {ok, ReqState#wm_reqstate{reqdata=RD}};
@@ -792,3 +798,18 @@ load_dispatch_data(Bindings, HostTokens, Port, PathTokens,
           PathTokens, AppRoot, DispPath}).
 
 log_data() -> call(log_data).
+
+port_string(Scheme, Port) ->
+    case Scheme of
+        http ->
+            case Port of
+                80 -> "";
+                _ -> ":" ++ erlang:integer_to_list(Port)
+            end;
+        https ->
+            case Port of
+                443 -> "";
+                _ -> ":" ++ erlang:integer_to_list(Port)
+            end;
+        _ -> ":" ++ erlang:integer_to_list(Port)
+    end.
