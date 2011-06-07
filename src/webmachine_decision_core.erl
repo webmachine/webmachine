@@ -438,7 +438,7 @@ decision(v3n11) ->
                                         _ -> Any
                                     end
                             end,
-                            FullPath = filename:join([wrcall(path), NewPath]),
+                            FullPath = filename:join(["/", wrcall(path), NewPath]),
                             wrcall({set_disp_path, FullPath}),
                             case wrcall({get_resp_header, "Location"}) of
                                 undefined -> wrcall({set_resp_header, "Location", BaseUri ++ FullPath});
