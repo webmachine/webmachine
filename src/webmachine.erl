@@ -39,11 +39,12 @@ stop() ->
 new_request(mochiweb, Request) ->
     Socket = Request:get(socket),
     Method = Request:get(method),
+    Scheme = Request:get(scheme),
     RawPath = Request:get(raw_path), 
     Version = Request:get(version),
     Headers = Request:get(headers),
     InitState = #wm_reqstate{socket=Socket,
-                          reqdata=wrq:create(Method,Version,RawPath,Headers)},
+                          reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
     
     InitReq = {webmachine_request,InitState},
     {Peer, ReqState} = InitReq:get_peer(),

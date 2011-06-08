@@ -429,7 +429,21 @@ decision(v3n11) ->
                     case is_list(NewPath) of
                         false -> error_response("create_path not a string");
                         true ->
-                            wrcall({set_disp_path, NewPath}),
+                            BaseUri = case resource_call(base_uri) of
+                                undefined -> wrcall(base_uri);
+                                Any ->
+                                    case [lists:last(Any)] of
+                                        "/" -> lists:sublist(Any, erlang:length(Any) - 1);
+                                        _ -> Any
+                                    end
+                            end,
+                            FullPath = filename:join(["/", wrcall(path), NewPath]),
+                            wrcall({set_disp_path, FullPath}),
+                            case wrcall({get_resp_header, "Location"}) of
+                                undefined -> wrcall({set_resp_header, "Location", BaseUri ++ FullPath});
+                                _ -> ok
+                            end,
+
                             Res = accept_helper(),
                             case Res of
                                 {respond, Code} -> respond(Code);
@@ -665,4 +679,3 @@ variances() ->
             end
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
-    

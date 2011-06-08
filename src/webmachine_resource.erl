@@ -65,6 +65,8 @@ default(post_is_create) ->
     false;
 default(create_path) ->
     undefined;
+default(base_uri) ->
+	undefined;
 default(process_post) ->
     false;
 default(language_available) ->
