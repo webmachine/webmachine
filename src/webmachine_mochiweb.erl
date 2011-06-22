@@ -69,7 +69,8 @@ loop(MochiReq) ->
                [] -> []
            end,
     {Path, _} = Req:path(),
-    case webmachine_dispatcher:dispatch(Host, Path, DispatchList) of
+    {RD, _} = Req:get_reqdata(),
+    case webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
             {ErrorHTML,ReqState1} = 
