@@ -5,7 +5,7 @@ on top of the excellent bit-pushing and HTTP syntax-management
 provided by mochiweb, and provides a simple and clean way to connect
 that to your application's behavior.
 
-More information is available [[https://webmachine.basho.com/][here]].
+More information is available [[http://webmachine.basho.com/][here]].
 
 ** Quick Start
 A shell script is provided in the =webmachine= repository to help
