@@ -24,8 +24,8 @@ start(Options) ->
     {DispatchList, Options1} = get_option(dispatch, Options),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
-    ErrorHandler = 
-        case ErrorHandler0 of 
+    ErrorHandler =
+        case ErrorHandler0 of
             undefined ->
                 webmachine_error_handler;
             EH -> EH
@@ -70,46 +70,47 @@ loop(MochiReq) ->
            end,
     {Path, _} = Req:path(),
     {RD, _} = Req:get_reqdata(),
-    case webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
+
+    %% Run the dispatch code, catch any errors...
+    try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
-            {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-            {ErrorHTML,ReqState1} = 
-                ErrorHandler:render_error(404, Req, {none, none, []}),
-            Req1 = {webmachine_request,ReqState1},
-            {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
-            Req2 = {webmachine_request,ReqState2},
-            {ok,ReqState3} = Req2:send_response(404),
-            Req3 = {webmachine_request,ReqState3},
-            {LogData,_ReqState4} = Req3:log_data(),
-            case application:get_env(webmachine,webmachine_logger_module) of
-                {ok, LogModule} ->
-                    spawn(LogModule, log_access, [LogData]);
-                _ -> nop
-            end;
+            handle_error(404, {none, none, []}, Req);
         {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
          AppRoot, StringPath} ->
             BootstrapResource = webmachine_resource:new(x,x,x,x),
-            {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
             {ok,RS1} = Req:load_dispatch_data(Bindings,HostTokens,Port,
                                               PathTokens,AppRoot,StringPath),
             XReq1 = {webmachine_request,RS1},
-            {ok,RS2} = XReq1:set_metadata('resource_module', Mod),
-            try 
+            try
+                {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
+                {ok,RS2} = XReq1:set_metadata('resource_module', Mod),
                 webmachine_decision_core:handle_request(Resource, RS2)
             catch
-                error:_ -> 
-                    FailReq = {webmachine_request,RS2},
-                    {ok,RS3} = FailReq:send_response(500),
-                    PostFailReq = {webmachine_request,RS3},
-                    {LogData,_RS4} = PostFailReq:log_data(),
-                    case application:get_env(webmachine,
-                                             webmachine_logger_module) of
-                        {ok, LogModule} ->
-                            spawn(LogModule, log_access, [LogData]);
-                        _ -> nop
-                    end
+                error:Error ->
+                    handle_error(500, {error, Error}, Req)
             end
+    catch
+        Type : Error ->
+            handle_error(500, {Type, Error}, Req)
     end.
+
+handle_error(Code, Error, Req) ->
+    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
+    {ErrorHTML,ReqState1} =
+        ErrorHandler:render_error(Code, Req, Error),
+    Req1 = {webmachine_request,ReqState1},
+    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
+    Req2 = {webmachine_request,ReqState2},
+    {ok,ReqState3} = Req2:send_response(Code),
+    Req3 = {webmachine_request,ReqState3},
+    {LogData,_ReqState4} = Req3:log_data(),
+    case application:get_env(webmachine,webmachine_logger_module) of
+        {ok, LogModule} ->
+            spawn(LogModule, log_access, [LogData]);
+        _ -> nop
+    end.
+
+
 
 get_option(Option, Options) ->
     {proplists:get_value(Option, Options), proplists:delete(Option, Options)}.
