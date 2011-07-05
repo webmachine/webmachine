@@ -247,7 +247,7 @@ simple_dispatch_test() ->
     R1 = set_peer("127.0.0.1", R0),    
     {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} = 
         webmachine_dispatcher:dispatch("127.0.0.1", "/foo", 
-                                       [{["foo"], foo_resource, []}]),
+                                       [{["foo"], foo_resource, []}], R1),
     R = load_dispatch_data(Bindings,
                            HostTokens,
                            Port,
