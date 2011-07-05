@@ -195,14 +195,10 @@ decision(v3b9a) ->
             case BodyHash =:= Checksum of
                 true -> d(v3b9b);
                 _ ->
-                    wrcall({set_resp_header, "Content-Type", "text/plain"}),
-                    wrcall({set_resp_body, "Content-MD5 header does not match request body."}),
-                    respond(400)
+                    error_response(400, <<"Content-MD5 header does not match request body.">>)
             end;
         false ->
-            wrcall({set_resp_header, "Content-Type", "text/plain"}),
-            wrcall({set_resp_body, "Content-MD5 header does not match request body."}),
-            respond(400);
+            error_response(400, <<"Content-MD5 header does not match request body.">>);
         _ -> d(v3b9b)
     end;
 %% "Malformed?"
