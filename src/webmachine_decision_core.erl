@@ -717,9 +717,11 @@ compute_body_md5() ->
 
 compute_body_md5_stream() ->
     MD5Ctx = crypto:md5_init(),
-    compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192})).
+    compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192}), <<>>).
 
-compute_body_md5_stream(MD5, {Hunk, done}) ->    
+compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
+    %% Save the body so it can be retrieved later
+    put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
     crypto:md5final(crypto:md5update(MD5, Hunk));
-compute_body_md5_stream(MD5, {Hunk, Next}) ->
-    compute_body_md5_stream(crypto:md5update(MD5, Hunk), Next()).
+compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
+    compute_body_md5_stream(crypto:md5update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
