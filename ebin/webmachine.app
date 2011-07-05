@@ -23,6 +23,7 @@
   {registered, []},
   {mod, {webmachine_app, []}},
   {env, [
-         {dispatch_list, []}
+         {dispatch_list, []},
+         {error_handler, webmachine_error_handler}
         ]},
   {applications, [kernel, stdlib, crypto]}]}.
