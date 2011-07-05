@@ -178,8 +178,35 @@ decision(v3b10) ->
                    string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
             respond(405)
     end;
-%% "Malformed?"
+
+%% "Content-MD5 present?"
 decision(v3b9) ->
+    decision_test(get_header_val("content-md5"), undefined, v3b9b, v3b9a);
+%% "Content-MD5 valid?"
+decision(v3b9a) ->
+    case resource_call(validate_content_checksum) of
+        {error, Reason} ->
+            error_response(Reason);
+        {halt, Code} ->
+            respond(Code);
+        not_validated ->
+            Checksum = mochihex:to_bin(get_header_val("content-md5")),
+            BodyHash = compute_body_md5(),
+            case BodyHash =:= Checksum of
+                true -> d(v3b9b);
+                _ ->
+                    wrcall({set_resp_header, "Content-Type", "text/plain"}),
+                    wrcall({set_resp_body, "Content-MD5 header does not match request body."}),
+                    respond(400)
+            end;
+        false ->
+            wrcall({set_resp_header, "Content-Type", "text/plain"}),
+            wrcall({set_resp_body, "Content-MD5 header does not match request body."}),
+            respond(400);
+        _ -> d(v3b9b)
+    end;
+%% "Malformed?"
+decision(v3b9b) ->
     decision_test(resource_call(malformed_request), true, 400, v3b8);
 %% "Authorized?"
 decision(v3b8) ->
@@ -679,3 +706,20 @@ variances() ->
             end
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
+
+compute_body_md5() ->
+    case wrcall({req_body, 52428800}) of
+        stream_conflict ->
+            compute_body_md5_stream();
+        Body ->
+            crypto:md5(Body)
+    end.
+
+compute_body_md5_stream() ->
+    MD5Ctx = crypto:md5_init(),
+    compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192})).
+
+compute_body_md5_stream(MD5, {Hunk, done}) ->    
+    crypto:md5final(crypto:md5update(MD5, Hunk));
+compute_body_md5_stream(MD5, {Hunk, Next}) ->
+    compute_body_md5_stream(crypto:md5update(MD5, Hunk), Next()).
