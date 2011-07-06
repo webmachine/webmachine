@@ -41,7 +41,7 @@ start(Options) ->
         true ->
           case whereis(webmachine_perf_logger) of
             undefined ->
-              application:set_env(webmachine, enable_perf_logger, true),
+              application_set_unless_env(webmachine, enable_perf_logger, true),
               webmachine_sup:start_perf_logger(LogDir);
             _ ->
               ignore
@@ -53,8 +53,8 @@ start(Options) ->
       {undefined, _} -> {?MODULE, Options4};
       {PN, O5} -> {PN, O5}
     end,
-    application:set_env(webmachine, dispatch_list, DispatchList),
-    application:set_env(webmachine, error_handler, ErrorHandler),
+    application_set_unless_env(webmachine, dispatch_list, DispatchList),
+    application_set_unless_env(webmachine, error_handler, ErrorHandler),
     mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options5]).
 
 stop() ->
@@ -114,6 +114,16 @@ handle_error(Code, Error, Req) ->
 
 get_option(Option, Options) ->
     {proplists:get_value(Option, Options), proplists:delete(Option, Options)}.
+
+application_set_unless_env(App, Var, Value) ->
+    Current = application:get_all_env(App),
+    CurrentKeys = proplists:get_keys(Current),
+    case lists:member(Var, CurrentKeys) of
+        true ->
+            ok;
+        false ->
+            application:set_env(App, Var, Value)
+    end.
 
 host_headers(Req) ->
     [ V || {V,_ReqState} <- [Req:get_header_value(H)
