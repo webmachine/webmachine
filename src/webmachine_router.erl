@@ -139,8 +139,12 @@ filter_by_resource({_, _, _}, _Resource) ->
     true.
 
 get_dispatch_list() ->
-    {ok, Dispatch} = application:get_env(webmachine, dispatch_list),
-    Dispatch.
+    case application:get_env(webmachine, dispatch_list) of
+        {ok, Dispatch} ->
+            Dispatch;
+        undefined ->
+            []
+    end.
 
 set_dispatch_list(DispatchList) ->
     ok = application:set_env(webmachine, dispatch_list, DispatchList),
