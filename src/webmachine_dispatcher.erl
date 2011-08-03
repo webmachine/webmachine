@@ -206,16 +206,6 @@ try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings,
             case run_guard(Guard, RD1) of
                 true ->
                     {Mod, Props, Remainder, NewBindings, AppRoot, StringPath};
-                    %% {Mod, Props, PathRemainder, PathBindings, AppRoot, StringPath} - from try_path_binding
-                    %% {Mod, Props, PathRemainder, PathBindings, AppRoot, StringPath} - to try_host_binding
-                    %% {Mod, Props, HostRemainder, Port, PathRemainder, PathBindings, AppRoot, StringPath}} - from try_host_binding
-                    %% {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} - to loop
-                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, StringPath} - from loop
-                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, DispPath) - to load_dispatch_data
-                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, DispPath) - from load_dispatch_data
-                    %% {PathProps, HostTokens, Port, PathTokens, AppRoot, DispPath) - to call/load_dispatch_data
-                    %% {PathInfo,  HostTokens, Port, PathTokens, AppRoot, DispPath) - from call/load_dispatch_data
-
                 false ->
                     try_path_binding(Rest, PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD)
             end;
