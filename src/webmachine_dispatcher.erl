@@ -160,7 +160,7 @@ try_host_binding([Dispatch|Rest], Host, Port, Path, Depth, RD) ->
         {ok, PortBindings} ->
             case bind(lists:reverse(HostSpec), Host, PortBindings, 0) of
                 {ok, HostRemainder, HostBindings, _} ->
-                    case try_path_binding(PathSpec, Path, HostBindings, Depth, RD) of
+                    case try_path_binding(PathSpec, Path, HostRemainder, Port, HostBindings, Depth, RD) of
                         {Mod, Props, PathRemainder, PathBindings,
                          AppRoot, StringPath} ->
                             {Mod, Props, HostRemainder, Port, PathRemainder,
@@ -181,26 +181,46 @@ bind_port(PortAtom, Port, Bindings) when is_atom(PortAtom) ->
     {ok, [{PortAtom, Port}|Bindings]};
 bind_port(_, _, _) -> fail.
 
-try_path_binding([], PathTokens, _, _, _) ->
+try_path_binding([], PathTokens, _, _, _, _, _) ->
     {no_dispatch_match, PathTokens};
-try_path_binding([PathSpec|Rest], PathTokens, Bindings, ExtraDepth, RD) ->
-    {PathSchema, Guard, Mod, Props} = 
+try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD) ->
+    {PathSchema, Guard, Mod, Props} =
         case PathSpec of
             {P, M, Pr} -> {P, undefined, M, Pr};
             {P, G, M, Pr} -> {P, G, M, Pr}
         end,
 
-    case bind(PathSchema, PathTokens, Bindings, 0) of
+    case bind(PathSchema, PathTokens, HostBindings, 0) of
         {ok, Remainder, NewBindings, Depth} ->
-            case run_guard(Guard, RD) of
+            AppRoot = calculate_app_root(Depth + ExtraDepth),
+            StringPath = reconstitute(Remainder),
+            PathInfo = dict:from_list(NewBindings),
+            RD1 =
+                case RD of
+                    testing ->
+                        testing;
+                    _ ->
+                        wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
+                                               AppRoot, StringPath, RD)
+                end,
+            case run_guard(Guard, RD1) of
                 true ->
-                    {Mod, Props, Remainder, NewBindings,
-                     calculate_app_root(Depth + ExtraDepth), reconstitute(Remainder)};
+                    {Mod, Props, Remainder, NewBindings, AppRoot, StringPath};
+                    %% {Mod, Props, PathRemainder, PathBindings, AppRoot, StringPath} - from try_path_binding
+                    %% {Mod, Props, PathRemainder, PathBindings, AppRoot, StringPath} - to try_host_binding
+                    %% {Mod, Props, HostRemainder, Port, PathRemainder, PathBindings, AppRoot, StringPath}} - from try_host_binding
+                    %% {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} - to loop
+                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, StringPath} - from loop
+                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, DispPath) - to load_dispatch_data
+                    %% {Bindings,  HostTokens, Port, PathTokens, AppRoot, DispPath) - from load_dispatch_data
+                    %% {PathProps, HostTokens, Port, PathTokens, AppRoot, DispPath) - to call/load_dispatch_data
+                    %% {PathInfo,  HostTokens, Port, PathTokens, AppRoot, DispPath) - from call/load_dispatch_data
+
                 false ->
-                    try_path_binding(Rest, PathTokens, Bindings, ExtraDepth, RD)
+                    try_path_binding(Rest, PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD)
             end;
-        fail -> 
-            try_path_binding(Rest, PathTokens, Bindings, ExtraDepth, RD)
+        fail ->
+            try_path_binding(Rest, PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD)
     end.
 
 run_guard(undefined, _RD) ->
@@ -330,30 +350,30 @@ bind_path_string_fail_test() ->
     ?assertEqual(fail, bind(["a","b"], ["a","c"], [], 0)).
 
 try_path_matching_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({bar, baz, [], [], ".", ""},
-                 try_path_binding([{["foo"], bar, baz}], ["foo"], [], 0, RD)),
+                 try_path_binding([{["foo"], bar, baz}], ["foo"], [], 80, [], 0, RD)),
     Dispatch = [{["a", x], foo, bar},
                 {["b", y], baz, quux},
                 {["b", y, '*'], baz2, quux2}],
     ?assertEqual({foo, bar, [], [{x, "c"}], "../..", []},
-                 try_path_binding(Dispatch, ["a","c"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["a","c"], [], 80, [], 0, RD)),
     ?assertEqual({baz, quux, [], [{y, "c"}], "../..", []},
-                 try_path_binding(Dispatch, ["b","c"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["b","c"], [], 80, [], 0, RD)),
     ?assertEqual({baz2, quux2, ["z"], [{y, "c"}], "../../..", "z"},
-                 try_path_binding(Dispatch, ["b","c","z"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["b","c","z"], [], 80, [], 0, RD)),
     ?assertEqual({baz2, quux2, ["z","v"], [{y, "c"}], "../../../..", "z/v"},
-                 try_path_binding(Dispatch, ["b","c","z","v"], [], 0, RD)).
+                 try_path_binding(Dispatch, ["b","c","z","v"], [], 80, [], 0, RD)).
 
 try_path_failing_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({no_dispatch_match, ["a"]},
-                 try_path_binding([{["b"], x, y}], ["a"], [], 0, RD)).
+                 try_path_binding([{["b"], x, y}], ["a"], [], 80, [], 0, RD)).
 
 %% host binding
 
 try_host_binding_nohosts_test() ->
-    RD = ignored,
+    RD = testing,
     PathDispatches = [{["a"], foo, bar},
                       {["b"], baz, quux}],
     ?assertEqual(try_host_binding([{{['*'],'*'},PathDispatches}],
@@ -374,7 +394,7 @@ try_host_binding_nohosts_test() ->
                                   ["quux","baz"], 1234, ["b"], 0, RD)).
 
 try_host_binding_noport_test() ->
-    RD = ignored,
+    RD = testing,
     Dispatch = [{["foo","bar"], [{["a"],x,y}]},
                 {["baz","quux"],[{["b"],z,q}]},
                 {[m,"quux"],    [{["c"],r,s}]},
@@ -398,7 +418,7 @@ try_host_binding_noport_test() ->
                                   ["quux","no"], 82, ["d"], 0, RD)).
 
 try_host_binding_fullmatch_test() ->
-    RD = ignored,
+    RD = testing,
     Dispatch = [{{["foo","bar"],80},[{["a"],x,y}]},
                 {{[foo,"bar"],80},  [{["b"],z,q}]},
                 {{[foo,"bar"],baz}, [{["c"],r,s}]},
@@ -426,12 +446,12 @@ try_host_binding_fullmatch_test() ->
                  try_host_binding(Dispatch, ["bar","quux","foo"],80,["d"],0, RD)).
 
 try_host_binding_fail_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({no_dispatch_match, {["bar","foo"], 1234}, ["x","y","z"]},
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 
 dispatch_test() ->
-    RD = ignored,
+    RD = testing,
     TrueFun = fun(_) -> true end,
     FalseFun = fun(_) -> false end,
 
