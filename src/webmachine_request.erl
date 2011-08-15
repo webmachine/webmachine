@@ -92,6 +92,7 @@ get_peer() ->
     case ReqState#wm_reqstate.peer of
     undefined ->
         PeerName = case ReqState#wm_reqstate.socket of
+            testing -> {ok, {{127,0,0,1}, 80}};
             {ssl,SslSocket} -> ssl:peername(SslSocket);
             _ -> inet:peername(ReqState#wm_reqstate.socket)
         end,

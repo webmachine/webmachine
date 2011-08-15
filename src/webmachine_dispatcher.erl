@@ -160,7 +160,7 @@ try_host_binding([Dispatch|Rest], Host, Port, Path, Depth, RD) ->
         {ok, PortBindings} ->
             case bind(lists:reverse(HostSpec), Host, PortBindings, 0) of
                 {ok, HostRemainder, HostBindings, _} ->
-                    case try_path_binding(PathSpec, Path, HostBindings, Depth, RD) of
+                    case try_path_binding(PathSpec, Path, HostRemainder, Port, HostBindings, Depth, RD) of
                         {Mod, Props, PathRemainder, PathBindings,
                          AppRoot, StringPath} ->
                             {Mod, Props, HostRemainder, Port, PathRemainder,
@@ -181,26 +181,36 @@ bind_port(PortAtom, Port, Bindings) when is_atom(PortAtom) ->
     {ok, [{PortAtom, Port}|Bindings]};
 bind_port(_, _, _) -> fail.
 
-try_path_binding([], PathTokens, _, _, _) ->
+try_path_binding([], PathTokens, _, _, _, _, _) ->
     {no_dispatch_match, PathTokens};
-try_path_binding([PathSpec|Rest], PathTokens, Bindings, ExtraDepth, RD) ->
-    {PathSchema, Guard, Mod, Props} = 
+try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD) ->
+    {PathSchema, Guard, Mod, Props} =
         case PathSpec of
             {P, M, Pr} -> {P, undefined, M, Pr};
             {P, G, M, Pr} -> {P, G, M, Pr}
         end,
 
-    case bind(PathSchema, PathTokens, Bindings, 0) of
+    case bind(PathSchema, PathTokens, HostBindings, 0) of
         {ok, Remainder, NewBindings, Depth} ->
-            case run_guard(Guard, RD) of
+            AppRoot = calculate_app_root(Depth + ExtraDepth),
+            StringPath = reconstitute(Remainder),
+            PathInfo = dict:from_list(NewBindings),
+            RD1 =
+                case RD of
+                    testing ->
+                        testing;
+                    _ ->
+                        wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
+                                               AppRoot, StringPath, RD)
+                end,
+            case run_guard(Guard, RD1) of
                 true ->
-                    {Mod, Props, Remainder, NewBindings,
-                     calculate_app_root(Depth + ExtraDepth), reconstitute(Remainder)};
+                    {Mod, Props, Remainder, NewBindings, AppRoot, StringPath};
                 false ->
-                    try_path_binding(Rest, PathTokens, Bindings, ExtraDepth, RD)
+                    try_path_binding(Rest, PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD)
             end;
-        fail -> 
-            try_path_binding(Rest, PathTokens, Bindings, ExtraDepth, RD)
+        fail ->
+            try_path_binding(Rest, PathTokens, HostRemainder, Port, HostBindings, ExtraDepth, RD)
     end.
 
 run_guard(undefined, _RD) ->
@@ -247,7 +257,10 @@ calculate_app_root(N) when N > 1 ->
 %% TEST
 %%
 -ifdef(TEST).
+
 -include_lib("eunit/include/eunit.hrl").
+-include("wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
 
 app_root_test() ->
     ?assertEqual(".",           calculate_app_root(1)),
@@ -330,30 +343,30 @@ bind_path_string_fail_test() ->
     ?assertEqual(fail, bind(["a","b"], ["a","c"], [], 0)).
 
 try_path_matching_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({bar, baz, [], [], ".", ""},
-                 try_path_binding([{["foo"], bar, baz}], ["foo"], [], 0, RD)),
+                 try_path_binding([{["foo"], bar, baz}], ["foo"], [], 80, [], 0, RD)),
     Dispatch = [{["a", x], foo, bar},
                 {["b", y], baz, quux},
                 {["b", y, '*'], baz2, quux2}],
     ?assertEqual({foo, bar, [], [{x, "c"}], "../..", []},
-                 try_path_binding(Dispatch, ["a","c"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["a","c"], [], 80, [], 0, RD)),
     ?assertEqual({baz, quux, [], [{y, "c"}], "../..", []},
-                 try_path_binding(Dispatch, ["b","c"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["b","c"], [], 80, [], 0, RD)),
     ?assertEqual({baz2, quux2, ["z"], [{y, "c"}], "../../..", "z"},
-                 try_path_binding(Dispatch, ["b","c","z"], [], 0, RD)),
+                 try_path_binding(Dispatch, ["b","c","z"], [], 80, [], 0, RD)),
     ?assertEqual({baz2, quux2, ["z","v"], [{y, "c"}], "../../../..", "z/v"},
-                 try_path_binding(Dispatch, ["b","c","z","v"], [], 0, RD)).
+                 try_path_binding(Dispatch, ["b","c","z","v"], [], 80, [], 0, RD)).
 
 try_path_failing_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({no_dispatch_match, ["a"]},
-                 try_path_binding([{["b"], x, y}], ["a"], [], 0, RD)).
+                 try_path_binding([{["b"], x, y}], ["a"], [], 80, [], 0, RD)).
 
 %% host binding
 
 try_host_binding_nohosts_test() ->
-    RD = ignored,
+    RD = testing,
     PathDispatches = [{["a"], foo, bar},
                       {["b"], baz, quux}],
     ?assertEqual(try_host_binding([{{['*'],'*'},PathDispatches}],
@@ -374,7 +387,7 @@ try_host_binding_nohosts_test() ->
                                   ["quux","baz"], 1234, ["b"], 0, RD)).
 
 try_host_binding_noport_test() ->
-    RD = ignored,
+    RD = testing,
     Dispatch = [{["foo","bar"], [{["a"],x,y}]},
                 {["baz","quux"],[{["b"],z,q}]},
                 {[m,"quux"],    [{["c"],r,s}]},
@@ -398,7 +411,7 @@ try_host_binding_noport_test() ->
                                   ["quux","no"], 82, ["d"], 0, RD)).
 
 try_host_binding_fullmatch_test() ->
-    RD = ignored,
+    RD = testing,
     Dispatch = [{{["foo","bar"],80},[{["a"],x,y}]},
                 {{[foo,"bar"],80},  [{["b"],z,q}]},
                 {{[foo,"bar"],baz}, [{["c"],r,s}]},
@@ -426,12 +439,12 @@ try_host_binding_fullmatch_test() ->
                  try_host_binding(Dispatch, ["bar","quux","foo"],80,["d"],0, RD)).
 
 try_host_binding_fail_test() ->
-    RD = ignored,
+    RD = testing,
     ?assertEqual({no_dispatch_match, {["bar","foo"], 1234}, ["x","y","z"]},
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 
 dispatch_test() ->
-    RD = ignored,
+    RD = testing,
     TrueFun = fun(_) -> true end,
     FalseFun = fun(_) -> false end,
 
@@ -451,4 +464,74 @@ dispatch_test() ->
                  dispatch("baz.bar:8000", "q/r",
                           [{{["foo","bar"],80},[{["a","b","c"],x,y}]}], RD)).
 
-  -endif.
+guard1_test() ->
+    %% Basic guard test. Match everything.
+    Guard = fun(_) -> true end,
+    DispatchList = [{['*'], Guard, foo, bar}],
+    ?assertEqual(
+       {foo, bar, [], 80, ["test"], [], ".", "test"},
+       dispatch("test", DispatchList, make_reqdata("/test"))),
+    ok.
+
+guard2_test() ->
+    %% Basic guard test. Use guard to prevent all matches.
+    Guard = fun(_) -> false end,
+    DispatchList = [{['*'], Guard, foo, bar}],
+    ?assertEqual(
+       {no_dispatch_match, {[], 80}, ["test"]},
+       dispatch("test", DispatchList, make_reqdata("/test"))),
+    ok.
+
+guard3_test() ->
+    %% Check that path_info and path_tokens are passed to the guard...
+    Guard =
+        fun(RD) ->
+                ?assertEqual("a", wrq:path_info(a, RD)),
+                ?assertEqual("b", wrq:path_info(b, RD)),
+                ?assertEqual("c", wrq:path_info(c, RD)),
+                ?assertEqual(["d", "e"], wrq:path_tokens(RD)),
+                true
+        end,
+    DispatchList = [{[a,b,c,'*'], Guard, foo, bar}],
+    ?assertEqual(
+       {foo,bar,[],80, ["d","e"],
+        [{c,"c"},{b,"b"},{a,"a"}],
+        "../../../../..","d/e"},
+       dispatch("a/b/c/d/e", DispatchList, make_reqdata("/a/b/c/d/e"))),
+    ok.
+
+guard4_test() ->
+    %% Check that host and port are possed to the guard...
+    Guard =
+        fun(RD) ->
+                ?assertEqual("0", wrq:path_info(x, RD)),
+                ?assertEqual("0", wrq:path_info(y, RD)),
+                ?assertEqual("1", wrq:path_info(z, RD)),
+                ?assertEqual(80, wrq:port(RD)),
+                true
+        end,
+    DispatchList=
+        [{
+          {["127",x,y,z], 80},
+          [
+           {['*'], Guard, foo, bar}
+          ]
+        }],
+    ?assertEqual(
+       {foo,bar,[],80,
+        ["a","b","c","d","e"],
+        [{x,"0"},{y,"0"},{z,"1"}],
+        "../../../../..","a/b/c/d/e"},
+       dispatch("127.0.0.1", "a/b/c/d/e", DispatchList, make_reqdata("http://127.0.0.1:80/a/b/c/d/e"))),
+    ok.
+
+make_reqdata(Path) ->
+    %% Helper function to construct a request and return the ReqData
+    %% object.
+    MochiReq = mochiweb_request:new(testing, 'GET', Path, {1, 1},
+                                    mochiweb_headers:make([])),
+    Req = webmachine:new_request(mochiweb, MochiReq),
+    {RD, _} = Req:get_reqdata(),
+    RD.
+
+-endif.
