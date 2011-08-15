@@ -257,7 +257,10 @@ calculate_app_root(N) when N > 1 ->
 %% TEST
 %%
 -ifdef(TEST).
+
 -include_lib("eunit/include/eunit.hrl").
+-include("wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
 
 app_root_test() ->
     ?assertEqual(".",           calculate_app_root(1)),
@@ -461,4 +464,74 @@ dispatch_test() ->
                  dispatch("baz.bar:8000", "q/r",
                           [{{["foo","bar"],80},[{["a","b","c"],x,y}]}], RD)).
 
-  -endif.
+guard1_test() ->
+    %% Basic guard test. Match everything.
+    Guard = fun(_) -> true end,
+    DispatchList = [{['*'], Guard, foo, bar}],
+    ?assertEqual(
+       {foo, bar, [], 80, ["test"], [], ".", "test"},
+       dispatch("test", DispatchList, make_reqdata("/test"))),
+    ok.
+
+guard2_test() ->
+    %% Basic guard test. Use guard to prevent all matches.
+    Guard = fun(_) -> false end,
+    DispatchList = [{['*'], Guard, foo, bar}],
+    ?assertEqual(
+       {no_dispatch_match, {[], 80}, ["test"]},
+       dispatch("test", DispatchList, make_reqdata("/test"))),
+    ok.
+
+guard3_test() ->
+    %% Check that path_info and path_tokens are passed to the guard...
+    Guard =
+        fun(RD) ->
+                ?assertEqual("a", wrq:path_info(a, RD)),
+                ?assertEqual("b", wrq:path_info(b, RD)),
+                ?assertEqual("c", wrq:path_info(c, RD)),
+                ?assertEqual(["d", "e"], wrq:path_tokens(RD)),
+                true
+        end,
+    DispatchList = [{[a,b,c,'*'], Guard, foo, bar}],
+    ?assertEqual(
+       {foo,bar,[],80, ["d","e"],
+        [{c,"c"},{b,"b"},{a,"a"}],
+        "../../../../..","d/e"},
+       dispatch("a/b/c/d/e", DispatchList, make_reqdata("/a/b/c/d/e"))),
+    ok.
+
+guard4_test() ->
+    %% Check that host and port are possed to the guard...
+    Guard =
+        fun(RD) ->
+                ?assertEqual("0", wrq:path_info(x, RD)),
+                ?assertEqual("0", wrq:path_info(y, RD)),
+                ?assertEqual("1", wrq:path_info(z, RD)),
+                ?assertEqual(80, wrq:port(RD)),
+                true
+        end,
+    DispatchList=
+        [{
+          {["127",x,y,z], 80},
+          [
+           {['*'], Guard, foo, bar}
+          ]
+        }],
+    ?assertEqual(
+       {foo,bar,[],80,
+        ["a","b","c","d","e"],
+        [{x,"0"},{y,"0"},{z,"1"}],
+        "../../../../..","a/b/c/d/e"},
+       dispatch("127.0.0.1", "a/b/c/d/e", DispatchList, make_reqdata("http://127.0.0.1:80/a/b/c/d/e"))),
+    ok.
+
+make_reqdata(Path) ->
+    %% Helper function to construct a request and return the ReqData
+    %% object.
+    MochiReq = mochiweb_request:new(testing, 'GET', Path, {1, 1},
+                                    mochiweb_headers:make([])),
+    Req = webmachine:new_request(mochiweb, MochiReq),
+    {RD, _} = Req:get_reqdata(),
+    RD.
+
+-endif.
