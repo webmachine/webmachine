@@ -427,7 +427,7 @@ decision(v3n11) ->
                 undefined -> error_response("post_is_create w/o create_path");
                 NewPath ->
                     case is_list(NewPath) of
-                        false -> error_response("create_path not a string");
+                        false -> error_response({"create_path not a string",NewPath});
                         true ->
                             BaseUri = case resource_call(base_uri) of
                                 undefined -> wrcall(base_uri);
