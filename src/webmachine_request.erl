@@ -81,7 +81,7 @@
 -include_lib("mochiweb/include/internal.hrl").
 
 -define(WMVSN, "1.9.0").
--define(QUIP, "participate in the frantic").
+-define(QUIP, "someone had painted it blue").
 -define(IDLE_TIMEOUT, infinity).
 
 trim_state() ->
