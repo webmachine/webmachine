@@ -26,7 +26,8 @@
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
 
-%% @spec dispatch(Path::string(), DispatchList::[matchterm()]) ->
+%% @spec dispatch(Path::string(), DispatchList::[matchterm()],
+%%                wrq:reqdata()) ->
 %%                                            dispterm() | dispfail()
 %% @doc Interface for URL dispatching.
 %% See also http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
@@ -34,7 +35,7 @@ dispatch(PathAsString, DispatchList, RD) ->
     dispatch([], PathAsString, DispatchList, RD).
 
 %% @spec dispatch(Host::string(), Path::string(),
-%%                DispatchList::[matchterm()]) ->
+%%                DispatchList::[matchterm()], wrq:reqdata()) ->
 %%         dispterm() | dispfail()
 %% @doc Interface for URL dispatching.
 %% See also http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
@@ -108,8 +109,8 @@ split_host(HostAsString) ->
 % Any atom pathterm other than '*' will match any token and will
 % create a binding in the result if a complete match occurs.
 
-%% @type guardfun() = function(wrq:reqdata()) -> boolean()
-%%                  | {Mod::atom(), Fun::atom()}
+%% @type guardfun() = (wrq:reqdata()) -> boolean()
+%%                  | {Mod::atom(), Fun::atom()}.
 % This function or tuple representing a function, if present, is
 % called after a successful match of the host, port, and path for a
 % dispatch entry. The function should take a single argument, the
