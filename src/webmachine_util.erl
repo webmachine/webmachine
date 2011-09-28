@@ -92,6 +92,10 @@ guess_mime(File) ->
             "text/cache-manifest";
         ".svg" ->
             "image/svg+xml";
+        ".less" ->
+            "text/less";
+        ".coffee" ->
+            "application/x-coffeescript";
         _ ->
             "text/plain"
     end.
