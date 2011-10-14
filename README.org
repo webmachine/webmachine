@@ -34,7 +34,7 @@ make
 
 The application will be available at [[http://localhost:8000]].
 
-To learn more continue reading [[https://webmachine.basho.com/][here]].
+To learn more continue reading [[http://webmachine.basho.com/][here]].
 
 ** Contributing
    We encourage contributions to =webmachine= from the community.
