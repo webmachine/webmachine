@@ -23,6 +23,7 @@
 -export([choose_media_type/2]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
+-export([format_content_type/2]).
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
@@ -102,7 +103,7 @@ choose_media_type(Provided,AcceptHead) ->
     % AcceptHead is the value of the request's Accept header
     % Provided is a list of media types the resource can provide.
     %  each is either a string e.g. -- "text/html"
-    %   or a string and parameters e.g. -- {"text/html",[{level,1}]}
+    %   or a string and parameters e.g. -- {"text/html",[{"level","1"}]}
     % (the plain string case with no parameters is much more common)
     Requested = accept_header_to_media_types(AcceptHead),
     Prov1 = normalize_provided(Provided),
@@ -192,6 +193,7 @@ normalize_provided1(Type) when is_list(Type) -> {Type, []};
 normalize_provided1({Type,Params}) -> {Type, Params}.
 
 format_content_type(Type,[]) -> Type;
+format_content_type(Type,[{K,V}|T]) -> format_content_type(Type ++ "; " ++ K ++ "=" ++ V, T);
 format_content_type(Type,[H|T]) -> format_content_type(Type ++ "; " ++ H, T).
 
 choose_charset(CSets, AccCharHdr) -> do_choose(CSets, AccCharHdr, "ISO-8859-1").
