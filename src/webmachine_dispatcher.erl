@@ -109,7 +109,7 @@ split_host(HostAsString) ->
 % create a binding in the result if a complete match occurs.
 
 %% @type guardfun() = function(wrq:reqdata()) -> boolean()
-%%                  | {Mod::atom(), Fun::atom()}
+%%                  | {Mod::atom(), Fun::atom()}.
 % This function or tuple representing a function, if present, is
 % called after a successful match of the host, port, and path for a
 % dispatch entry. The function should take a single argument, the
