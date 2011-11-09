@@ -16,7 +16,7 @@ distclean: clean
 	@(./rebar delete-deps)
 
 edoc:
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
+	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, [".", "deps"]}]'
 
 test: all
 	@(./rebar skip_deps=true eunit)
