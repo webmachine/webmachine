@@ -36,7 +36,13 @@ start() ->
 stop() ->
     application:stop(webmachine).
 
-new_request(mochiweb, Request) ->
+new_request(mochiweb, Request0) ->
+    Request = case application:get_env(webmachine, rewrite_module) of
+        {ok, RewriteMod} ->
+            RewriteMod:rewrite(Request0);
+        undefined ->
+            Request0
+    end,
     Socket = Request:get(socket),
     Method = Request:get(method),
     Scheme = Request:get(scheme),
@@ -59,8 +65,3 @@ new_request(mochiweb, Request) ->
                            response_code=404,
                            response_length=0},
     webmachine_request:new(PeerState#wm_reqstate{log_data=LogData}).
-
-
-
-
-  
