@@ -529,6 +529,16 @@ decision(v3o18) ->
             end,
             F = hd([Fun || {Type,Fun} <- resource_call(content_types_provided),
                            CT =:= Type]),
+            FunL = lists:foldl(
+                     fun({{Type, Params}, Fun}, AccIn) ->
+                             case webmachine_util:format_content_type(Type, Params) =:= CT of
+                                 true -> [Fun|AccIn];
+                                 false -> AccIn
+                             end;
+                        ({Type, Fun}, AccIn) when Type =:= CT -> [Fun|AccIn];
+                        (_, AccIn) -> AccIn
+                     end, [], resource_call(content_types_provided)),
+            F = hd(lists:reverse(FunL)),
             resource_call(F);
         false -> nop
     end,
