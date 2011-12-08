@@ -682,7 +682,10 @@ make_headers(Code, Length, RD) ->
                       mochiweb_headers:make(wrq:resp_headers(RD)))
             end
     end,
-    ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")",
+    case application:get_env(webmachine, server_name) of
+      undefined -> ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")";
+      {ok, ServerHeader} when is_list(ServerHeader) -> ok
+    end,
     WithSrv = mochiweb_headers:enter("Server", ServerHeader, Hdrs0),
     Hdrs = case mochiweb_headers:get_value("date", WithSrv) of
         undefined ->
