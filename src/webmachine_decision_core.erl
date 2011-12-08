@@ -527,8 +527,6 @@ decision(v3o18) ->
                            httpd_util:rfc1123_date(
                               calendar:universal_time_to_local_time(Exp))})
             end,
-            F = hd([Fun || {Type,Fun} <- resource_call(content_types_provided),
-                           CT =:= Type]),
             FunL = lists:foldl(
                      fun({{Type, Params}, Fun}, AccIn) ->
                              case webmachine_util:format_content_type(Type, Params) =:= CT of
