@@ -54,43 +54,53 @@ compare_ims_dates(D1, D2) ->
 %% @doc  Guess the mime type of a file by the extension of its filename.
 guess_mime(File) ->
     case filename:extension(File) of
-        ".html" ->
+        "."++Extension ->
+            try moo_mime_types:t(Extension)
+            catch _:_ -> fallback_guess_mime(Extension) end;
+        _ ->
+            "application/octet-stream"
+    end.
+                    
+%% Retaining the old webmachine behaviour.
+fallback_guess_mime(Extension) ->
+    case Extension of
+        "html" ->
             "text/html";
-        ".xhtml" ->
+        "xhtml" ->
             "application/xhtml+xml";
-        ".xml" ->
+        "xml" ->
             "application/xml";
-        ".css" ->
+        "css" ->
             "text/css";
-        ".js" ->
+        "js" ->
             "application/x-javascript";
-        ".jpg" ->
+        "jpg" ->
             "image/jpeg";
-        ".jpeg" ->
+        "jpeg" ->
             "image/jpeg";
-        ".gif" ->
+        "gif" ->
             "image/gif";
-        ".png" ->
+        "png" ->
             "image/png";
-        ".ico" ->
+        "ico" ->
             "image/x-icon";
-        ".swf" ->
+        "swf" ->
             "application/x-shockwave-flash";
-        ".zip" ->
+        "zip" ->
             "application/zip";
-        ".bz2" ->
+        "bz2" ->
             "application/x-bzip2";
-        ".gz" ->
+        "gz" ->
             "application/x-gzip";
-        ".tar" ->
+        "tar" ->
             "application/x-tar";
-        ".tgz" ->
+        "tgz" ->
             "application/x-gzip";
-        ".htc" ->
+        "htc" ->
             "text/x-component";
-        ".manifest" ->
+        "manifest" ->
             "text/cache-manifest";
-        ".svg" ->
+        "svg" ->
             "image/svg+xml";
         _ ->
             "text/plain"
