@@ -120,7 +120,10 @@ wrap(Mod, Args) ->
     end.
 
 do(Fun, ReqProps) when is_atom(Fun) andalso is_list(ReqProps) ->
-    RState0 = proplists:get_value(reqstate, ReqProps),
+    case lists:keyfind(reqstate, 1, ReqProps) of
+        false -> RState0 = undefined;
+        {reqstate, RState0} -> ok
+    end,
     put(tmp_reqstate, empty),
     {Reply, ReqData, NewModState} = handle_wm_call(Fun, 
                     (RState0#wm_reqstate.reqdata)#wm_reqdata{wm_state=RState0}),

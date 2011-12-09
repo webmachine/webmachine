@@ -205,14 +205,22 @@ append_to_response_body(Data, RD=#wm_reqdata{resp_body=RespB}) ->
     end.
 
 get_cookie_value(Key, RD) when is_list(Key) -> % string
-    proplists:get_value(Key, req_cookie(RD)).
+    case lists:keyfind(Key, 1, req_cookie(RD)) of
+        false -> undefined;
+        {Key, Value} -> Value
+    end.
 
 get_qs_value(Key, RD) when is_list(Key) -> % string
-    proplists:get_value(Key, req_qs(RD)).
+    case lists:keyfind(Key, 1, req_qs(RD)) of
+        false -> undefined;
+        {Key, Value} -> Value
+    end.
 
 get_qs_value(Key, Default, RD) when is_list(Key) ->
-    proplists:get_value(Key, req_qs(RD), Default).
-
+    case lists:keyfind(Key, 1, req_qs(RD)) of
+        false -> Default;
+        {Key, Value} -> Value
+    end.
 add_note(K, V, RD) -> RD#wm_reqdata{notes=[{K, V} | RD#wm_reqdata.notes]}.
 
 get_notes(RD) -> RD#wm_reqdata.notes.
