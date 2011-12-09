@@ -113,9 +113,9 @@ handle_error(Code, Error, Req) ->
 
 
 get_option(Option, Options) ->
-    case lists:keyfind(Option, 1, Options) of
+    case lists:keytake(Option, 1, Options) of
        false -> {undefined, Options};
-       {Option, Value} -> {Value, lists:keydelete(Option,1, Options)}
+       {value, {Option, Value}, NewOptions} -> {Value, NewOptions}
     end.
 
 application_set_unless_env(App, Var, Value) ->
