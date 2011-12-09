@@ -54,44 +54,72 @@ compare_ims_dates(D1, D2) ->
 %% @doc  Guess the mime type of a file by the extension of its filename.
 guess_mime(File) ->
     case filename:extension(File) of
-        ".html" ->
-            "text/html";
-        ".xhtml" ->
-            "application/xhtml+xml";
-        ".xml" ->
-            "application/xml";
-        ".css" ->
-            "text/css";
-        ".js" ->
-            "application/x-javascript";
-        ".jpg" ->
-            "image/jpeg";
-        ".jpeg" ->
-            "image/jpeg";
-        ".gif" ->
-            "image/gif";
-        ".png" ->
-            "image/png";
-        ".ico" ->
-            "image/x-icon";
-        ".swf" ->
-            "application/x-shockwave-flash";
-        ".zip" ->
-            "application/zip";
         ".bz2" ->
             "application/x-bzip2";
+        ".css" ->
+            "text/css";
+        ".eot" ->
+            "application/vnd.ms-fontobject";
+        ".gif" ->
+            "image/gif";
         ".gz" ->
             "application/x-gzip";
+        ".htc" ->
+            "text/x-component";
+        ".html" ->
+            "text/html";
+        ".ico" ->
+            "image/x-icon";
+        ".jpeg" ->
+            "image/jpeg";
+        ".jpg" ->
+            "image/jpeg";
+        ".js" ->
+            "application/x-javascript";
+        ".m4v" ->
+            "video/mp4";
+        ".manifest" ->
+            "text/cache-manifest";
+        ".mp4" ->
+            "video/mp4";
+        ".oga" ->
+            "audio/ogg";
+        ".ogg" ->
+            "audio/ogg";
+        ".ogv" ->
+            "video/ogg";
+        ".otf" ->
+            "font/opentyp";
+        ".png" ->
+            "image/png";
+        ".svg" ->
+            "image/svg+xml";
+        ".svgz" ->
+            "image/svg+xml";
+        ".swf" ->
+            "application/x-shockwave-flash";
         ".tar" ->
             "application/x-tar";
         ".tgz" ->
             "application/x-gzip";
-        ".htc" ->
-            "text/x-component";
-        ".manifest" ->
-            "text/cache-manifest";
-        ".svg" ->
-            "image/svg+xml";
+        ".ttc" ->
+            "application/x-font-ttf";
+        ".ttf" ->
+            "application/x-font-ttf";
+        ".vcf" ->
+            "text/x-vcard";
+        ".webm" ->
+            "video/web";
+        ".webp" ->
+            "image/web";
+        ".woff" ->
+            "application/x-font-woff";
+        ".xhtml" ->
+            "application/xhtml+xml";
+        ".xml" ->
+            "application/xml";
+        ".zip" ->
+            "application/zip";
         _ ->
             "text/plain"
     end.
