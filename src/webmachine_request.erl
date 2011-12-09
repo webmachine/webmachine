@@ -78,7 +78,6 @@
 -include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
--include_lib("mochiweb/include/internal.hrl").
 
 -define(WMVSN, "1.9.0").
 -define(QUIP, "someone had painted it blue").
