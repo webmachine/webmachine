@@ -633,6 +633,8 @@ encode_body(Body) ->
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        {known_length_stream, Size, StreamBody} ->
+            {known_length_stream, Size, make_encoder_stream(Encoder, Charsetter, StreamBody)};
         {stream, Size, Fun} ->
             {stream, Size, make_size_encoder_stream(Encoder, Charsetter, Fun)};
         {writer, BodyFun} ->
