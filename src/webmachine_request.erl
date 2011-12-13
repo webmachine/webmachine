@@ -374,6 +374,7 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
         {stream, StreamBody} -> {{stream, StreamBody}, chunked};
+        {known_length_stream, Size, StreamBody} -> {{stream, StreamBody}, Size};
         {stream, Size, Fun} -> {{stream, Fun(0, Size-1)}, chunked};
         {writer, WriteBody} -> {{writer, WriteBody}, chunked};
         _ -> {Body0, iolist_size([Body0])}
