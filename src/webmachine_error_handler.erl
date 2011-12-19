@@ -38,7 +38,15 @@ render_error_body(404, Req, _Reason) ->
 render_error_body(500, Req, Reason) ->
     {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
     {Path,_} = Req:path(),
-    error_logger:error_msg("webmachine error: path=~p~n~p~n", [Path, Reason]),
+    case Reason of
+        {error, {exit, normal, _Stack}} ->
+            %% webmachine_request did an exit(normal), so suppress this
+            %% message. This usually happens when a chunked upload is
+            %% interrupted by network failure.
+            ok;
+        _ ->
+            error_logger:error_msg("webmachine error: path=~p~n~p~n", [Path, Reason])
+    end,
     STString = io_lib:format("~p", [Reason]),
     ErrorStart = "<html><head><title>500 Internal Server Error</title></head><body><h1>Internal Server Error</h1>The server encountered an error while processing this request:<br><pre>",
     ErrorEnd = "</pre><P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></body></html>",
