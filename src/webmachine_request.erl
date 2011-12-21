@@ -507,6 +507,9 @@ range_parts(_RD=#wm_reqdata{resp_body={stream, Size, StreamFun}}, Ranges) ->
     {[ {Skip, Skip+Length-1, StreamFun} || {Skip, Length} <- SkipLengths ],
      Size};
 
+range_parts(_RD=#wm_reqdata{resp_body=Data}, Ranges) when is_binary(Data); is_list(Data) ->
+    range_parts(Data, Ranges);
+
 range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
     Body = iolist_to_binary(Body0),
     Size = size(Body),
