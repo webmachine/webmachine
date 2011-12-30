@@ -47,6 +47,8 @@ default(valid_content_headers) ->
     true;
 default(valid_entity_length) ->
     true;
+default(processable_entity) ->
+    true;
 default(options) ->
     [];
 default(allowed_methods) ->
