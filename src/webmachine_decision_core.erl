@@ -205,8 +205,11 @@ decision(v3b5) ->
 %% "Req Entity Too Large?"
 decision(v3b4) ->
     decision_test(resource_call(valid_entity_length), true, v3b3, 413);
-%% "OPTIONS?"
+%% "Processable Entity?"
 decision(v3b3) ->
+    decision_test(resource_call(processable_entity), true, v3b2, 422);
+%% "OPTIONS?"
+decision(v3b2) ->
     case method() of 
         'OPTIONS' ->
             Hdrs = resource_call(options),
