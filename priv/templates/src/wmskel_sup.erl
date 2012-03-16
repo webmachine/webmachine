@@ -43,8 +43,7 @@ upgrade() ->
 init([]) ->
     Ip = case os:getenv("WEBMACHINE_IP") of false -> "0.0.0.0"; Any -> Any end,
     {ok, Dispatch} = file:consult(filename:join(
-                         [filename:dirname(code:which(?MODULE)),
-                          "..", "priv", "dispatch.conf"])),
+                         [code:priv_dir({{appid}}), "dispatch.conf"])),
     WebConfig = [
                  {ip, Ip},
                  {port, 8000},
