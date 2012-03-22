@@ -217,7 +217,19 @@ accept_header_to_media_types(HeadVal) ->
 normalize_provided(Provided) ->
     [normalize_provided1(X) || X <- Provided].
 normalize_provided1(Type) when is_list(Type) -> {Type, []};
-normalize_provided1({Type,Params}) -> {Type, Params}.
+normalize_provided1({Type,Params}) -> {Type, normalize_media_params(Params)}.
+
+normalize_media_params(Params) ->
+    normalize_media_params(Params,[]).
+
+normalize_media_params([],Acc) ->
+    Acc;
+normalize_media_params([{K,V}|T], Acc) when is_atom(K) ->
+    normalize_media_params(T,[{atom_to_list(K),V}|Acc]);
+normalize_media_params([H|T], Acc) ->
+    normalize_media_params(T, [H|Acc]).
+
+    
 
 format_content_type(Type,[]) -> Type;
 format_content_type(Type,[H|T]) -> 
