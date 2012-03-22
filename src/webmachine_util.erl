@@ -20,7 +20,7 @@
 -module(webmachine_util).
 -export([guess_mime/1]).
 -export([convert_request_date/1, compare_ims_dates/2]).
--export([choose_media_type/2]).
+-export([choose_media_type/2, format_content_type/1]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
 -export([now_diff_milliseconds/2]).
@@ -231,13 +231,16 @@ normalize_media_params([H|T], Acc) ->
 
     
 
+format_content_type(Type) when is_list(Type) ->
+    Type;
+format_content_type({Type,Params}) ->
+    format_content_type(Type,Params).
+
 format_content_type(Type,[]) -> Type;
-format_content_type(Type,[H|T]) -> 
-    P = case H of 
-	    {K,V} -> K ++ "=" ++ V;
-	    _ -> H
-	end,
-    format_content_type(Type ++ "; " ++ P, T).
+format_content_type(Type,[{K,V}|T]) when is_atom(K) -> 
+    format_content_type(Type, [{atom_to_list(K),V}|T]);
+format_content_type(Type,[{K,V}|T]) -> 
+    format_content_type(Type ++ "; " ++ K ++ "=" ++ V, T).
 
 choose_charset(CSets, AccCharHdr) -> do_choose(CSets, AccCharHdr, "ISO-8859-1").
 

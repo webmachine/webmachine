@@ -528,7 +528,7 @@ decision(v3o18) ->
                               calendar:universal_time_to_local_time(Exp))})
             end,
             F = hd([Fun || {Type,Fun} <- resource_call(content_types_provided),
-                           CT =:= Type]),
+                           CT =:= webmachine_util:format_content_type(Type)]),
             resource_call(F);
         false -> nop
     end,
