@@ -812,12 +812,12 @@ log_data() -> call(log_data).
 
 port_string(Scheme, Port) ->
     case Scheme of
-        http ->
+        "http" ->
             case Port of
                 80 -> "";
                 _ -> ":" ++ erlang:integer_to_list(Port)
             end;
-        https ->
+        "https" ->
             case Port of
                 443 -> "";
                 _ -> ":" ++ erlang:integer_to_list(Port)
