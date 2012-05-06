@@ -56,7 +56,15 @@ start(Options) ->
     end,
     application_set_unless_env(webmachine, dispatch_list, DispatchList),
     application_set_unless_env(webmachine, error_handler, ErrorHandler),
-    application_set_unless_env(webmachine, rewrite_module, RewriteModule),
+    case RewriteModule of
+        undefined ->
+            %% webmachine:new_request/2 will explode if
+            %% application:get_env returns {ok, undefined}
+            ok;
+        _ ->
+            application_set_unless_env(
+              webmachine, rewrite_module, RewriteModule)
+    end,
     mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options6]).
 
 stop() ->
