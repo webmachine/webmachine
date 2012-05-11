@@ -27,7 +27,8 @@
          merge_resp_headers/2,remove_resp_header/2,
          append_to_resp_body/2,append_to_response_body/2,
          max_recv_body/1,set_max_recv_body/2,
-         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,
+         get_cookie_value/2,get_qs_value/2,get_qs_value/3,
+	 get_qs_values/2,get_qs_values/3,set_peer/2,
          add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
