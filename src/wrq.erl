@@ -36,7 +36,7 @@
 
 
 create(Method,Version,RawPath,Headers) ->
-	create(Method,http,Version,RawPath,Headers).
+        create(Method,http,Version,RawPath,Headers).
 create(Method,Scheme,Version,RawPath,Headers) ->
     create(#wm_reqdata{method=Method,scheme=Scheme,version=Version,
                        raw_path=RawPath,req_headers=Headers,
@@ -221,6 +221,23 @@ get_qs_value(Key, Default, RD) when is_list(Key) ->
         false -> Default;
         {Key, Value} -> Value
     end.
+
+get_qs_values(Key, RD) when is_list(Key) -> % [string]
+    get_qs_values(Key, undefined, RD).
+
+get_qs_values(Key, Default, RD) when is_list(Key) -> % [string]
+    case collect_qs_values(Key, RD) of
+        [] -> Default;
+        Values -> Values
+    end.
+
+collect_qs_values(Key, RD) when is_list(Key) ->
+    lists:foldl(fun ({K, V}, Acc) when K =:= Key -> [V | Acc];
+                    ({_, _}, Acc) -> Acc
+                end,
+                [],
+                req_qs(RD)).
+
 add_note(K, V, RD) -> RD#wm_reqdata{notes=[{K, V} | RD#wm_reqdata.notes]}.
 
 get_notes(RD) -> RD#wm_reqdata.notes.
@@ -236,15 +253,21 @@ make_wrq(Method, RawPath, Headers) ->
     create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
 
 accessor_test() ->
-    R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
+    R0 = make_wrq('GET', "/foo?a=1&d=11&b=2&d=12&d=13", [{"Cookie", "foo=bar"}]),
     R = set_peer("127.0.0.1", R0),
     ?assertEqual('GET', method(R)),
     ?assertEqual({1,1}, version(R)),
     ?assertEqual("/foo", path(R)),
-    ?assertEqual("/foo?a=1&b=2", raw_path(R)),     
-    ?assertEqual([{"a", "1"}, {"b", "2"}], req_qs(R)),
+    ?assertEqual("/foo?a=1&d=11&b=2&d=12&d=13", raw_path(R)),     
+    ?assertEqual([{"a", "1"}, {"d", "11"}, {"b", "2"}, {"d", "12"}, {"d", "13"}], req_qs(R)),
     ?assertEqual({"1", "2"}, {get_qs_value("a", R), get_qs_value("b", R)}),
     ?assertEqual("3", get_qs_value("c", "3", R)),
+    ?assertEqual(undefined, get_qs_value("c", R)),
+    ?assertEqual("2", get_qs_value("b", "3", R)),
+    ?assertEqual(["13","12","11"], get_qs_values("d", R)),
+    ?assertEqual("3", get_qs_values("c", "3", R)),
+    ?assertEqual(undefined, get_qs_values("c", R)),
+    ?assertEqual(["13","12","11"], get_qs_values("d", "3", R)),
     ?assertEqual([{"foo", "bar"}], req_cookie(R)),
     ?assertEqual("bar", get_cookie_value("foo", R)),
     ?assertEqual("127.0.0.1", peer(R)).
