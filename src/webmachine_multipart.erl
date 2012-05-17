@@ -96,7 +96,11 @@ get_more_data(done) -> {<<"--\n">>, really_done};
 get_more_data(Fun) -> Fun().
    
 make_part(PartData) ->
-    [HeadData, Body] = re:split(PartData, "\\r\\n\\r\\n", [{parts,2}]),
+    %% Remove the trailing \r\n
+    [HeadData, BodyWithCRLF] = re:split(PartData, "\\r\\n\\r\\n", [{parts,2}]),
+    BodyLen = size(BodyWithCRLF) - 2,
+    <<Body:BodyLen/binary, _/binary>> = BodyWithCRLF,
+
     HeadList = [list_to_binary(X) ||
                    X <- string:tokens(binary_to_list(HeadData), "\r\n")],
     {Name, Params, Headers} = make_headers(HeadList),
@@ -153,15 +157,14 @@ body_test() ->
     ?assertEqual(
        [{"Filename",
          {[{<<"name">>,<<"Filename">>}],[]},
-         <<"testfile.txt\r\n">>},
+         <<"testfile.txt">>},
         {"Filedata",
          {[{<<"name">>,<<"Filedata">>},
            {<<"filename">>,<<"testfile.txt">>}],
           [{<<"Content-Type">>,<<"application/octet-stream">>}]},
-         <<"%%% The contents of this file are a test,\n%%% do not be alarmed.\n\r\n">>},
-        {"Upload",
-         {[{<<"name">>,<<"Upload">>}],[]},
-         <<"Submit Query\r\n">>}],
+         <<"%%% The contents of this file are a test,\n%%% do not be alarmed.\n">>},
+        {"Upload",{[{<<"name">>,<<"Upload">>}],[]},
+         <<"Submit Query">>}],
        get_all_parts(Body, Boundary)).
     
 body2_test() ->
@@ -172,8 +175,30 @@ body2_test() ->
          {[{<<"name">>,<<"Filedata">>},
            {<<"filename">>,<<"akamai.txt">>}],
           [{<<"Content-Type">>,<<"text/plain">>}]},
-         <<"CAMBRIDGE, MA - February 18, 2009 - Akamai Technologies, Inc. (NASDAQ: AKAM), the leader in powering rich media, dynamic transactions and enterprise applications online, today announced that its Service & Support organization was awarded top honors for Innovation in Customer Service at the 3rd Annual Stevie Awards for Sales & Customer Service, an international competition recognizing excellence in disciplines that are crucial to business success.\n\n\"We have always set incredibly high standards with respect to the service and support we provide our customers,\" said Sanjay Singh, vice president of Global Service & Support at Akamai. \"Our support team provides highly responsive service around the clock to our global customer base and, as a result, has become an extension of our customers' online businesses. This prestigious award is validation of Akamai's commitment to customer service and technical support.\"\n\nAkamai Service & Support professionals are dedicated to working with customers on a daily basis to fine tune, optimize, and support their Internet initiatives. Akamai's winning submission highlighted the key pillars of its service and support offering, as well as the initiatives established to meet customer requirements for proactive communication, simplification, and faster response times.\n\n\"This year's honorees demonstrate that even in challenging economic times, it's possible for organizations to continue to shine in sales and customer service, the two most important functions in business: acquiring and keeping customers,\" said Michael Gallagher, president of the Stevie Awards.\n\nThe awards are presented by the Stevie Awards, which organizes several of the world's leading business awards shows, including the prestigious American Business Awards. Nicknamed the Stevies for the Greek word \"crowned,\" winners were announced during a gala banquet on Monday, February 9 at Caesars Palace in Las Vegas. Nominated customer service and sales executives from the U.S.A. and several other countries attended. More than 500 entries from companies of all sizes and in virtually every industry were submitted to this year's competition. There are 27 categories for customer service professionals, as well as 41 categories for sales professionals.\n\nDetails about the Stevie Awards for Sales & Customer Service and the list of honorees in all categories are available at www.stevieawards.com/sales. \n\r\n">>
+         <<"CAMBRIDGE, MA - February 18, 2009 - Akamai Technologies, Inc. (NASDAQ: AKAM), the leader in powering rich media, dynamic transactions and enterprise applications online, today announced that its Service & Support organization was awarded top honors for Innovation in Customer Service at the 3rd Annual Stevie Awards for Sales & Customer Service, an international competition recognizing excellence in disciplines that are crucial to business success.\n\n\"We have always set incredibly high standards with respect to the service and support we provide our customers,\" said Sanjay Singh, vice president of Global Service & Support at Akamai. \"Our support team provides highly responsive service around the clock to our global customer base and, as a result, has become an extension of our customers' online businesses. This prestigious award is validation of Akamai's commitment to customer service and technical support.\"\n\nAkamai Service & Support professionals are dedicated to working with customers on a daily basis to fine tune, optimize, and support their Internet initiatives. Akamai's winning submission highlighted the key pillars of its service and support offering, as well as the initiatives established to meet customer requirements for proactive communication, simplification, and faster response times.\n\n\"This year's honorees demonstrate that even in challenging economic times, it's possible for organizations to continue to shine in sales and customer service, the two most important functions in business: acquiring and keeping customers,\" said Michael Gallagher, president of the Stevie Awards.\n\nThe awards are presented by the Stevie Awards, which organizes several of the world's leading business awards shows, including the prestigious American Business Awards. Nicknamed the Stevies for the Greek word \"crowned,\" winners were announced during a gala banquet on Monday, February 9 at Caesars Palace in Las Vegas. Nominated customer service and sales executives from the U.S.A. and several other countries attended. More than 500 entries from companies of all sizes and in virtually every industry were submitted to this year's competition. There are 27 categories for customer service professionals, as well as 41 categories for sales professionals.\n\nDetails about the Stevie Awards for Sales & Customer Service and the list of honorees in all categories are available at www.stevieawards.com/sales. \n">>
         }],
+       get_all_parts(Body,Boundary)).
+
+firefox_test() ->
+    Body = <<"-----------------------------823378840143542612896544303\r\nContent-Disposition: form-data; name=\"upload-test\"; filename=\"abcdef.txt\"\r\nContent-Type: text/plain\r\n\r\n01234567890123456789012345678901234567890123456789\r\n-----------------------------823378840143542612896544303--\r\n">>,
+    Boundary = "---------------------------823378840143542612896544303",
+    ?assertEqual(
+       [{"upload-test",
+         {[{<<"name">>,<<"upload-test">>},
+           {<<"filename">>,<<"abcdef.txt">>}],
+          [{<<"Content-Type">>,<<"text/plain">>}]},
+         <<"01234567890123456789012345678901234567890123456789">>}],
+       get_all_parts(Body,Boundary)).
+
+chrome_test() ->
+    Body = <<"------WebKitFormBoundaryIHB9Xyi7ZCNKJusP\r\nContent-Disposition: form-data; name=\"upload-test\"; filename=\"abcdef.txt\"\r\nContent-Type: text/plain\r\n\r\n01234567890123456789012345678901234567890123456789\r\n------WebKitFormBoundaryIHB9Xyi7ZCNKJusP--\r\n">>,
+    Boundary = "----WebKitFormBoundaryIHB9Xyi7ZCNKJusP",
+    ?assertEqual(
+       [{"upload-test",
+         {[{<<"name">>,<<"upload-test">>},
+           {<<"filename">>,<<"abcdef.txt">>}],
+          [{<<"Content-Type">>,<<"text/plain">>}]},
+         <<"01234567890123456789012345678901234567890123456789">>}],
        get_all_parts(Body,Boundary)).
 
 -endif.
