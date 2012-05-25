@@ -25,7 +25,8 @@
 -export([start_link/0,
          add_route/1,
          remove_route/1,
-         remove_resource/1]).
+         remove_resource/1,
+         get_routes/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -81,6 +82,12 @@ remove_route(Route) ->
 remove_resource(Resource) when is_atom(Resource) ->
     gen_server:call(?SERVER, {remove_resource, Resource}, infinity).
 
+%% @spec get_routes() -> [{[], res, []}]
+%% @doc Retrieve a list of routes and resources set in webmachine's
+%%      route table.
+get_routes() ->
+    gen_server:call(?SERVER, get_routes, infinity).
+
 %% @spec start_link() -> {ok, pid()} | {error, any()}
 %% @doc Starts the webmachine_router gen_server.
 start_link() ->
@@ -91,12 +98,13 @@ init([]) ->
   {ok, []}.
 
 %% @private
-handle_call(get_routes, _From, State) ->
-    {reply, get_dispatch_list(), State};
-
 handle_call({remove_resource, Resource}, _From, State) ->
     DL = filter_by_resource(Resource, get_dispatch_list()),
     {reply, set_dispatch_list(DL), State};
+
+handle_call(get_routes, _From, State) ->
+    {reply, get_dispatch_list(), State};
+
 
 handle_call({remove_route, Route}, _From, State) ->
     DL = [D || D <- get_dispatch_list(),
@@ -165,10 +173,6 @@ set_dispatch_list(DispatchList) ->
 %% For unit tests only
 start() ->
     gen_server:start({local, ?SERVER}, ?MODULE, [], []).
-
-get_routes() ->
-    gen_server:call(?SERVER, get_routes, infinity).
-
 
 add_remove_route_test() ->
     application:set_env(webmachine, dispatch_list, []),
