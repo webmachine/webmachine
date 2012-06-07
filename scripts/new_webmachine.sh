@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+SCRIPT=${0##*/}
 WS=mochiweb
 # Set WSAPP to the whole rebar variable to allow it to be
 # set completely empty for particular web servers. This is
@@ -11,7 +12,7 @@ WSAPP='webserver_app=mochiweb,'
 
 usage() {
     cat <<EOF
-usage: $0 [-s webserver] name [destdir]
+usage: $SCRIPT [-s webserver] name [destdir]
   supported web servers: mochiweb, yaws
 EOF
 }
@@ -40,7 +41,6 @@ while getopts ":hs:" option; do
 done
 shift $(($OPTIND - 1))
 
-SCRIPT=${0##*/}
 NAME=$1
 DESTDIR=${2:-.}
 

@@ -40,21 +40,10 @@ new_request(mochiweb, Request) ->
     Method = Request:get(method),
     Scheme = Request:get(scheme),
     Version = Request:get(version),
-    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
-        {ok, RewriteMod} ->
-            do_rewrite(RewriteMod,
-                       Method,
-                       Scheme,
-                       Version,
-                       Request:get(headers),
-                       Request:get(raw_path));
-        undefined ->
-            {Request:get(headers), Request:get(raw_path)}
-    end,
     Socket = Request:get(socket),
-    Method = Request:get(method),
-    Scheme = Request:get(scheme),
+    RawPath = Request:get(raw_path),
     Version = Request:get(version),
+    Headers = Request:get(headers),
     new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_mochiweb);
 
 new_request(yaws, {Module, Arg}) ->
@@ -63,7 +52,18 @@ new_request(yaws, {Module, Arg}) ->
     {_, [Socket, Method, Scheme, RawPath, Version, Headers]} = lists:unzip(PList),
     new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_yaws).
 
-new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, WSMod) ->
+new_request_common(Socket, Method, Scheme, RawPath0, Version, Headers0, WSMod) ->
+    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
+                             {ok, RewriteMod} ->
+                                 do_rewrite(RewriteMod,
+                                            Method,
+                                            Scheme,
+                                            Version,
+                                            Headers0,
+                                            RawPath0);
+                             undefined ->
+                                 {Headers0, RawPath0}
+                         end,
     InitState = #wm_reqstate{socket=Socket,
                              reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers,WSMod)},
     InitReq = {webmachine_request,InitState},
@@ -83,7 +83,9 @@ new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, WSMod) ->
 do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
     case RewriteMod:rewrite(Method, Scheme, Version, Headers, RawPath) of
         %% only raw path has been rewritten (older style rewriting)
-        NewPath when is_list(NewPath) -> {Headers, NewPath};
+        NewPath when is_list(NewPath) ->
+            {Headers, NewPath};
         %% headers and raw path rewritten (new style rewriting)
-        {NewHeaders, NewPath} -> {NewHeaders,NewPath}
+        {NewHeaders, NewPath} ->
+            {NewHeaders,NewPath}
     end.

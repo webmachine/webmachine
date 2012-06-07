@@ -23,13 +23,14 @@ start(Options, WSMod) ->
     {DispatchList, Options1} = get_option(dispatch, Options),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
+    {RewriteModule, Options4} = get_option(rewrite_module, Options3),
     ErrorHandler =
         case ErrorHandler0 of
             undefined ->
                 webmachine_error_handler;
             EH -> EH
         end,
-    {LogDir, Options4} = get_option(log_dir, Options3),
+    {LogDir, Options5} = get_option(log_dir, Options4),
     case whereis(webmachine_logger) of
         undefined ->
             webmachine_sup:start_logger(LogDir);
@@ -48,16 +49,25 @@ start(Options, WSMod) ->
         _ ->
             ignore
     end,
-    {PName, Options5} = case get_option(name, Options4) of
-                            {undefined, _} -> {WSMod, Options4};
-                            {PN, O5} -> {PN, O5}
+    {PName, Options6} = case get_option(name, Options5) of
+                            {undefined, _} -> {WSMod, Options5};
+                            {PN, O6} -> {PN, O6}
                         end,
-    application_set_unless_env(webmachine, dispatch_list, DispatchList),
+    webmachine_router:init_routes(DispatchList),
     application_set_unless_env(webmachine, error_handler, ErrorHandler),
-    {PName, Options5}.
+    case RewriteModule of
+        undefined ->
+            %% webmachine:new_request/2 will explode if
+            %% application:get_env returns {ok, undefined}
+            ok;
+        _ ->
+            application_set_unless_env(
+              webmachine, rewrite_module, RewriteModule)
+    end,
+    {PName, Options6}.
 
 dispatch_request(Req) ->
-    {ok, DispatchList} = application:get_env(webmachine, dispatch_list),
+    DispatchList = webmachine_router:get_routes(),
     Host = case host_headers(Req) of
                [H|_] -> H;
                [] -> []
@@ -97,6 +107,22 @@ get_webserver_mod() ->
             webmachine_yaws
     end.
 
+handle_error(Code, Error, Req) ->
+    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
+    {ErrorHTML,ReqState1} =
+        ErrorHandler:render_error(Code, Req, Error),
+    Req1 = {webmachine_request,ReqState1},
+    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
+    Req2 = {webmachine_request,ReqState2},
+    {ok,ReqState3} = Req2:send_response(Code),
+    Req3 = {webmachine_request,ReqState3},
+    {LogData,_ReqState4} = Req3:log_data(),
+    case application:get_env(webmachine,webmachine_logger_module) of
+        {ok, LogModule} ->
+            spawn(LogModule, log_access, [LogData]);
+        _ -> nop
+    end.
+
 host_headers(Req) ->
     [ V || {V,_ReqState} <- [Req:get_header_value(H)
                              || H <- ["x-forwarded-host",
@@ -118,21 +144,4 @@ application_set_unless_env(App, Var, Value) ->
             ok;
         false ->
             application:set_env(App, Var, Value)
-    end.
-
-
-handle_error(Code, Error, Req) ->
-    {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-    {ErrorHTML,ReqState1} =
-        ErrorHandler:render_error(Code, Req, Error),
-    Req1 = {webmachine_request,ReqState1},
-    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
-    Req2 = {webmachine_request,ReqState2},
-    {ok,ReqState3} = Req2:send_response(Code),
-    Req3 = {webmachine_request,ReqState3},
-    {LogData,_ReqState4} = Req3:log_data(),
-    case application:get_env(webmachine,webmachine_logger_module) of
-        {ok, LogModule} ->
-            spawn(LogModule, log_access, [LogData]);
-        _ -> nop
     end.

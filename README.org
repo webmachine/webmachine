@@ -3,12 +3,14 @@
 
 [[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://secure.travis-ci.org/basho/webmachine.png]]
 
-Webmachine is an application layer that adds HTTP semantic awareness
-on top of the excellent bit-pushing and HTTP syntax-management
-provided by mochiweb, and provides a simple and clean way to connect
-that to your application's behavior.
+Webmachine is an application layer that adds HTTP semantic awareness on top
+of the excellent bit-pushing and HTTP syntax-management provided by
+mochiweb and yaws, and provides a simple and clean way to connect that to
+your application's behavior.
 
 More information is available [[http://webmachine.basho.com/][here]].
+
+The yaws branch of this webmachine fork supports the [[http://yaws.hyber.org/][Yaws webserver]].
 
 ** Quick Start
 A shell script is provided in the =webmachine= repository to help
@@ -36,6 +38,13 @@ make
 #+END_SRC
 
 The application will be available at [[http://localhost:8000]].
+
+To use yaws instead of mochiweb, use the =-s= option to the
+=new_webmachine.sh= script:
+
+#+BEGIN_SRC shell
+./scripts/new_webmachine.sh -s yaws mydemo
+#+END_SRC
 
 To learn more continue reading [[http://webmachine.basho.com/][here]].
 

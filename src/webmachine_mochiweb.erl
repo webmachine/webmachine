@@ -30,6 +30,9 @@
          socket_send/2,
          socket_recv/3,
          socket_setopts/2,
+         urlsplit_path/1,
+         parse_qs/1,
+         parse_cookie/1,
          make_reqdata/1
         ]).
 
@@ -74,6 +77,15 @@ socket_recv(Socket, Length, Timeout) ->
 
 socket_setopts(Socket, Options) ->
     mochiweb_socket:setopts(Socket, Options).
+
+urlsplit_path(Path) ->
+    mochiweb_util:urlsplit_path(Path).
+
+parse_qs(QueryString) ->
+    mochiweb_util:parse_qs(QueryString).
+
+parse_cookie(Value) ->
+    mochiweb_cookies:parse_cookie(Value).
 
 make_reqdata(Path) ->
     %% Helper function to construct a request and return the ReqData

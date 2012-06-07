@@ -25,6 +25,7 @@
 {template, "README", "{{prefix}}/README"}.
 {template, "Makefile", "{{prefix}}/Makefile"}.
 {template, "rebar.config", "{{prefix}}/rebar.config"}.
+{file, "rebar.config.script", "{{prefix}}/rebar.config.script"}.
 {file, "{{webmachine}}/rebar", "{{prefix}}/rebar"}.
 {chmod, 8#744, "{{prefix}}/rebar"}.
 {template, "start.sh", "{{prefix}}/start.sh"}.

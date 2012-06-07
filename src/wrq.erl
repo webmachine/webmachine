@@ -59,14 +59,14 @@ create(Method,Scheme,Version,RawPath,Headers,WSMod) ->
       resp_redirect=false, resp_headers=WSMod:new_headers(),
       resp_body = <<>>, response_code=500,
       notes=[], wsmod=WSMod}).
-create(RD = #wm_reqdata{raw_path=RawPath}) ->
+create(RD = #wm_reqdata{raw_path=RawPath, wsmod=WSMod}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
     Cookie = case get_req_header("cookie", RD) of
                  undefined -> [];
-                 Value -> mochiweb_cookies:parse_cookie(Value)
+                 Value -> WSMod:parse_cookie(Value)
              end,
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
-    ReqQS = mochiweb_util:parse_qs(QueryString),
+    ReqQS = WSMod:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
 load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
                    DispPath, RD) ->
@@ -258,8 +258,11 @@ port_string(Scheme, Port) ->
 -include_lib("eunit/include/eunit.hrl").
 
 make_wrq(Method, RawPath, Headers) ->
+    make_wrq(Method, http, RawPath, Headers).
+
+make_wrq(Method, Scheme, RawPath, Headers) ->
     WSMod = webmachine_ws:get_webserver_mod(),
-    create(Method, Scheme, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
+    create(Method, Scheme, {1,1}, RawPath, WSMod:headers_from_list(Headers), WSMod).
 
 accessor_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
