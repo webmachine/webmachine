@@ -102,7 +102,7 @@ get_peer() ->
         {ReqState#wm_reqstate.peer, ReqState}
     end.
 
-peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->  
+peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->
     x_peername(inet_parse:ntoa(Addr));
 peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}) when (Second > 15) andalso (Second < 32) ->
     x_peername(inet_parse:ntoa(Addr));
@@ -168,8 +168,9 @@ call(resp_headers) ->
 call(resp_redirect) ->
     {wrq:resp_redirect(ReqState#wm_reqstate.reqdata), ReqState};
 call({get_resp_header, HdrName}) ->
-    Reply = mochiweb_headers:get_value(HdrName,
-                wrq:resp_headers(ReqState#wm_reqstate.reqdata)),
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
+    Reply = WSMod:get_header_value(HdrName, wrq:resp_headers(ReqData)),
     {Reply, ReqState};
 call(get_path_info) ->
     PropList = dict:to_list(wrq:path_info(ReqState#wm_reqstate.reqdata)),
@@ -210,7 +211,7 @@ call(do_redirect) ->
     {ok, ReqState#wm_reqstate{
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
 call({send_response, Code}) ->
-    {Reply, NewState} = 
+    {Reply, NewState} =
         case Code of
             200 ->
                 send_ok_response();
@@ -257,11 +258,14 @@ get_header_value(K) ->
     {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState}.
 
 get_outheader_value(K) ->
-    {mochiweb_headers:get_value(K,
-      wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
+    {WSMod:get_header_value(K, wrq:resp_headers(ReqData)), ReqState}.
 
 send(Socket, Data) ->
-    case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
+    case WSMod:socket_send(Socket, Data) of
         ok -> ok;
         {error,closed} -> ok;
         _ -> exit(normal)
@@ -336,11 +340,11 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}) ->
     end,
     send(PassedState#wm_reqstate.socket,
          [make_version(wrq:version(RD)),
-          make_code(Code), <<"\r\n">> | 
+          make_code(Code), <<"\r\n">> |
          make_headers(Code, Length, RD)]),
-    FinalLength = case wrq:method(RD) of 
+    FinalLength = case wrq:method(RD) of
          'HEAD' -> Length;
-         _ -> 
+         _ ->
             case Body of
                 {stream, Body2} ->
                     send_stream_body(PassedState#wm_reqstate.socket, Body2);
@@ -377,11 +381,11 @@ do_recv_body(PassedState=#wm_reqstate{reqdata=RD}) ->
     read_whole_stream(recv_stream_body(PassedState, MRH), [], MRB, 0).
 
 read_whole_stream({Hunk,_}, _, MaxRecvBody, SizeAcc)
-  when SizeAcc + byte_size(Hunk) > MaxRecvBody -> 
+  when SizeAcc + byte_size(Hunk) > MaxRecvBody ->
     {error, req_body_too_large};
 read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
     HunkSize = byte_size(Hunk),
-    if SizeAcc + HunkSize > MaxRecvBody -> 
+    if SizeAcc + HunkSize > MaxRecvBody ->
             {error, req_body_too_large};
        true ->
             Acc = [Hunk|Acc0],
@@ -396,7 +400,7 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     put(mochiweb_request_recv, true),
     case get_header_value("expect") of
         {"100-continue", _} ->
-            send(PassedState#wm_reqstate.socket, 
+            send(PassedState#wm_reqstate.socket,
                  [make_version(wrq:version(RD)),
                   make_code(100), <<"\r\n\r\n">>]);
         _Else ->
@@ -413,42 +417,48 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     end.
 
 recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
     case MaxHunk >= DataLeft of
         true ->
-            {ok,Data1} = mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT),
+            {ok,Data1} = WSMod:socket_recv(Socket,DataLeft,?IDLE_TIMEOUT),
             {Data1, done};
         false ->
-            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {ok,Data2} = WSMod:socket_recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
              fun() -> recv_unchunked_body(
                         Socket, MaxHunk, DataLeft-MaxHunk)
              end}
     end.
-    
+
 recv_chunked_body(Socket, MaxHunk) ->
     case read_chunk_length(Socket, false) of
         0 -> {<<>>, done};
         ChunkLength -> recv_chunked_body(Socket,MaxHunk,ChunkLength)
     end.
 recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
     case MaxHunk >= LeftInChunk of
         true ->
-            {ok,Data1} = mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
+            {ok,Data1} = WSMod:socket_recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
             {Data1,
              fun() -> recv_chunked_body(Socket, MaxHunk)
              end};
         false ->
-            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
+            {ok,Data2} = WSMod:socket_recv(Socket,MaxHunk,?IDLE_TIMEOUT),
             {Data2,
              fun() -> recv_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
              end}
     end.
 
 read_chunk_length(Socket, MaybeLastChunk) ->
-    mochiweb_socket:setopts(Socket, [{packet, line}]),
-    case mochiweb_socket:recv(Socket, 0, ?IDLE_TIMEOUT) of
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
+    WSMod:socket_setopts(Socket, [{packet, line}]),
+    case WSMod:socket_recv(Socket, 0, ?IDLE_TIMEOUT) of
         {ok, Header} ->
-            mochiweb_socket:setopts(Socket, [{packet, raw}]),
+            WSMod:socket_setopts(Socket, [{packet, raw}]),
             Splitter = fun (C) ->
                                C =/= $\r andalso C =/= $\n andalso C =/= $
                                    andalso C =/= 59 % semicolon
@@ -560,7 +570,7 @@ parse_range_request(RawRange) when is_list(RawRange) ->
 
 parts_to_body([{Start, End, Body0}], Size) ->
     %% return body for a range reponse with a single body
-    ContentType = 
+    ContentType =
         case get_outheader_value("content-type") of
             {undefined, _} ->
                 "text/html";
@@ -570,7 +580,7 @@ parts_to_body([{Start, End, Body0}], Size) ->
     HeaderList = [{"Content-Type", ContentType},
                   {"Content-Range",
                    ["bytes ",
-                    mochiweb_util:make_io(Start), "-", 
+                    mochiweb_util:make_io(Start), "-",
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
     Body = if is_function(Body0) ->
@@ -583,7 +593,7 @@ parts_to_body(BodyList, Size) when is_list(BodyList) ->
     %% return
     %% header Content-Type: multipart/byteranges; boundary=441934886133bdee4
     %% and multipart body
-    ContentType = 
+    ContentType =
         case get_outheader_value("content-type") of
             {undefined, _} ->
                 "text/html";
@@ -666,36 +676,38 @@ make_version(_) ->
     <<"HTTP/1.1 ">>.
 
 make_headers(Code, Length, RD) ->
+    ReqData = ReqState#wm_reqstate.reqdata,
+    WSMod = ReqData#wm_reqdata.wsmod,
     Hdrs0 = case Code of
         304 ->
-            mochiweb_headers:make(wrq:resp_headers(RD));
-        _ -> 
+            WSMod:make_headers(wrq:resp_headers(RD));
+        _ ->
             case Length of
                 chunked ->
-                    mochiweb_headers:enter(
+                    WSMod:add_header(
                       "Transfer-Encoding","chunked",
-                      mochiweb_headers:make(wrq:resp_headers(RD)));
+                      WSMod:make_headers(wrq:resp_headers(RD)));
                 _ ->
-                    mochiweb_headers:enter(
+                    WSMod:add_header(
                       "Content-Length",integer_to_list(Length),
-                      mochiweb_headers:make(wrq:resp_headers(RD)))
+                      WSMod:make_headers(wrq:resp_headers(RD)))
             end
     end,
     case application:get_env(webmachine, server_name) of
       undefined -> ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")";
       {ok, ServerHeader} when is_list(ServerHeader) -> ok
     end,
-    WithSrv = mochiweb_headers:enter("Server", ServerHeader, Hdrs0),
-    Hdrs = case mochiweb_headers:get_value("date", WithSrv) of
+    WithSrv = WSMod:add_header("Server", ServerHeader, Hdrs0),
+    Hdrs = case WSMod:get_header_value("date", WithSrv) of
         undefined ->
-            mochiweb_headers:enter("Date", httpd_util:rfc1123_date(), WithSrv);
+            WSMod:add_header("Date", httpd_util:rfc1123_date(), WithSrv);
         _ ->
             WithSrv
     end,
     F = fun({K, V}, Acc) ->
                 [mochiweb_util:make_io(K), <<": ">>, V, <<"\r\n">> | Acc]
         end,
-    lists:foldl(F, [<<"\r\n">>], mochiweb_headers:to_list(Hdrs)).
+    lists:foldl(F, [<<"\r\n">>], WSMod:headers_to_list(Hdrs)).
 
 get_reqdata() -> call(get_reqdata).
 

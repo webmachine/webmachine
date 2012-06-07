@@ -3,6 +3,6 @@
                      app_root,response_code,max_recv_body, max_recv_hunk,
                      req_cookie, req_qs, req_headers, req_body,
                      resp_redirect, resp_headers, resp_body,
-                     host_tokens, port, notes
+                     host_tokens, port, notes, wsmod=webmachine_mochiweb
                     }).
 

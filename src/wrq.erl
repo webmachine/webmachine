@@ -16,7 +16,7 @@
 -module(wrq).
 -author('Justin Sheehy <justin@basho.com>').
 
--export([create/4, create/5,load_dispatch_data/7]).
+-export([create/4, create/5, create/6, load_dispatch_data/7]).
 -export([method/1,scheme/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,
          path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
@@ -36,8 +36,10 @@
 
 
 create(Method,Version,RawPath,Headers) ->
-	create(Method,http,Version,RawPath,Headers).
+	create(Method,http,Version,RawPath,Headers,webmachine_mochiweb).
 create(Method,Scheme,Version,RawPath,Headers) ->
+    create(Method,Scheme,Version,RawPath,Headers,webmachine_mochiweb).
+create(Method,Scheme,Version,RawPath,Headers,WSMod) ->
     create(#wm_reqdata{method=Method,scheme=Scheme,version=Version,
                        raw_path=RawPath,req_headers=Headers,
       wm_state=defined_on_call,
@@ -53,17 +55,17 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       path_info=dict:new(),
       path_tokens=defined_in_load_dispatch_data,
       disp_path=defined_in_load_dispatch_data,
-      resp_redirect=false, resp_headers=mochiweb_headers:empty(),
+      resp_redirect=false, resp_headers=WSMod:new_headers(),
       resp_body = <<>>, response_code=500,
-      notes=[]}).
-create(RD = #wm_reqdata{raw_path=RawPath}) ->
+      notes=[], wsmod=WSMod}).
+create(RD = #wm_reqdata{raw_path=RawPath, wsmod=WSMod}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
     Cookie = case get_req_header("cookie", RD) of
                  undefined -> [];
-                 Value -> mochiweb_cookies:parse_cookie(Value)
+                 Value -> WSMod:parse_cookie(Value)
              end,
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
-    ReqQS = mochiweb_util:parse_qs(QueryString),
+    ReqQS = WSMod:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
 load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
                    DispPath, RD) ->
@@ -155,8 +157,8 @@ path_info(Key, RD) when is_atom(Key) ->
         error -> undefined
     end.
 
-get_req_header(HdrName, RD) -> % string->string
-    mochiweb_headers:get_value(HdrName, req_headers(RD)).
+get_req_header(HdrName, #wm_reqdata{wsmod=WSMod}=RD) -> % string->string
+    WSMod:get_header_value(HdrName, req_headers(RD)).
 
 do_redirect(true, RD) ->  RD#wm_reqdata{resp_redirect=true};
 do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.
@@ -172,24 +174,24 @@ set_resp_body(Body, RD) -> RD#wm_reqdata{resp_body=Body}.
 set_response_code(Code, RD) when is_integer(Code) ->
     RD#wm_reqdata{response_code=Code}.
 
-get_resp_header(HdrName, _RD=#wm_reqdata{resp_headers=RespH}) ->
-    mochiweb_headers:get_value(HdrName, RespH).
-set_resp_header(K, V, RD=#wm_reqdata{resp_headers=RespH})
+get_resp_header(HdrName, _RD=#wm_reqdata{resp_headers=RespH, wsmod=WSMod}) ->
+    WSMod:get_header_value(HdrName, RespH).
+set_resp_header(K, V, RD=#wm_reqdata{resp_headers=RespH, wsmod=WSMod})
   when is_list(K),is_list(V) ->
-    RD#wm_reqdata{resp_headers=mochiweb_headers:enter(K, V, RespH)}.
-set_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH}) ->
-    F = fun({K, V}, Acc) -> mochiweb_headers:enter(K, V, Acc) end,
+    RD#wm_reqdata{resp_headers=WSMod:add_header(K, V, RespH)}.
+set_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH, wsmod=WSMod}) ->
+    F = fun({K, V}, Acc) -> WSMod:add_header(K, V, Acc) end,
     RD#wm_reqdata{resp_headers=lists:foldl(F, RespH, Hdrs)}.
-fresh_resp_headers(Hdrs, RD) ->
-    F = fun({K, V}, Acc) -> mochiweb_headers:enter(K, V, Acc) end,
-    RD#wm_reqdata{resp_headers=lists:foldl(F, mochiweb_headers:empty(), Hdrs)}.
-remove_resp_header(K, RD=#wm_reqdata{resp_headers=RespH}) when is_list(K) ->
-    RD#wm_reqdata{resp_headers=mochiweb_headers:from_list(
+fresh_resp_headers(Hdrs, #wm_reqdata{wsmod=WSMod}=RD) ->
+    F = fun({K, V}, Acc) -> WSMod:add_header(K, V, Acc) end,
+    RD#wm_reqdata{resp_headers=lists:foldl(F, WSMod:new_headers(), Hdrs)}.
+remove_resp_header(K, RD=#wm_reqdata{resp_headers=RespH, wsmod=WSMod}) when is_list(K) ->
+    RD#wm_reqdata{resp_headers=WSMod:headers_from_list(
                                  proplists:delete(K,
-                                     mochiweb_headers:to_list(RespH)))}.
+                                     WSMod:headers_to_list(RespH)))}.
 
-merge_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH}) ->
-    F = fun({K, V}, Acc) -> mochiweb_headers:insert(K, V, Acc) end,
+merge_resp_headers(Hdrs, RD=#wm_reqdata{resp_headers=RespH, wsmod=WSMod}) ->
+    F = fun({K, V}, Acc) -> WSMod:merge_header(K, V, Acc) end,
     NewHdrs = lists:foldl(F, RespH, Hdrs),
     RD#wm_reqdata{resp_headers=NewHdrs}.
 
@@ -233,7 +235,8 @@ get_notes(RD) -> RD#wm_reqdata.notes.
 -include_lib("eunit/include/eunit.hrl").
 
 make_wrq(Method, RawPath, Headers) ->
-    create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
+    WSMod = webmachine_ws:get_webserver_mod(),
+    create(Method, "http", {1,1}, RawPath, WSMod:headers_from_list(Headers), WSMod).
 
 accessor_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
@@ -241,7 +244,7 @@ accessor_test() ->
     ?assertEqual('GET', method(R)),
     ?assertEqual({1,1}, version(R)),
     ?assertEqual("/foo", path(R)),
-    ?assertEqual("/foo?a=1&b=2", raw_path(R)),     
+    ?assertEqual("/foo?a=1&b=2", raw_path(R)),
     ?assertEqual([{"a", "1"}, {"b", "2"}], req_qs(R)),
     ?assertEqual({"1", "2"}, {get_qs_value("a", R), get_qs_value("b", R)}),
     ?assertEqual("3", get_qs_value("c", "3", R)),
@@ -249,12 +252,12 @@ accessor_test() ->
     ?assertEqual("bar", get_cookie_value("foo", R)),
     ?assertEqual("127.0.0.1", peer(R)).
 
-    
+
 simple_dispatch_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
-    R1 = set_peer("127.0.0.1", R0),    
-    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} = 
-        webmachine_dispatcher:dispatch("127.0.0.1", "/foo", 
+    R1 = set_peer("127.0.0.1", R0),
+    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} =
+        webmachine_dispatcher:dispatch("127.0.0.1", "/foo",
                                        [{["foo"], foo_resource, []}], R1),
     R = load_dispatch_data(Bindings,
                            HostTokens,

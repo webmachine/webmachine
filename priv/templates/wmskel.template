@@ -8,9 +8,12 @@
 %%               default = "../.."
 %%   prefix: path where the application should be created
 %%           default = "."
+%%   webserver: name of the webserver to host webmachine
+%%              default = "mochiweb"
 {variables, [{appid, "wmskel"},
              {webmachine, "../.."},
-             {prefix, "."}]}.
+             {prefix, "."},
+             {webserver, "mochiweb"}]}.
 
 %% main project files
 {template, "README", "{{prefix}}/README"}.

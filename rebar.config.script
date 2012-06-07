@@ -1,0 +1,16 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
+
+YawsDep = {yaws, "1.*", {git, "git://github.com/klacke/yaws", {branch, "master"}}}.
+
+case os:getenv("WEBMACHINE_SERVER") of
+    false ->
+        %% default to mochiweb
+        CONFIG;
+    "mochiweb" ->
+        CONFIG;
+    "yaws" ->
+        {value, {deps, Deps}} = lists:keysearch(deps, 1, CONFIG),
+        NDeps = lists:keystore(yaws, 1, Deps, YawsDep),
+        lists:keystore(deps, 1, CONFIG, {deps, NDeps})
+end.

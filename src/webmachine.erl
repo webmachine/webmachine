@@ -40,16 +40,24 @@ new_request(mochiweb, Request) ->
     Socket = Request:get(socket),
     Method = Request:get(method),
     Scheme = Request:get(scheme),
-    RawPath = Request:get(raw_path), 
+    RawPath = Request:get(raw_path),
     Version = Request:get(version),
     Headers = Request:get(headers),
+    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_mochiweb);
+
+new_request(yaws, {Module, Arg}) ->
+    Props = [socket, method, scheme, path, version, headers],
+    PList = Module:get_req_info(Props, Arg),
+    {_, [Socket, Method, Scheme, RawPath, Version, Headers]} = lists:unzip(PList),
+    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_yaws).
+
+new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, WSMod) ->
     InitState = #wm_reqstate{socket=Socket,
-                          reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
-    
+                             reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers,WSMod)},
     InitReq = {webmachine_request,InitState},
     {Peer, ReqState} = InitReq:get_peer(),
-    PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer,
-                                              ReqState#wm_reqstate.reqdata)},
+    ReqData = ReqState#wm_reqstate.reqdata,
+    PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer, ReqData)},
     LogData = #wm_log_data{start_time=now(),
                            method=Method,
                            headers=Headers,
@@ -59,8 +67,3 @@ new_request(mochiweb, Request) ->
                            response_code=404,
                            response_length=0},
     webmachine_request:new(PeerState#wm_reqstate{log_data=LogData}).
-
-
-
-
-  

@@ -1,13 +1,14 @@
 ERL ?= erl
 APP := {{appid}}
+WEBSERVER := {{webserver}}
 
 .PHONY: deps
 
 all: deps
-	@./rebar compile
+	@WEBMACHINE_SERVER=$(WEBSERVER) ./rebar compile
 
 deps:
-	@./rebar get-deps
+	@WEBMACHINE_SERVER=$(WEBSERVER) ./rebar get-deps
 
 clean:
 	@./rebar clean

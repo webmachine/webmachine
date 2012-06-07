@@ -17,10 +17,12 @@
     webmachine_mochiweb,
     webmachine_multipart,
     webmachine_util,
+    webmachine_ws,
+    webmachine_yaws,
     wrq,
     wmtrace_resource
   ]},
   {registered, []},
   {mod, {webmachine_app, []}},
   {env, []},
-  {applications, [kernel, stdlib, crypto, mochiweb]}]}.
+  {applications, [kernel, stdlib, crypto]}]}.

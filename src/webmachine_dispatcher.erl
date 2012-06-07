@@ -468,18 +468,22 @@ guard1_test() ->
     %% Basic guard test. Match everything.
     Guard = fun(_) -> true end,
     DispatchList = [{['*'], Guard, foo, bar}],
+    WSMod = webmachine_ws:get_webserver_mod(),
     ?assertEqual(
        {foo, bar, [], 80, ["test"], [], ".", "test"},
-       dispatch("test", DispatchList, make_reqdata("/test"))),
+       dispatch("test", DispatchList,
+                WSMod:make_reqdata("/test"))),
     ok.
 
 guard2_test() ->
     %% Basic guard test. Use guard to prevent all matches.
     Guard = fun(_) -> false end,
     DispatchList = [{['*'], Guard, foo, bar}],
+    WSMod = webmachine_ws:get_webserver_mod(),
     ?assertEqual(
        {no_dispatch_match, {[], 80}, ["test"]},
-       dispatch("test", DispatchList, make_reqdata("/test"))),
+       dispatch("test", DispatchList,
+                WSMod:make_reqdata("/test"))),
     ok.
 
 guard3_test() ->
@@ -493,11 +497,13 @@ guard3_test() ->
                 true
         end,
     DispatchList = [{[a,b,c,'*'], Guard, foo, bar}],
+    WSMod = webmachine_ws:get_webserver_mod(),
     ?assertEqual(
        {foo,bar,[],80, ["d","e"],
         [{c,"c"},{b,"b"},{a,"a"}],
         "../../../../..","d/e"},
-       dispatch("a/b/c/d/e", DispatchList, make_reqdata("/a/b/c/d/e"))),
+       dispatch("a/b/c/d/e", DispatchList,
+                WSMod:make_reqdata("/a/b/c/d/e"))),
     ok.
 
 guard4_test() ->
@@ -517,21 +523,13 @@ guard4_test() ->
            {['*'], Guard, foo, bar}
           ]
         }],
+    WSMod = webmachine_ws:get_webserver_mod(),
     ?assertEqual(
        {foo,bar,[],80,
         ["a","b","c","d","e"],
         [{x,"0"},{y,"0"},{z,"1"}],
         "../../../../..","a/b/c/d/e"},
-       dispatch("127.0.0.1", "a/b/c/d/e", DispatchList, make_reqdata("http://127.0.0.1:80/a/b/c/d/e"))),
+       dispatch("127.0.0.1", "a/b/c/d/e", DispatchList,
+                WSMod:make_reqdata("http://127.0.0.1:80/a/b/c/d/e"))),
     ok.
-
-make_reqdata(Path) ->
-    %% Helper function to construct a request and return the ReqData
-    %% object.
-    MochiReq = mochiweb_request:new(testing, 'GET', Path, {1, 1},
-                                    mochiweb_headers:make([])),
-    Req = webmachine:new_request(mochiweb, MochiReq),
-    {RD, _} = Req:get_reqdata(),
-    RD.
-
 -endif.

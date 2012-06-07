@@ -269,10 +269,10 @@ base_decision_name(Decision) ->
     end.
 
 encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
-    {struct, [{"method", atom_to_list(
-                           wrq:method(ReqData))},
+    WSMod = ReqData#wm_reqdata.wsmod,
+    {struct, [{"method", atom_to_list(wrq:method(ReqData))},
               {"path", wrq:raw_path(ReqData)},
-              {"headers", encode_headers(wrq:req_headers(ReqData))},
+              {"headers", encode_headers(wrq:req_headers(ReqData), WSMod)},
               {"body", case ReqData#wm_reqdata.req_body of
                            undefined -> [];
                            Body when is_atom(Body) ->
@@ -281,15 +281,16 @@ encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
                        end}]}.
 
 encode_response(ReqData) ->
+    WSMod = ReqData#wm_reqdata.wsmod,
     {struct, [{"code", integer_to_list(
                          wrq:response_code(ReqData))},
-              {"headers", encode_headers(wrq:resp_headers(ReqData))},
+              {"headers", encode_headers(wrq:resp_headers(ReqData), WSMod)},
               {"body", lists:flatten(io_lib:format("~s", [wrq:resp_body(ReqData)]))}]}.
 
 encode_headers(Headers) when is_list(Headers) ->
-    {struct, [ {N, V} || {N, V} <- Headers ]};
-encode_headers(Headers) ->
-    encode_headers(mochiweb_headers:to_list(Headers)).
+    {struct, [ {N, V} || {N, V} <- Headers ]}.
+encode_headers(Headers, WSMod) ->
+    encode_headers(WSMod:headers_to_list(Headers)).
 
 encode_trace_part({Decision, Calls}) ->
     {struct, [{"d", Decision},
