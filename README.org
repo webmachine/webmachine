@@ -1,5 +1,8 @@
 * webmachine
 ** Overview
+
+[[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://secure.travis-ci.org/basho/webmachine.png]]
+
 Webmachine is an application layer that adds HTTP semantic awareness
 on top of the excellent bit-pushing and HTTP syntax-management
 provided by mochiweb, and provides a simple and clean way to connect
