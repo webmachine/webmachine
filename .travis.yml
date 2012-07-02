@@ -1,5 +1,6 @@
 language: erlang
 notifications:
+  webhooks: http://basho-engbot.herokuapp.com/travis?key=66724b424957d598311ba00bb2d137fcae4eae21
   email: eng@basho.com
 otp_release:
   - R15B01
