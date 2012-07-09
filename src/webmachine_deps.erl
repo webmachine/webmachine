@@ -57,7 +57,19 @@ new_siblings(Module) ->
 %%      of the application for Module are on the code path.
 ensure(Module) ->
     code:add_paths(new_siblings(Module)),
-    code:clash(),
+
+    case lists:filter(fun(Path) -> case lists:reverse(Path) of
+				       "tinue." ++ _ -> true;
+				       _ -> false
+				   end
+		      end, code:get_path()) of
+	[] ->
+	    code:clash();
+	_EUnitPath ->
+	    %% EUnit running, don't check for clashes
+	    ok
+    end,
+
     ok.
 
 %% @spec ensure() -> ok

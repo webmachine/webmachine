@@ -124,7 +124,7 @@ x_peername(Default) ->
 call(base_uri) ->
     RD = ReqState#wm_reqstate.reqdata,
     Scheme = erlang:atom_to_list(RD#wm_reqdata.scheme),
-    Host = string:join(RD#wm_reqdata.host_tokens, "."),
+    Host = string:join(lists:reverse(RD#wm_reqdata.host_tokens), "."),
     PortString = port_string(Scheme, RD#wm_reqdata.port),
     {Scheme ++ "://" ++ Host ++ PortString,ReqState};
 call(socket) -> {ReqState#wm_reqstate.socket,ReqState};
@@ -505,6 +505,9 @@ range_parts(_RD=#wm_reqdata{resp_body={stream, Size, StreamFun}}, Ranges) ->
     SkipLengths = [ range_skip_length(R, Size) || R <- Ranges],
     {[ {Skip, Skip+Length-1, StreamFun} || {Skip, Length} <- SkipLengths ],
      Size};
+
+range_parts(_RD=#wm_reqdata{resp_body=Data}, Ranges) when is_binary(Data); is_list(Data) ->
+    range_parts(Data, Ranges);
 
 range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
     Body = iolist_to_binary(Body0),
