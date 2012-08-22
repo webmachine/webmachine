@@ -79,7 +79,7 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.9.0").
+-define(WMVSN, "1.9.2").
 -define(QUIP, "someone had painted it blue").
 -define(IDLE_TIMEOUT, infinity).
 
@@ -102,7 +102,7 @@ get_peer() ->
         {ReqState#wm_reqstate.peer, ReqState}
     end.
 
-peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->  
+peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}) ->
     x_peername(inet_parse:ntoa(Addr));
 peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}) when (Second > 15) andalso (Second < 32) ->
     x_peername(inet_parse:ntoa(Addr));
@@ -210,7 +210,7 @@ call(do_redirect) ->
     {ok, ReqState#wm_reqstate{
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
 call({send_response, Code}) ->
-    {Reply, NewState} = 
+    {Reply, NewState} =
         case Code of
             200 ->
                 send_ok_response();
@@ -336,11 +336,11 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}) ->
     end,
     send(PassedState#wm_reqstate.socket,
          [make_version(wrq:version(RD)),
-          make_code(Code), <<"\r\n">> | 
+          make_code(Code), <<"\r\n">> |
          make_headers(Code, Length, RD)]),
-    FinalLength = case wrq:method(RD) of 
+    FinalLength = case wrq:method(RD) of
          'HEAD' -> Length;
-         _ -> 
+         _ ->
             case Body of
                 {stream, Body2} ->
                     send_stream_body(PassedState#wm_reqstate.socket, Body2);
@@ -377,11 +377,11 @@ do_recv_body(PassedState=#wm_reqstate{reqdata=RD}) ->
     read_whole_stream(recv_stream_body(PassedState, MRH), [], MRB, 0).
 
 read_whole_stream({Hunk,_}, _, MaxRecvBody, SizeAcc)
-  when SizeAcc + byte_size(Hunk) > MaxRecvBody -> 
+  when SizeAcc + byte_size(Hunk) > MaxRecvBody ->
     {error, req_body_too_large};
 read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
     HunkSize = byte_size(Hunk),
-    if SizeAcc + HunkSize > MaxRecvBody -> 
+    if SizeAcc + HunkSize > MaxRecvBody ->
             {error, req_body_too_large};
        true ->
             Acc = [Hunk|Acc0],
@@ -396,7 +396,7 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     put(mochiweb_request_recv, true),
     case get_header_value("expect") of
         {"100-continue", _} ->
-            send(PassedState#wm_reqstate.socket, 
+            send(PassedState#wm_reqstate.socket,
                  [make_version(wrq:version(RD)),
                   make_code(100), <<"\r\n\r\n">>]);
         _Else ->
@@ -424,7 +424,7 @@ recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
                         Socket, MaxHunk, DataLeft-MaxHunk)
              end}
     end.
-    
+
 recv_chunked_body(Socket, MaxHunk) ->
     case read_chunk_length(Socket, false) of
         0 -> {<<>>, done};
@@ -560,7 +560,7 @@ parse_range_request(RawRange) when is_list(RawRange) ->
 
 parts_to_body([{Start, End, Body0}], Size) ->
     %% return body for a range reponse with a single body
-    ContentType = 
+    ContentType =
         case get_outheader_value("content-type") of
             {undefined, _} ->
                 "text/html";
@@ -570,7 +570,7 @@ parts_to_body([{Start, End, Body0}], Size) ->
     HeaderList = [{"Content-Type", ContentType},
                   {"Content-Range",
                    ["bytes ",
-                    mochiweb_util:make_io(Start), "-", 
+                    mochiweb_util:make_io(Start), "-",
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
     Body = if is_function(Body0) ->
@@ -583,7 +583,7 @@ parts_to_body(BodyList, Size) when is_list(BodyList) ->
     %% return
     %% header Content-Type: multipart/byteranges; boundary=441934886133bdee4
     %% and multipart body
-    ContentType = 
+    ContentType =
         case get_outheader_value("content-type") of
             {undefined, _} ->
                 "text/html";
@@ -669,7 +669,7 @@ make_headers(Code, Length, RD) ->
     Hdrs0 = case Code of
         304 ->
             mochiweb_headers:make(wrq:resp_headers(RD));
-        _ -> 
+        _ ->
             case Length of
                 chunked ->
                     mochiweb_headers:enter(
