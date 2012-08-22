@@ -20,7 +20,8 @@
 -export([method/1,scheme/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,
          path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
-         resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1]).
+         resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1,
+         base_uri/1]).
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
@@ -225,6 +226,27 @@ add_note(K, V, RD) -> RD#wm_reqdata{notes=[{K, V} | RD#wm_reqdata.notes]}.
 
 get_notes(RD) -> RD#wm_reqdata.notes.
 
+base_uri(RD) ->
+    Scheme = erlang:atom_to_list(RD#wm_reqdata.scheme),
+    Host = string:join(RD#wm_reqdata.host_tokens, "."),
+    PortString = port_string(RD#wm_reqdata.scheme, RD#wm_reqdata.port),
+    Scheme ++ "://" ++ Host ++ PortString.
+
+port_string(Scheme, Port) ->
+    case Scheme of
+        http ->
+            case Port of
+                80 -> "";
+                _ -> ":" ++ erlang:integer_to_list(Port)
+            end;
+        https ->
+            case Port of
+                443 -> "";
+                _ -> ":" ++ erlang:integer_to_list(Port)
+            end;
+        _ -> ":" ++ erlang:integer_to_list(Port)
+    end.
+
 %%
 %% Tests
 %%
@@ -233,7 +255,10 @@ get_notes(RD) -> RD#wm_reqdata.notes.
 -include_lib("eunit/include/eunit.hrl").
 
 make_wrq(Method, RawPath, Headers) ->
-    create(Method, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
+    make_wrq(Method, http, RawPath, Headers).
+
+make_wrq(Method, Scheme, RawPath, Headers) ->
+    create(Method, Scheme, {1,1}, RawPath, mochiweb_headers:from_list(Headers)).
 
 accessor_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
@@ -248,7 +273,6 @@ accessor_test() ->
     ?assertEqual([{"foo", "bar"}], req_cookie(R)),
     ?assertEqual("bar", get_cookie_value("foo", R)),
     ?assertEqual("127.0.0.1", peer(R)).
-
     
 simple_dispatch_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
@@ -264,6 +288,39 @@ simple_dispatch_test() ->
                            StringPath,
                            R1),
     ?assertEqual(".", app_root(R)),
-    ?assertEqual(80, port(R)).
+    ?assertEqual(80, port(R)),
+    ?assertEqual("http://127.0.0.1", base_uri(R)).
+
+base_uri_test_() ->
+    Make_req =
+        fun(Scheme, Host) ->
+                R0 = make_wrq('GET', Scheme, "/foo?a=1&b=2",
+                              [{"Cookie", "foo=bar"}]),
+                R1 = set_peer("127.0.0.1", R0),
+                DispatchRule = {["foo"], foo_resource, []},
+                {_, _, HostTokens, Port, PathTokens,
+                 Bindings, AppRoot,StringPath} =
+                    webmachine_dispatcher:dispatch(Host, "/foo", [DispatchRule],
+                                                   R1),
+                load_dispatch_data(Bindings,
+                                   HostTokens,
+                                   Port,
+                                   PathTokens,
+                                   AppRoot,
+                                   StringPath,
+                                   R1)
+        end,
+    Tests = [{{http, "somewhere.com:8080"}, "http://somewhere.com:8080"},
+             {{https, "somewhere.com:8080"}, "https://somewhere.com:8080"},
+
+             {{http, "somewhere.com"}, "http://somewhere.com"},
+             {{https, "somewhere.com"}, "https://somewhere.com"},
+
+             {{http, "somewhere.com:80"}, "http://somewhere.com"},
+             {{https, "somewhere.com:443"}, "https://somewhere.com"},
+             {{https, "somewhere.com:80"}, "https://somewhere.com:80"},
+             {{http, "somewhere.com:443"}, "http://somewhere.com:443"}],
+    [ ?_assertEqual(Expect, base_uri(Make_req(Scheme, Host)))
+      || {{Scheme, Host}, Expect} <- Tests ].
 
 -endif.
