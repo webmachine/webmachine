@@ -33,8 +33,8 @@
          make_reqdata/1
         ]).
 
--include("/usr/local/src/yaws/include/yaws_api.hrl").
--include("/usr/local/src/yaws/include/yaws.hrl").
+-include_lib("yaws/include/yaws_api.hrl").
+-include_lib("yaws/include/yaws.hrl").
 
 
 start(Options0) ->
