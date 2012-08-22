@@ -47,22 +47,25 @@ dispatch(HostAsString, PathAsString, DispatchList, RD) ->
                      true -> 1;
                      _ -> 0
                  end,
-    {Host, Port} = split_host_port(HostAsString),
+    {Host, Port} = split_host_port(HostAsString, wrq:scheme(RD)),
     try_host_binding(DispatchList, Host, Port, Path, ExtraDepth, RD).
 
-split_host_port(HostAsString) ->
+split_host_port(HostAsString, Scheme) ->
     case string:tokens(HostAsString, ":") of
         [HostPart, PortPart] ->
             {split_host(HostPart), list_to_integer(PortPart)};
         [HostPart] ->
-            {split_host(HostPart), 80};
+            {split_host(HostPart), default_port(Scheme)};
         [] ->
             %% no host header
-            {[], 80}
+            {[], default_port(Scheme)}
     end.
 
 split_host(HostAsString) ->
     string:tokens(HostAsString, ".").
+
+default_port(http) -> 80;
+default_port(https) -> 443.
 
 %% @type matchterm() = hostmatchterm() | pathmatchterm().
 % The dispatch configuration is a list of these terms, and the
@@ -284,11 +287,17 @@ split_host_test() ->
     ?assertEqual(["foo","bar","baz"], split_host("foo.bar.baz")).
 
 split_host_port_test() ->
-    ?assertEqual({[], 80}, split_host_port("")),
+    ?assertEqual({[], 80}, split_host_port("", http)),
     ?assertEqual({["foo","bar","baz"], 80},
-                 split_host_port("foo.bar.baz:80")),
+                 split_host_port("foo.bar.baz:80", http)),
     ?assertEqual({["foo","bar","baz"], 1234},
-                 split_host_port("foo.bar.baz:1234")).
+                 split_host_port("foo.bar.baz:1234", http)),
+
+    ?assertEqual({[], 443}, split_host_port("", https)),
+    ?assertEqual({["foo","bar","baz"], 443},
+                 split_host_port("foo.bar.baz", https)),
+    ?assertEqual({["foo","bar","baz"], 1234},
+                 split_host_port("foo.bar.baz:1234", https)).
 
 %% port binding
 bind_port_simple_match_test() ->
@@ -445,7 +454,7 @@ try_host_binding_fullmatch_test() ->
                  try_host_binding(Dispatch, ["foo","quux","bar"],80,["d"],0, RD)).
 
 try_host_binding_wildcard_token_order_test() ->
-    RD = testing,
+    RD = wrq:create('GET', http, {1,1}, "testing", mochiweb_headers:from_list([])),
     Dispatch = [{{['*',"quux","com"],80},[{['*'],x,y}]}],
     ?assertEqual({x,y,["foo","bar","baz"],80,[],[],".",""},
                  dispatch("foo.bar.baz.quux.com","/",Dispatch,RD)).
@@ -456,7 +465,7 @@ try_host_binding_fail_test() ->
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 
 dispatch_test() ->
-    RD = testing,
+    RD = wrq:create('GET', http, {1,1}, "testing", mochiweb_headers:from_list([])),
     TrueFun = fun(_) -> true end,
     FalseFun = fun(_) -> false end,
 
