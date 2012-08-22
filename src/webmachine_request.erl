@@ -79,7 +79,7 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.9.0").
+-define(WMVSN, "1.9.1").
 -define(QUIP, "someone had painted it blue").
 -define(IDLE_TIMEOUT, infinity).
 
