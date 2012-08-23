@@ -1,7 +1,7 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ft=erlang ts=4 sw=4 et
 
-WMDep = {deps, [{webmachine, "1.9.*", {git, "git://github.com/vinoski/webmachine", {branch, "yaws"}}}]}.
+WMDep = {deps, [{webmachine, "1.9.*", {git, "git://github.com/Vagabond/webmachine", {branch, "yaws-cowboy"}}}]}.
 
 case os:getenv("WEBMACHINE_SERVER") of
     false ->
@@ -10,5 +10,7 @@ case os:getenv("WEBMACHINE_SERVER") of
     "mochiweb" ->
         CONFIG;
     "yaws" ->
+        lists:keystore(deps, 1, CONFIG, WMDep);
+    "cowboy" ->
         lists:keystore(deps, 1, CONFIG, WMDep)
 end.

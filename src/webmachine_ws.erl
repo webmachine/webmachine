@@ -104,7 +104,9 @@ get_webserver_mod() ->
         "mochiweb" ->
             webmachine_mochiweb;
         "yaws" ->
-            webmachine_yaws
+            webmachine_yaws;
+        "cowboy" ->
+            webmachine_cowboy
     end.
 
 handle_error(Code, Error, Req) ->

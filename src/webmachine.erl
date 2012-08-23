@@ -50,7 +50,22 @@ new_request(yaws, {Module, Arg}) ->
     Props = [socket, method, scheme, path, version, headers],
     PList = Module:get_req_info(Props, Arg),
     {_, [Socket, Method, Scheme, RawPath, Version, Headers]} = lists:unzip(PList),
-    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_yaws).
+    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_yaws);
+
+new_request(cowboy, Req) ->
+    {ok, Transport, S} = cowboy_http_req:transport(Req),
+    {Method, Req1} = cowboy_http_req:method(Req),
+    {Socket, Scheme} = case Transport:name() of
+        tcp ->
+            {S, http};
+        ssl ->
+            {{ssl, S}, https}
+    end,
+    {RawPath, Req2} = cowboy_http_req:raw_path(Req1),
+    {Version, Req3} = cowboy_http_req:version(Req2),
+    {Headers, _Req4} = cowboy_http_req:headers(Req3),
+    new_request_common(Socket, Method, Scheme, binary_to_list(RawPath), Version, Headers, webmachine_cowboy).
+
 
 new_request_common(Socket, Method, Scheme, RawPath0, Version, Headers0, WSMod) ->
     {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
