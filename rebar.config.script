@@ -12,5 +12,8 @@ case os:getenv("WEBMACHINE_SERVER") of
     "yaws" ->
         {value, {deps, Deps}} = lists:keysearch(deps, 1, CONFIG),
         NDeps = lists:keystore(yaws, 1, Deps, YawsDep),
-        lists:keystore(deps, 1, CONFIG, {deps, NDeps})
+        NConfig = lists:keystore(deps, 1, CONFIG, {deps, NDeps}),
+        {value, {erl_opts, Opts}} = lists:keysearch(erl_opts, 1, NConfig),
+        Define = [{d, 'WEBMACHINE_YAWS'}],
+        lists:keystore(erl_opts, 1, NConfig, {erl_opts, Opts ++ Define})
 end.

@@ -16,6 +16,8 @@
 %% @doc Yaws interface for webmachine.
 -module(webmachine_yaws).
 -author('Steve Vinoski <vinoski@ieee.org>').
+
+-ifdef(WEBMACHINE_YAWS).
 -export([start/1, stop/0, out/1, get_req_info/2]).
 -export([get_header_value/2,
          new_headers/0,
@@ -163,3 +165,4 @@ make_reqdata(Path) ->
     Req = webmachine:new_request(yaws, {?MODULE, Arg}),
     {RD, _} = Req:get_reqdata(),
     RD.
+-endif.
