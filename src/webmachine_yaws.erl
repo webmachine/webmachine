@@ -29,8 +29,6 @@
          socket_send/2,
          socket_recv/3,
          socket_setopts/2,
-         parse_qs/1,
-         parse_cookie/1,
          make_reqdata/1
         ]).
 
@@ -140,14 +138,6 @@ socket_recv(Socket, Length, Timeout) ->
 socket_setopts(Socket, Options) ->
     SC = get(sc),
     yaws:setopts(Socket, Options, yaws:is_ssl(SC)).
-
-parse_qs(QueryString) ->
-    yaws_api:parse_query(#arg{querydata=QueryString}).
-
-parse_cookie(Value) ->
-    lists:foldl(fun(#cookie{key=Key, value=Val}, Acc) ->
-                        [{Key,Val}|Acc]
-                end, [], yaws_api:parse_cookie(Value)).
 
 make_reqdata(Path) ->
     %% Helper function to construct a request and return the ReqData
