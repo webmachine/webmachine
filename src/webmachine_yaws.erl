@@ -29,7 +29,6 @@
          socket_send/2,
          socket_recv/3,
          socket_setopts/2,
-         urlsplit_path/1,
          parse_qs/1,
          parse_cookie/1,
          make_reqdata/1
@@ -141,10 +140,6 @@ socket_recv(Socket, Length, Timeout) ->
 socket_setopts(Socket, Options) ->
     SC = get(sc),
     yaws:setopts(Socket, Options, yaws:is_ssl(SC)).
-
-urlsplit_path(Path) ->
-    Url = yaws_api:parse_url(Path),
-    {Url#url.path, Url#url.querypart, ""}.
 
 parse_qs(QueryString) ->
     yaws_api:parse_query(#arg{querydata=QueryString}).
