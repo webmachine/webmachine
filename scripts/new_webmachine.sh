@@ -8,6 +8,8 @@ if [ -z $NAME ] || [[ $NAME =~ ^[\.\~\/] ]]; then
     exit 1
 fi
 
+NAME=`echo "$NAME" | sed -e 's/-/_/g'`
+
 if [ -z $DESTDIR ]; then
     DESTDIR="."
 elif [[ $DESTDIR =~ /${NAME}$ ]]; then
