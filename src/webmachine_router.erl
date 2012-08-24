@@ -186,11 +186,27 @@ add_remove_resource_test() ->
     PathSpec1 = {["foo"], foo, []},
     PathSpec2 = {["bar"], foo, []},
     PathSpec3 = {["baz"], bar, []},
+    PathSpec4 = {["foo"], fun(_) -> true end, foo, []},
+    PathSpec5 = {["foo"], {webmachine_router, test_guard}, foo, []},
     webmachine_router:add_route(PathSpec1),
     webmachine_router:add_route(PathSpec2),
     webmachine_router:add_route(PathSpec3),
     webmachine_router:remove_resource(foo),
     [PathSpec3] = get_routes(),
+    webmachine_router:add_route(PathSpec4),
+    webmachine_router:remove_resource(foo),
+    [PathSpec3] = get_routes(),
+    webmachine_router:add_route(PathSpec5),
+    webmachine_router:remove_resource(foo),
+    [PathSpec3] = get_routes(),
+    webmachine_router:remove_route(PathSpec3),
+    [begin
+         PathSpec = {"localhost", [HostPath]},
+         webmachine_router:add_route(PathSpec),
+         webmachine_router:remove_resource(foo),
+         [{"localhost", []}] = get_routes(),
+         webmachine_router:remove_route({"localhost", []})
+     end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
     exit(Pid, kill).
 
 no_dupe_path_test() ->
