@@ -21,7 +21,7 @@
 -export([start_link/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
--export([log/1, refresh/0]).
+-export([log/1]).
 -include("webmachine_logger.hrl").
 -record(state, {hourstamp, filename, handle}).
 
@@ -39,24 +39,20 @@ init([BaseDir]) ->
     Handle = log_open(FileName, DateHour),
     {ok, #state{filename=FileName, handle=Handle, hourstamp=DateHour}}.
 
-refresh() ->
-    refresh(now()).
-
-refresh(Time) ->
-    gen_server:cast(?MODULE, {refresh, Time}).
-
 log(#wm_log_data{}=D) ->
     gen_server:call(?MODULE, {log, D}, infinity).
 
 handle_call({log, LogData}, _From, State) ->
-    NewState = maybe_rotate(State, now()),
+    NewState = maybe_rotate(State, os:timestamp()),
     Msg = format_req(LogData),
     log_write(NewState#state.handle, Msg),
     {reply, ok, NewState}.
 
-handle_cast({refresh, Time}, State) ->
-    {noreply, maybe_rotate(State, Time)}.
+handle_cast(_Info, State) ->
+    {noreply, State}.
 
+handle_info(refresh, State) ->
+    {noreply, maybe_rotate(State, os:timestamp())};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -130,10 +126,10 @@ fix_log(FD, Location) ->
 defer_refresh() ->
     {_, {_, M, S}} = calendar:universal_time(),
     Time = 1000 * (3600 - ((M * 60) + S)),
-    timer:apply_after(Time, ?MODULE, refresh, []).
+    erlang:send_after(Time, self(), refresh).
 
 datehour() ->
-    datehour(now()).
+    datehour(os:timestamp()).
 
 datehour(Now) ->
     {{Y, M, D}, {H, _, _}} = calendar:now_to_universal_time(Now),
