@@ -218,7 +218,7 @@ call({send_response, Code}) ->
                 send_response(Code)
         end,
     LogData = NewState#wm_reqstate.log_data,
-    NewLogData = LogData#wm_log_data{finish_time=now()},
+    NewLogData = LogData#wm_log_data{finish_time=os:timestamp()},
     {Reply, NewState#wm_reqstate{log_data=NewLogData}};
 call(resp_body) -> {wrq:resp_body(ReqState#wm_reqstate.reqdata), ReqState};
 call({set_resp_body, Body}) ->

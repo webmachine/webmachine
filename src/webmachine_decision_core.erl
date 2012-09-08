@@ -61,7 +61,7 @@ d(DecisionID) ->
     
 respond(Code) ->
     Resource = get(resource),
-    EndTime = now(),
+    EndTime = os:timestamp(),
     case Code of
         404 ->
             {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
