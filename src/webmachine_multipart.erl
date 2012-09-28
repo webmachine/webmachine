@@ -20,6 +20,7 @@
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
 -export([get_all_parts/2,
+         get_all_parts_from_chunked/2,
          stream_parts/2,
          stream_parts_chunked/2,
          find_boundary/1]).
@@ -65,6 +66,28 @@ get_all_parts(Body, Boundary) when is_binary(Body), is_list(Boundary) ->
 stream_parts_chunked(StreamStruct, Boundary) ->
     stream_until_headers(StreamStruct, "--" ++ Boundary, <<>>).
 
+get_all_parts_from_chunked(StreamStruct, Boundary) ->
+    handle_stream_parts_chunked(stream_parts_chunked(StreamStruct, Boundary),
+                                []).
+
+%% @private
+handle_stream_parts_chunked(done_parts, ResultBuildup) ->
+    lists:reverse(ResultBuildup);
+handle_stream_parts_chunked({part_headers, PartName, ParamsAndHeaders, NextFun},
+                            ResultBuildup) ->
+    {NextHeaders, Content} = stream_rest_of_content(NextFun(), []),
+    Part = make_fpart(PartName, ParamsAndHeaders, Content),
+    handle_stream_parts_chunked(NextHeaders, [Part | ResultBuildup]).
+
+stream_rest_of_content({part_headers, _PartName, _ParamsAndHeaders, _NextFun}=H,
+                       ContentBuffer) ->
+    {H, lists:reverse(ContentBuffer)};
+stream_rest_of_content({part_chunk, _PartName, Chunk, NextFun}, ContentBuffer) ->
+    stream_rest_of_content(NextFun(), [Chunk | ContentBuffer]).
+
+make_fpart(PartName, ParamsAndHeaders, Content) ->
+    {PartName, {ParamsAndHeaders, Content}}.
+
 %% Header Streaming -----------------------------------------------------------
 
 %% @private
@@ -74,20 +97,36 @@ stream_until_headers({Hunk, Next}, Boundary, Buffer) ->
                          Boundary, Next).
 
 %% @private
+handle_split_headers([_NoMatch], _Boundary, really_done) ->
+    %% TODO: think this should be an error
+    %% because there is no more data, and we haven't
+    %% been able to split the headers
+    ok;
 handle_split_headers([NoMatch], Boundary, Next) ->
+    %% Next() is safe to call because we pattern
+    %% matched on it being `really_done' earlier
     stream_until_headers(Next(), Boundary, NoMatch);
 handle_split_headers([Headers | BodyBegin], Boundary, Next) ->
     make_headers_response(Headers, BodyBegin, Boundary, Next).
 
 %% @private
+make_headers_response(Headers, BodyBegin, Boundary, really_done) ->
+    Next = constantly_really_done(),
+    full_header_received_response(Headers, BodyBegin, Boundary, Next);
 make_headers_response(Headers, BodyBegin, Boundary, Next) ->
+    full_header_received_response(Headers, BodyBegin, Boundary, Next).
+
+full_header_received_response(Headers, BodyBegin, Boundary, Next) ->
     HeadList = [list_to_binary(X) ||
                    X <- string:tokens(binary_to_list(Headers), "\r\n")],
     {Name, Params, Headers} = make_headers(HeadList),
     {part_headers, Name, {Params, Headers}, fun () ->
-                stream_rest_of_value({BodyBegin, Next()},
+                stream_rest_of_value({BodyBegin, Next},
                                      Boundary,
                                      Name) end}.
+
+constantly_really_done() ->
+    fun () -> {<<>>, really_done} end.
 
 %% Value Streaming ------------------------------------------------------------
 
@@ -96,13 +135,26 @@ stream_rest_of_value({Hunk, Next}, Boundary, PartName) ->
     handle_split_boundary(re:split(Hunk, Boundary, [{parts, 2}]),
                           Boundary, PartName, Next).
 
+%% @private
+handle_split_boundary([_NoMatch], _Boundary, _PartName, really_done) ->
+    %% this is an error, because we haven't been able to make a full
+    %% body out of what is here and there is no more data.
+    ok;
 handle_split_boundary([NoMatch], Boundary, PartName, Next) ->
+    %% Next() should be safe to call
     {part_chunk, PartName, NoMatch, fun () ->
                 stream_rest_of_value(Next(), Boundary, PartName) end};
+handle_split_boundary([RestBinary | BeginHeaders], Boundary, PartName, really_done) ->
+    Next = constantly_really_done(),
+    make_chunk_response(PartName, RestBinary, Boundary, Next, BeginHeaders);
 handle_split_boundary([RestBinary | BeginHeaders], Boundary, PartName, Next) ->
-    {part_chunk, PartName, remove_crlf(RestBinary), fun () ->
-                stream_until_headers(Next(), Boundary, BeginHeaders) end}.
+    make_chunk_response(PartName, RestBinary, Boundary, Next, BeginHeaders).
 
+make_chunk_response(PartName, RestBinary, Boundary, Next, Buffer) ->
+    {part_chunk, PartName, remove_crlf(RestBinary), fun () ->
+                stream_until_headers(Next(), Boundary, Buffer) end}.
+
+%% @private
 remove_crlf(Binary) ->
     BodyLen = size(Binary) - 2,
     <<WithoutCRLF:BodyLen/binary, _/binary>> = Binary,
