@@ -19,7 +19,10 @@
 -module(webmachine_multipart).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([get_all_parts/2,stream_parts/2, find_boundary/1]).
+-export([get_all_parts/2,
+         stream_parts/2,
+         stream_parts_chunked/2,
+         find_boundary/1]).
 
 % @type incoming_req_body() = binary().
 % The request body, in "multipart/form-data" (rfc2388) form,
@@ -54,6 +57,56 @@ find_boundary(ReqData) ->
 get_all_parts(Body, Boundary) when is_binary(Body), is_list(Boundary) ->
     StreamStruct = send_streamed_body(Body,1024),
     getparts1(stream_parts(StreamStruct, Boundary), []).
+
+%% @spec stream_parts_chunked(term(), boundary()) ->
+%%  'done_parts' |
+%%  {part_headers, fpartname(), {[fparam()], [fheader()]}, function()} |
+%%  {part_chunk, fpartname(), fcontent(), function()}.
+stream_parts_chunked(StreamStruct, Boundary) ->
+    stream_until_headers(StreamStruct, "--" ++ Boundary, <<>>).
+
+%% Header Streaming -----------------------------------------------------------
+
+%% @private
+stream_until_headers({Hunk, Next}, Boundary, Buffer) ->
+    FullBuffer = <<Buffer/binary, Hunk/binary>>,
+    handle_split_headers(re:split(FullBuffer, "\\r\\n\\r\\n", [{parts, 2}]),
+                         Boundary, Next).
+
+%% @private
+handle_split_headers([NoMatch], Boundary, Next) ->
+    stream_until_headers(Next(), Boundary, NoMatch);
+handle_split_headers([Headers | BodyBegin], Boundary, Next) ->
+    make_headers_response(Headers, BodyBegin, Boundary, Next).
+
+%% @private
+make_headers_response(Headers, BodyBegin, Boundary, Next) ->
+    HeadList = [list_to_binary(X) ||
+                   X <- string:tokens(binary_to_list(Headers), "\r\n")],
+    {Name, Params, Headers} = make_headers(HeadList),
+    {part_headers, Name, {Params, Headers}, fun () ->
+                stream_rest_of_value({BodyBegin, Next()},
+                                     Boundary,
+                                     Name) end}.
+
+%% Value Streaming ------------------------------------------------------------
+
+%% @private
+stream_rest_of_value({Hunk, Next}, Boundary, PartName) ->
+    handle_split_boundary(re:split(Hunk, Boundary, [{parts, 2}]),
+                          Boundary, PartName, Next).
+
+handle_split_boundary([NoMatch], Boundary, PartName, Next) ->
+    {part_chunk, PartName, NoMatch, fun () ->
+                stream_rest_of_value(Next(), Boundary, PartName) end};
+handle_split_boundary([RestBinary | BeginHeaders], Boundary, PartName, Next) ->
+    {part_chunk, PartName, remove_crlf(RestBinary), fun () ->
+                stream_until_headers(Next(), Boundary, BeginHeaders) end}.
+
+remove_crlf(Binary) ->
+    BodyLen = size(Binary) - 2,
+    <<WithoutCRLF:BodyLen/binary, _/binary>> = Binary,
+    WithoutCRLF.
 
 % @doc Similar to get_all_parts/2, but for streamed/chunked bodies.
 %   Takes as input the result of wrq:stream_req_body/2, and provides
