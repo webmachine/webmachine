@@ -28,7 +28,6 @@
 -endif.
 
 -export([get_all_parts/2,
-         get_all_parts_from_chunked/2,
          stream_parts/2,
          stream_parts_chunked/2,
          find_boundary/1]).
@@ -75,49 +74,11 @@ stream_parts_chunked(StreamStruct, Boundary) ->
     %%stream_until_headers(StreamStruct, "\r\n--" ++ Boundary, <<>>).
     stream_until_headers(StreamStruct, "--" ++ Boundary, <<>>).
 
-%% Testing funs ---------------------------------------------------------------
-
-get_all_parts_from_chunked(StreamStruct, Boundary) ->
-    handle_stream_parts_chunked(stream_parts_chunked(StreamStruct, Boundary),
-                                []).
-
-%% @private
-handle_stream_parts_chunked(done_parts, ResultBuildup) ->
-    %% we're not going to receive any more parts,
-    %% return the result.
-    lists:reverse(ResultBuildup);
-handle_stream_parts_chunked({part_headers, PartName, ParamsAndHeaders, done_parts},
-                            ResultBuildup) ->
-    Part = make_fpart(PartName, ParamsAndHeaders, <<>>),
-    lists:reverse([Part | ResultBuildup]);
-handle_stream_parts_chunked({part_headers, PartName, ParamsAndHeaders, NextFun},
-                            ResultBuildup) ->
-    {NextHeaders, Content} = stream_rest_of_content(NextFun(), []),
-    case NextHeaders of
-        done_parts ->
-            Part = make_fpart(PartName, ParamsAndHeaders, Content),
-            lists:reverse([Part | ResultBuildup]);
-        Else ->
-            Part = make_fpart(PartName, ParamsAndHeaders, Content),
-            handle_stream_parts_chunked(Else, [Part | ResultBuildup])
-    end.
-
-stream_rest_of_content(done_parts, ContentBuffer) ->
-    {done_parts, iolist_to_binary(lists:reverse(ContentBuffer))};
-stream_rest_of_content({part_headers, _PartName, _ParamsAndHeaders, _NextFun}=H,
-                       ContentBuffer) ->
-    {H, iolist_to_binary(lists:reverse(ContentBuffer))};
-stream_rest_of_content({part_chunk, _PartName, Chunk, done_parts}, ContentBuffer) ->
-    {done_parts, iolist_to_binary(lists:reverse([Chunk | ContentBuffer]))};
-stream_rest_of_content({part_chunk, _PartName, Chunk, NextFun}, ContentBuffer) ->
-    stream_rest_of_content(NextFun(), [Chunk | ContentBuffer]).
-
-make_fpart(PartName, ParamsAndHeaders, Content) ->
-    {PartName, ParamsAndHeaders, Content}.
-
 %% Header Streaming -----------------------------------------------------------
 
 %% @private
+%% @doc Keep streaming bytes until we're able to parse
+%% a full set of headers in a part.
 stream_until_headers({Hunk, Next}, Boundary, Buffer) ->
     FullBuffer = <<Buffer/binary, Hunk/binary>>,
     handle_split_headers(re:split(FullBuffer, ?HEADERS_BOUNDARY, [{parts, 2}]),
@@ -129,9 +90,7 @@ handle_split_headers([<<"--">>], _Boundary, done) ->
 handle_split_headers([<<"--\r\n">>], _Boundary, done) ->
     done_parts;
 handle_split_headers([_NoMatch], _Boundary, done) ->
-    %% TODO: think this should be an error
-    %% because there is no more data, and we haven't
-    %% been able to split the headers
+    %% this should never be called
     error;
 handle_split_headers([NoMatch], Boundary, Next) ->
     %% Next() is safe to call because we pattern
@@ -141,13 +100,7 @@ handle_split_headers([Headers, BodyBegin], Boundary, Next) ->
     make_headers_response(Headers, BodyBegin, Boundary, Next).
 
 %% @private
-make_headers_response(Headers, BodyBegin, Boundary, done) ->
-    Next = constantly_really_done(),
-    full_header_received_response(Headers, BodyBegin, Boundary, Next);
 make_headers_response(Headers, BodyBegin, Boundary, Next) ->
-    full_header_received_response(Headers, BodyBegin, Boundary, Next).
-
-full_header_received_response(Headers, BodyBegin, Boundary, Next) ->
     RestHeaders = case re:split(Headers, Boundary, [{parts, 2}]) of
         [Single] -> Single;
         [<<>>, Rest] -> Rest
@@ -172,23 +125,19 @@ stream_rest_of_value({Hunk, Next}, Boundary, PartName) ->
 
 %% @private
 handle_split_boundary([_NoMatch], _Boundary, _PartName, done) ->
-    %% this is an error, because we haven't been able to make a full
+    %% This is an error, because we haven't been able to make a full
     %% body out of what is here and there is no more data.
+    %% This should never be called.
     error;
 handle_split_boundary([NoMatch], Boundary, PartName, Next) ->
     %% Next() should be safe to call
     CRLF = <<"\r\n">>,
     BinaryBoundary = list_to_binary(Boundary),
     BinaryBoundaryWithCRLF = <<CRLF/binary, BinaryBoundary/binary>>,
-    case could_possibly_contain_boundary(NoMatch, BinaryBoundaryWithCRLF) of
-        true ->
-            {NewHunk, Next2} = Next(),
-            NewHunk2 = <<NoMatch/binary, NewHunk/binary>>,
-            stream_rest_of_value({NewHunk2, Next2}, Boundary, PartName);
-        false ->
-            {part_chunk, PartName, NoMatch, fun () ->
-                        stream_rest_of_value(Next(), Boundary, PartName) end}
-    end;
+    CouldContainBoundary = could_contain_boundary(NoMatch,
+                                                  BinaryBoundaryWithCRLF),
+    handle_could_contain_boundary(CouldContainBoundary, NoMatch,
+                                  PartName, Boundary, Next);
 handle_split_boundary([RestBinary, BeginHeaders], Boundary, PartName, done) ->
     Next = constantly_really_done(),
     make_chunk_response(PartName, remove_crlf(RestBinary),
@@ -197,33 +146,61 @@ handle_split_boundary([RestBinary, BeginHeaders], Boundary, PartName, Next) ->
     make_chunk_response(PartName, remove_crlf(RestBinary),
                         Boundary, Next, BeginHeaders).
 
+handle_could_contain_boundary(true, Hunk, PartName, Boundary, Next) ->
+    {NewHunk, Next2} = Next(),
+    NewHunk2 = <<Hunk/binary, NewHunk/binary>>,
+    stream_rest_of_value({NewHunk2, Next2}, Boundary, PartName);
+handle_could_contain_boundary(false, Hunk, PartName, Boundary, Next) ->
+    {part_chunk, PartName, Hunk, fun () ->
+                stream_rest_of_value(Next(), Boundary, PartName) end}.
+
 %% @private
+%% @doc Return true if `Chunk' could contain a prefix
+%% of `Boundary' as a suffix.
+-spec could_contain_boundary(binary(), binary()) -> boolean().
 %% much easier to assume Boundary is a binary here
--spec could_possibly_contain_boundary(binary(), binary()) -> boolean().
-could_possibly_contain_boundary(Chunk, Boundary) ->
+could_contain_boundary(Chunk, Boundary) ->
     could_be_suffix(Chunk, Boundary).
 
-%% Could the end of A contain the beginning of B?
+%% @private
+%% @doc Return true if any prefix of `B' could
+%% be a suffix of `A'. For example:
+%% ```
+%% could_be_suffix(<<"foobar">>, <<"bar">>) -> true
+%% could_be_suffix(<<"fooba">>, <<"bar">>)  -> true
+%% could_be_suffix(<<"bazquz">>, <<"bar">>) -> false
+%% could_be_suffix(<<"bazquz">>, <<"zed">>) -> true
+%% '''
 could_be_suffix(A, B) ->
     Pred = fun (Prefix) ->
             binary:longest_common_suffix([A, Prefix]) > 0 end,
     lists:any(Pred, prefixes(B)).
 
+%% @private
+%% @doc Return a list of all prefixes of
+%% `Bin'. For example:
+%% ```
+%% prefixes(<<"foobar">>).
+%% [<<"f">>,<<"fo">>,<<"foo">>,<<"foob">>,<<"fooba">>,<<"foobar">>]
+%% '''
 prefixes(Bin) ->
-    Max = size(Bin) - 1,
+    Max = size(Bin),
     [binary:part(Bin, {0, N}) || N <- lists:seq(1, Max)].
 
+%% @private
+%% TODO: not sure if we need these first two
+%% pattern matches here, or if they should just
+%% be on `handle_split_headers'
 make_chunk_response(PartName, RestBinary, _Boundary, _Next, <<"--">>) ->
     {part_chunk, PartName, RestBinary, done_parts};
 make_chunk_response(PartName, RestBinary, _Boundary, _Next, <<"--\r\n">>) ->
     {part_chunk, PartName, RestBinary, done_parts};
 make_chunk_response(PartName, RestBinary, Boundary, Next, Buffer) ->
-    {part_chunk, PartName, RestBinary, fun () ->
-                stream_until_headers(Next(), Boundary, Buffer) end}.
+    {part_chunk, PartName, RestBinary,
+     fun () ->
+        stream_until_headers(Next(), Boundary, Buffer) end}.
 
 %% @private
-remove_crlf(<<>>) ->
-    <<>>;
 remove_crlf(Binary) ->
     BodyLen = size(Binary) - 2,
     CRLF = <<"\r\n">>,
@@ -330,6 +307,56 @@ send_streamed_body(Body, Max) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+%% Testing equivalence helper functions ---------------------------------------
+
+%% Return the equivalent of `stream_parts'.
+%% This is used to feed the same input into
+%% both methods for parsing `multipart/form-data'
+%% and verify they return the same result.
+%% It forces all of the parts to be parsed.
+get_all_parts_from_chunked(StreamStruct, Boundary) ->
+    handle_stream_parts_chunked(stream_parts_chunked(StreamStruct, Boundary),
+                                []).
+
+%% Start with an empty buffer, and keeping parsing
+%% accumulating results from `stream_parts_chunked/2'
+%% until we receive `done_parts'.
+handle_stream_parts_chunked({part_headers, PartName,
+                             ParamsAndHeaders, NextFun},
+                            ResultBuildup) ->
+    {NextHeaders, Content} = stream_rest_of_content(NextFun(), []),
+    Part = make_fpart(PartName, ParamsAndHeaders, Content),
+    handle_headers_or_done(NextHeaders, [Part | ResultBuildup]).
+
+handle_headers_or_done(done_parts, ResultBuildup) ->
+    lists:reverse(ResultBuildup);
+handle_headers_or_done(NextHeaders, ResultBuildup) ->
+    handle_stream_parts_chunked(NextHeaders, ResultBuildup).
+
+%% Helper to continue grabbing all chunks from
+%% a particular part name. Once we're done receiving
+%% chunks from the content, we either stop, or
+%% return with the parsed content and the headers
+%% of the next part.
+stream_rest_of_content(done_parts, ContentBuffer) ->
+    {done_parts, iolist_to_binary(lists:reverse(ContentBuffer))};
+stream_rest_of_content({part_headers, _PartName,
+                        _ParamsAndHeaders, _NextFun}=H,
+                       ContentBuffer) ->
+    {H, iolist_to_binary(lists:reverse(ContentBuffer))};
+stream_rest_of_content({part_chunk, _PartName,
+                        Chunk, done_parts}, ContentBuffer) ->
+    {done_parts, iolist_to_binary(lists:reverse([Chunk | ContentBuffer]))};
+stream_rest_of_content({part_chunk, _PartName,
+                        Chunk, NextFun}, ContentBuffer) ->
+    stream_rest_of_content(NextFun(), [Chunk | ContentBuffer]).
+
+%% Turn args into a three-tuple.
+make_fpart(PartName, ParamsAndHeaders, Content) ->
+    {PartName, ParamsAndHeaders, Content}.
+
+%% Functions that just return a body and a boundary.
+
 %% body for `body_test/0'
 body_1() ->
     {<<"------------ae0gL6gL6Ij5KM7Ef1KM7ei4ae0cH2\r\nContent-Disposition: form-data; name=\"Filename\"\r\n\r\ntestfile.txt\r\n------------ae0gL6gL6Ij5KM7Ef1KM7ei4ae0cH2\r\nContent-Disposition: form-data; name=\"Filedata\"; filename=\"testfile.txt\"\r\nContent-Type: application/octet-stream\r\n\r\n%%% The contents of this file are a test,\n%%% do not be alarmed.\n\r\n------------ae0gL6gL6Ij5KM7Ef1KM7ei4ae0cH2\r\nContent-Disposition: form-data; name=\"Upload\"\r\n\r\nSubmit Query\r\n------------ae0gL6gL6Ij5KM7Ef1KM7ei4ae0cH2--">>, "----------ae0gL6gL6Ij5KM7Ef1KM7ei4ae0cH2"}.
@@ -394,29 +421,27 @@ chrome_test() ->
 
 %% Test equivalence of chunked and old tests
 
-body_equiv_test() ->
-    {Body, Boundary} = body_1(),
-    StreamAdapter = send_streamed_body(Body, 1),
-    ?assertEqual(get_all_parts(Body, Boundary),
-                 get_all_parts_from_chunked(StreamAdapter, Boundary)).
+equiv_helper(Body, Boundary) ->
+    equiv_helper(Body, Boundary, [1, 2, 3, 4, 8, 16, 256, 512, 1024, 2048]).
 
-body_2_equiv_test() ->
-    {Body, Boundary} = body_2(),
-    StreamAdapter = send_streamed_body(Body, 1),
-    ?assertEqual(get_all_parts(Body, Boundary),
-                 get_all_parts_from_chunked(StreamAdapter, Boundary)).
+equiv_helper(Body, Boundary, BufferSizes) ->
+    [equiv(Body, Boundary, Size) || Size <- BufferSizes].
 
-firefox_equiv_test() ->
-    {Body, Boundary} = firefox_body(),
-    StreamAdapter = send_streamed_body(Body, 1),
-    ?assertEqual(get_all_parts(Body, Boundary),
-                 get_all_parts_from_chunked(StreamAdapter, Boundary)).
+equiv(Body, Boundary, Size) ->
+    fun () ->
+        StreamAdapter = send_streamed_body(Body, Size),
+        ?assertEqual(get_all_parts(Body, Boundary),
+                     get_all_parts_from_chunked(StreamAdapter, Boundary))
+    end.
 
-chrome_equiv_test() ->
-    {Body, Boundary} = chrome_body(),
-    StreamAdapter = send_streamed_body(Body, 1),
-    ?assertEqual(get_all_parts(Body, Boundary),
-                 get_all_parts_from_chunked(StreamAdapter, Boundary)).
-
+body_equiv_test_() ->
+    Args = [[Body, Boundary] || {Body, Boundary} <- [body_1(),
+                                                     body_2(),
+                                                     chrome_body(),
+                                                     firefox_body()]],
+    {setup,
+     fun () -> ok end,
+     lists:flatten([erlang:apply(fun equiv_helper/2, A) || A <- Args])
+    }.
 
 -endif.
