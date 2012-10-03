@@ -45,9 +45,13 @@ init([]) ->
     {ok, App} = application:get_application(?MODULE),
     {ok, Dispatch} = file:consult(filename:join([priv_dir(App),
                                                  "dispatch.conf"])),
+    Port = case os:getenv("WEBMACHINE_PORT") of
+            false -> 8000;
+            AnyPort -> AnyPort
+          end,
     WebConfig = [
                  {ip, Ip},
-                 {port, 8000},
+                 {port, Port},
                  {log_dir, "priv/log"},
                  {dispatch, Dispatch}],
     Web = {webmachine_{{webserver}},
