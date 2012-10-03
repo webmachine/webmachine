@@ -43,7 +43,7 @@ upgrade() ->
 init([]) ->
     Ip = case os:getenv("WEBMACHINE_IP") of false -> "0.0.0.0"; Any -> Any end,
     {ok, App} = application:get_application(?MODULE),
-    {ok, Dispatch} = file:consult(filename:join([code:priv_dir(App),
+    {ok, Dispatch} = file:consult(filename:join([priv_dir(App),
                                                  "dispatch.conf"])),
     WebConfig = [
                  {ip, Ip},
@@ -55,3 +55,9 @@ init([]) ->
            permanent, 5000, worker, [mochiweb_socket_server]},
     Processes = [Web],
     {ok, { {one_for_one, 10, 10}, Processes} }.
+
+%%
+%% @doc return the priv dir without using code:priv_dir
+priv_dir(Mod) ->
+    Ebin = filename:dirname(code:which(Mod)),
+    filename:join(filename:dirname(Ebin), "priv").
