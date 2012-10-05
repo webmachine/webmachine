@@ -18,7 +18,7 @@
 -author('Steve Vinoski <vinoski@ieee.org>').
 
 -ifdef(WEBMACHINE_YAWS).
--export([start/1, stop/0, out/1, get_req_info/2]).
+-export([start/1, stop/0, dispatch/1, get_req_info/2]).
 -export([get_header_value/2,
          new_headers/0,
          make_headers/1,
@@ -38,7 +38,7 @@
 
 start(Options0) ->
     {_PName, Options} = webmachine_ws:start(Options0, ?MODULE),
-    SConf0 = [{appmods, [{"/", ?MODULE}]}],
+    SConf0 = [{dispatchmod, ?MODULE}],
     {SConf, GConf} = convert_options(Options, SConf0, []),
     Docroot = "/tmp",
     ok = yaws:start_embedded(Docroot, SConf, GConf, "webmachine-yaws"),
@@ -47,10 +47,10 @@ start(Options0) ->
 stop() ->
     yaws:stop().
 
-out(Arg) ->
+dispatch(Arg) ->
     Req = webmachine:new_request(yaws, {?MODULE, Arg}),
     webmachine_ws:dispatch_request(Req),
-    ok.
+    done.
 
 get_req_info(Want, Arg) ->
     get_req_info(Want, Arg, []).
