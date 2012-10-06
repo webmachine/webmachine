@@ -37,6 +37,8 @@
 
 
 start(Options0) ->
+    YawsVersion = "Yaws/" ++ yaws_generated:version() ++ " Webmachine",
+    application:set_env(webmachine, server_name, YawsVersion),
     {_PName, Options} = webmachine_ws:start(Options0, ?MODULE),
     SConf0 = [{dispatchmod, ?MODULE}],
     {SConf, GConf} = convert_options(Options, SConf0, []),
@@ -80,6 +82,10 @@ convert_options([{ip, IpAddr0}|Opts], SConf, GConf) ->
     convert_options(Opts, [{listen, IpAddr}|SConf], GConf);
 convert_options([{port, Port}|Opts], SConf, GConf) ->
     convert_options(Opts, [{port, Port}|SConf], GConf);
+convert_options([{backlog, Backlog}|Opts], SConf, GConf) ->
+    convert_options(Opts, [{listen_backlog, Backlog}|SConf], GConf);
+convert_options([{log_dir, LogDir}|Opts], SConf, GConf) ->
+    convert_options(Opts, SConf, [{logdir, LogDir}|GConf]);
 convert_options([_|Opts], SConf, GConf) ->
     convert_options(Opts, SConf, GConf).
 
