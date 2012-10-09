@@ -1,7 +1,7 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %% ex: ft=erlang ts=4 sw=4 et
 
-YawsDep = {yaws, "1.*", {git, "git://github.com/klacke/yaws", {branch, "dispatch-mod"}}}.
+YawsDep = {yaws, "1.*", {git, "git://github.com/klacke/yaws", {branch, "master"}}}.
 
 case os:getenv("WEBMACHINE_SERVER") of
     false ->
