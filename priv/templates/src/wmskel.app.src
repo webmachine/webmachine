@@ -10,8 +10,6 @@
                   stdlib,
                   inets,
                   crypto,
-                  %% trailing comma intentionally left off below
-                  %% to allow the variable to be empty
                   {{webserver_app}}
                   webmachine
                  ]},
