@@ -59,6 +59,7 @@ Each function is described below, showing the default and allowed values that ma
 <table><tr><th>Result</th><th>Effect</th></tr>
 <tr><td class="fwf lhcol">{error, Err::term()}</td><td>Immediately end processing of this request, returning a 500 response code.  The response body will contain the <span class="fwf"> Err </span> term.</td></tr>
 <tr><td class="fwf lhcol">{halt, Code::integer()}</td><td>Immediately end processing of this request, returning response code Code.  It is the responsibility of the resource to ensure that all necessary response header and body elements are filled in <span class="fwf"> ReqData </span> in order to make that reponse code valid.</td></tr>
+<tr><td class="fwf lhcol">{halt, {Code::integer(), ReasonPhrase::iolist()}}</td><td>Same as <span class="fwf"> {halt, Code::integer()} </span> but supply a custom reason phrase for the HTTP status code as well.</td></tr>
 </table>
 
 <p>

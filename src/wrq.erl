@@ -170,6 +170,8 @@ set_req_body(Body, RD) -> RD#wm_reqdata{req_body=Body}.
 
 set_resp_body(Body, RD) -> RD#wm_reqdata{resp_body=Body}.
 
+set_response_code({Code, _ReasonPhrase}=CodeAndReason, RD) when is_integer(Code) ->
+    RD#wm_reqdata{response_code=CodeAndReason};
 set_response_code(Code, RD) when is_integer(Code) ->
     RD#wm_reqdata{response_code=Code}.
 

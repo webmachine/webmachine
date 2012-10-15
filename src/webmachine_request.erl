@@ -205,13 +205,15 @@ call({set_disp_path, P}) ->
 call(do_redirect) ->
     {ok, ReqState#wm_reqstate{
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
-call({send_response, Code}) ->
-    {Reply, NewState} = 
+call({send_response, Code}) when is_integer(Code) ->
+    call({send_response, {Code, undefined}});
+call({send_response, {Code, ReasonPhrase}=CodeAndReason}) when is_integer(Code) ->
+    {Reply, NewState} =
         case Code of
             200 ->
-                send_ok_response();
+                send_ok_response(ReasonPhrase);
             _ ->
-                send_response(Code)
+                send_response(CodeAndReason)
         end,
     LogData = NewState#wm_reqstate.log_data,
     NewLogData = LogData#wm_log_data{finish_time=now()},
@@ -298,18 +300,18 @@ send_chunk(Socket, Data) ->
     send(Socket, <<"\r\n">>),
     Size.
 
-send_ok_response() ->
+send_ok_response(ReasonPhrase) ->
     RD0 = ReqState#wm_reqstate.reqdata,
     {Range, State} = get_range(),
     case Range of
         X when X =:= undefined; X =:= fail ->
-            send_response(200);
+            send_response({200, ReasonPhrase});
         Ranges ->
             {PartList, Size} = range_parts(RD0, Ranges),
             case PartList of
                 [] -> %% no valid ranges
                     %% could be 416, for now we'll just return 200
-                    send_response(200);
+                    send_response({200, ReasonPhrase});
                 PartList ->
                     {RangeHeaders, RangeBody} = parts_to_body(PartList, Size),
                     RespHdrsRD = wrq:set_resp_headers(
@@ -317,7 +319,7 @@ send_ok_response() ->
                     RespBodyRD = wrq:set_resp_body(
                                    RangeBody, RespHdrsRD),
                     NewState = State#wm_reqstate{reqdata=RespBodyRD},
-                    send_response(206, NewState)
+                    send_response({206, ReasonPhrase}, NewState)
             end
     end.
 
@@ -651,8 +653,12 @@ stream_multipart_part_helper(Fun, Rest, CType, Boundary, Size) ->
             end
     end.
 
-make_code(X) when is_integer(X) ->
-    [integer_to_list(X), [" " | httpd_util:reason_phrase(X)]];
+make_code({Code, undefined}) when is_integer(Code) ->
+    make_code({Code, httpd_util:reason_phrase(Code)});
+make_code({Code, ReasonPhrase}) when is_integer(Code) ->
+    [integer_to_list(Code), [" " | ReasonPhrase]];
+make_code(Code) when is_integer(Code) ->
+    make_code({Code, httpd_util:reason_phrase(Code)});
 make_code(Io) when is_list(Io); is_binary(Io) ->
     Io.
 
@@ -661,11 +667,13 @@ make_version({1, 0}) ->
 make_version(_) ->
     <<"HTTP/1.1 ">>.
 
-make_headers(Code, Length, RD) ->
+make_headers({Code, _ReasonPhrase}, Length, RD) ->
+    make_headers(Code, Length, RD);
+make_headers(Code, Length, RD) when is_integer(Code) ->
     Hdrs0 = case Code of
         304 ->
             mochiweb_headers:make(wrq:resp_headers(RD));
-        _ -> 
+        _ ->
             case Length of
                 chunked ->
                     mochiweb_headers:enter(

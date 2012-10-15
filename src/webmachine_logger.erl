@@ -107,7 +107,14 @@ format_req(#wm_log_data{method=Method,
                         response_length=ResponseLength}) ->
     User = "-",
     Time = fmtnow(),
-    Status = integer_to_list(ResponseCode),
+    Status = case ResponseCode of
+                 {Code, _ReasonPhrase} when is_integer(Code)  ->
+                     integer_to_list(Code);
+                 _ when is_integer(ResponseCode) ->
+                     integer_to_list(ResponseCode);
+                 _ ->
+                     ResponseCode
+             end,
     Length = integer_to_list(ResponseLength),
     Referer = 
         case mochiweb_headers:get_value("Referer", Headers) of
