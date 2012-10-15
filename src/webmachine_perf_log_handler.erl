@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2011-2013 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -93,7 +93,14 @@ format_req(#wm_log_data{resource_module=Mod,
                         end_time=EndTime,
                         finish_time=FinishTime}) ->
     Time = webmachine_log:fmtnow(),
-    Status = integer_to_list(ResponseCode),
+    Status = case ResponseCode of
+                 {Code, _ReasonPhrase} when is_integer(Code)  ->
+                     integer_to_list(Code);
+                 _ when is_integer(ResponseCode) ->
+                     integer_to_list(ResponseCode);
+                 _ ->
+                     ResponseCode
+             end,
     Length = integer_to_list(ResponseLength),
     TTPD = webmachine_util:now_diff_milliseconds(EndTime, StartTime),
     TTPS = webmachine_util:now_diff_milliseconds(FinishTime, EndTime),
