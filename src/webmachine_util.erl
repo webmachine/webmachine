@@ -201,7 +201,7 @@ media_type_to_detail(MType) ->
     [CType|Params] = string:tokens(MType, ";"),
     MParams = [list_to_tuple([string:strip(KV) || KV <- string:tokens(X,"=")])
                 || X <- Params],
-    {CType, MParams}.                       
+    {string:strip(CType), MParams}.
 
 accept_header_to_media_types(HeadVal) ->
     % given the value of an accept header, produce an ordered list
