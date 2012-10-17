@@ -100,6 +100,8 @@ default(generate_etag) ->
     undefined;
 default(finish_request) ->
     true;
+default(validate_content_checksum) ->
+    not_validated;
 default(_) ->
     no_default.
           

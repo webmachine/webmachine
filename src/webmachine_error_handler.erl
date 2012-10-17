@@ -59,7 +59,7 @@ render_error_body(501, Req, _Reason) ->
     error_logger:error_msg("Webmachine does not support method ~p~n",
                            [Method]),
     ErrorStr = io_lib:format("<html><head><title>501 Not Implemented</title>"
-                             "</head><body><h1>Internal Server Error</h1>"
+                             "</head><body><h1>Not Implemented</h1>"
                              "The server does not support the ~p method.<br>"
                              "<P><HR><ADDRESS>mochiweb+webmachine web server"
                              "</ADDRESS></body></html>",
@@ -77,5 +77,19 @@ render_error_body(503, Req, _Reason) ->
                "or maintenance of the server.<br>"
                "<P><HR><ADDRESS>mochiweb+webmachine web server"
                "</ADDRESS></body></html>",
-    {list_to_binary(ErrorStr), ReqState}.
+    {list_to_binary(ErrorStr), ReqState};
+
+render_error_body(Code, Req, Reason) ->
+    {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
+    ReasonPhrase = httpd_util:reason_phrase(Code),
+    Body = ["<html><head><title>",
+            integer_to_list(Code),
+            " ",
+            ReasonPhrase,
+            "</title></head><body><h1>",
+            ReasonPhrase,
+            "</h1>",
+            Reason,
+            "<p><hr><address>mochiweb+webmachine web server</address></body></html>"],
+    {iolist_to_binary(Body), ReqState}.
 
