@@ -201,10 +201,7 @@ prioritize_media(Type,Params,Acc) ->
     end.
 
 media_type_to_detail(MType) ->
-    [CType|Params] = string:tokens(MType, ";"),
-    MParams = [list_to_tuple([string:strip(KV) || KV <- string:tokens(X,"=")])
-                || X <- Params],
-    {CType, MParams}.                       
+    mochiweb_util:parse_header(MType).
 
 accept_header_to_media_types(HeadVal) ->
     % given the value of an accept header, produce an ordered list
@@ -380,6 +377,11 @@ choose_media_type_qval_test() ->
       || I <- HtmlMatch ],
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
+
+media_type_extra_whitespace_test() ->
+    MType = "application/x-www-form-urlencoded          ;      charset      =       utf8",
+    ?assertEqual({"application/x-www-form-urlencoded",[{"charset","utf8"}]},
+                 webmachine_util:media_type_to_detail(MType)).
 
 convert_request_date_test() ->
     ?assertMatch({{_,_,_},{_,_,_}},
