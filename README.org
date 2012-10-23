@@ -1,7 +1,8 @@
 * webmachine
 ** Overview
+NOTE THIS FORK IS JUST FOR TEMPLATE CHANGES.
 
-[[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://secure.travis-ci.org/basho/webmachine.png]]
+
 
 Webmachine is an application layer that adds HTTP semantic awareness
 on top of the excellent bit-pushing and HTTP syntax-management
@@ -15,7 +16,7 @@ A shell script is provided in the =webmachine= repository to help
 users quickly and easily create a new =webmachine= application.
 
 #+BEGIN_SRC shell
-git clone git://github.com/basho/webmachine.git
+git clone git://github.com/michaelneale/webmachine.git
 cd webmachine
 ./scripts/new_webmachine.sh mydemo
 #+END_SRC
