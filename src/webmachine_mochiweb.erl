@@ -24,13 +24,14 @@ start(Options) ->
     {DispatchList, Options1} = get_option(dispatch, Options),
     {ErrorHandler0, Options2} = get_option(error_handler, Options1),
     {EnablePerfLog, Options3} = get_option(enable_perf_logger, Options2),
+    {RewriteModule, Options4} = get_option(rewrite_module, Options3),
     ErrorHandler =
         case ErrorHandler0 of
             undefined ->
                 webmachine_error_handler;
             EH -> EH
         end,
-    {LogDir, Options4} = get_option(log_dir, Options3),
+    {LogDir, Options5} = get_option(log_dir, Options4),
     case whereis(webmachine_logger) of
       undefined ->
         webmachine_sup:start_logger(LogDir);
@@ -49,13 +50,22 @@ start(Options) ->
         _ ->
             ignore
     end,
-    {PName, Options5} = case get_option(name, Options4) of
-      {undefined, _} -> {?MODULE, Options4};
-      {PN, O5} -> {PN, O5}
+    {PName, Options6} = case get_option(name, Options5) of
+      {undefined, _} -> {?MODULE, Options5};
+      {PN, O6} -> {PN, O6}
     end,
     application_set_unless_env(webmachine, dispatch_list, DispatchList),
     application_set_unless_env(webmachine, error_handler, ErrorHandler),
-    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options5]).
+    case RewriteModule of
+        undefined ->
+            %% webmachine:new_request/2 will explode if
+            %% application:get_env returns {ok, undefined}
+            ok;
+        _ ->
+            application_set_unless_env(
+              webmachine, rewrite_module, RewriteModule)
+    end,
+    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options6]).
 
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),
@@ -70,7 +80,7 @@ loop(MochiReq) ->
            end,
     {Path, _} = Req:path(),
     {RD, _} = Req:get_reqdata(),
-
+    
     %% Run the dispatch code, catch any errors...
     try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->

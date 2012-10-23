@@ -37,10 +37,15 @@ stop() ->
     application:stop(webmachine).
 
 new_request(mochiweb, Request) ->
+    RawPath = case application:get_env(webmachine, rewrite_module) of
+        {ok, RewriteMod} ->
+            RewriteMod:rewrite(Request:get(headers), Request:get(raw_path));
+        undefined ->
+            Request:get(raw_path)
+    end,
     Socket = Request:get(socket),
     Method = Request:get(method),
     Scheme = Request:get(scheme),
-    RawPath = Request:get(raw_path), 
     Version = Request:get(version),
     Headers = Request:get(headers),
     InitState = #wm_reqstate{socket=Socket,
@@ -63,4 +68,4 @@ new_request(mochiweb, Request) ->
 
 
 
-  
+
