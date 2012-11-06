@@ -594,6 +594,7 @@ decision(v3p11) ->
 accept_helper() ->
     CT = case get_header_val("Content-Type") of
              undefined -> "application/octet-stream";
+             [] -> "application/octet-stream";
              Other -> Other
          end,
     {MT, MParams} = webmachine_util:media_type_to_detail(CT),
