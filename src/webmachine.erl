@@ -37,17 +37,16 @@ stop() ->
     application:stop(webmachine).
 
 new_request(mochiweb, Request) ->
-    RawPath = case application:get_env(webmachine, rewrite_module) of
+    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
         {ok, RewriteMod} ->
-            RewriteMod:rewrite(Request:get(headers), Request:get(raw_path));
+            do_rewrite(RewriteMod, Request);
         undefined ->
-            Request:get(raw_path)
+            {Request:get(headers), Request:get(raw_path)}
     end,
     Socket = Request:get(socket),
     Method = Request:get(method),
     Scheme = Request:get(scheme),
     Version = Request:get(version),
-    Headers = Request:get(headers),
     InitState = #wm_reqstate{socket=Socket,
                           reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
     
@@ -65,6 +64,14 @@ new_request(mochiweb, Request) ->
                            response_length=0},
     webmachine_request:new(PeerState#wm_reqstate{log_data=LogData}).
 
+do_rewrite(RewriteMod, Request) ->
+    case RewriteMod:rewrite(Request:get(headers), Request:get(raw_path)) of
+        %% only raw path has been rewritten (older style rewriting)
+        RawPath when is_list(RawPath) -> 
+            {Request:get(headers), RawPath};
+        %% headers and raw path rewritten (new style rewriting)
+        {Headers, RawPath} -> {Headers,RawPath}
+    end.
 
 
 
