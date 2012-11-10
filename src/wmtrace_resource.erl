@@ -269,7 +269,7 @@ base_decision_name(Decision) ->
     end.
 
 encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
-    {struct, [{"method", atom_to_list(
+    {struct, [{"method", webmachine_util:fmt_method(
                            wrq:method(ReqData))},
               {"path", wrq:raw_path(ReqData)},
               {"headers", encode_headers(wrq:req_headers(ReqData))},

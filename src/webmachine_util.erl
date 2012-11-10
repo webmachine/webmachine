@@ -27,6 +27,8 @@
 -export([media_type_to_detail/1,
          quoted_string/1,
          split_quoted_strings/1]).
+-export([fmt_method/1]).
+
 
 -ifdef(TEST).
 -ifdef(EQC).
@@ -333,6 +335,12 @@ unescape_quoted_string([$" | Rest], Acc) ->        % Quote indicates end of this
     {lists:reverse(Acc), Rest};
 unescape_quoted_string([Char | Rest], Acc) ->
     unescape_quoted_string(Rest, [Char | Acc]).
+
+
+fmt_method(M) when is_atom(M) ->
+    atom_to_list(M);
+fmt_method(M) when is_list(M) ->
+    M.
 
 
 %% @type now() = {MegaSecs, Secs, MicroSecs}
