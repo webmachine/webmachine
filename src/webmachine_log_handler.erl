@@ -110,7 +110,7 @@ format_req(#wm_log_data{method=Method,
             undefined -> "";
             U -> U
         end,
-    fmt_alog(Time, Peer, User, atom_to_list(Method), Path, Version,
+    fmt_alog(Time, Peer, User, webmachine_util:fmt_method(Method), Path, Version,
              Status, Length, Referer, UserAgent).
 
 fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
