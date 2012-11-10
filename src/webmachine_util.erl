@@ -30,6 +30,7 @@
          split_quoted_strings/1]).
 -export([fmt_method/1]).
 -export([parse_range/2]).
+-export([fmt_method/1]).
 
 -ifdef(TEST).
 -ifdef(EQC).
