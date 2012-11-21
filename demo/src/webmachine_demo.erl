@@ -24,6 +24,7 @@ start_link() ->
 %% @spec start() -> ok
 %% @doc Start the webmachine_demo server.
 start() ->
+    ensure_started(inets), 
     ensure_started(crypto),
     ensure_started(mochiweb),
     application:set_env(webmachine, webmachine_logger_module, 
