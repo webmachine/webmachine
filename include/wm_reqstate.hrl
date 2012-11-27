@@ -1,5 +1,5 @@
 -record(wm_reqstate, {socket=undefined,
-                   metadata=dict:new(),
+                   metadata=orddict:new(),
                    range=undefined,
                    peer=undefined,
                    reqdata=undefined,

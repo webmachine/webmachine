@@ -104,19 +104,19 @@ default(validate_content_checksum) ->
     not_validated;
 default(_) ->
     no_default.
-          
+
 wrap(Mod, Args) ->
     case Mod:init(Args) of
         {ok, ModState} ->
-            {ok, webmachine_resource:new(Mod, ModState, 
-                           dict:from_list(Mod:module_info(exports)), false)};
+            {ok, webmachine_resource:new(Mod, ModState,
+                           orddict:from_list(Mod:module_info(exports)), false)};
         {{trace, Dir}, ModState} ->
             {ok, File} = open_log_file(Dir, Mod),
             log_decision(File, v3b14),
             log_call(File, attempt, Mod, init, Args),
             log_call(File, result, Mod, init, {{trace, Dir}, ModState}),
             {ok, webmachine_resource:new(Mod, ModState,
-                dict:from_list(Mod:module_info(exports)), File)};
+                orddict:from_list(Mod:module_info(exports)), File)};
         _ ->
             {stop, bad_init_arg}
     end.
@@ -144,7 +144,7 @@ handle_wm_call(Fun, ReqData) ->
         no_default ->
             resource_call(Fun, ReqData);
         Default ->
-            case dict:is_key(Fun, R_ModExports) of
+            case orddict:is_key(Fun, R_ModExports) of
                 true ->
                     resource_call(Fun, ReqData);
                 false ->
