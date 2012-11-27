@@ -145,9 +145,11 @@ do(Fun, ReqProps, {?MODULE, R_Mod, _, R_ModExports, R_Trace}=Req)
                    empty -> RState0;
                    X -> X
                end,
+    %% Do not need the embedded state anymore
+    TrimData = ReqData#wm_reqdata{wm_state=undefined},
     {Reply,
      webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace),
-     ReqState#wm_reqstate{reqdata=ReqData}}.
+     ReqState#wm_reqstate{reqdata=TrimData}}.
 
 handle_wm_call(Fun, ReqData, {?MODULE,R_Mod,R_ModState,R_ModExports,R_Trace}=Req) ->
     case default(Fun) of
