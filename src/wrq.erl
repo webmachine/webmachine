@@ -51,7 +51,7 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       % Stolen from R13B03 inet_drv.c's TCP_MAX_PACKET_SIZE definition
       max_recv_hunk=(64*(1024*1024)),
       app_root="defined_in_load_dispatch_data",
-      path_info=dict:new(),
+      path_info=orddict:new(),
       path_tokens=defined_in_load_dispatch_data,
       disp_path=defined_in_load_dispatch_data,
       resp_redirect=false, resp_headers=mochiweb_headers:empty(),
@@ -152,7 +152,7 @@ resp_body(_RD = #wm_reqdata{resp_body=RespB}) -> iolist_to_binary(RespB).
 %% --
 
 path_info(Key, RD) when is_atom(Key) ->
-    case dict:find(Key, path_info(RD)) of
+    case orddict:find(Key, path_info(RD)) of
         {ok, Value} when is_list(Value); is_integer(Value) ->
             Value; % string (for host or path match)
                    % or integer (for port match)
