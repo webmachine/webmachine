@@ -168,7 +168,7 @@ call({get_resp_header, HdrName}) ->
                 wrq:resp_headers(ReqState#wm_reqstate.reqdata)),
     {Reply, ReqState};
 call(get_path_info) ->
-    PropList = dict:to_list(wrq:path_info(ReqState#wm_reqstate.reqdata)),
+    PropList = orddict:to_list(wrq:path_info(ReqState#wm_reqstate.reqdata)),
     {PropList, ReqState};
 call({get_path_info, Key}) ->
     {wrq:path_info(Key, ReqState#wm_reqstate.reqdata), ReqState};
@@ -228,20 +228,20 @@ call(has_resp_body) ->
             end,
     {Reply, ReqState};
 call({get_metadata, Key}) ->
-    Reply = case dict:find(Key, ReqState#wm_reqstate.metadata) of
+    Reply = case orddict:find(Key, ReqState#wm_reqstate.metadata) of
                 {ok, Value} -> Value;
                 error -> undefined
             end,
     {Reply, ReqState};
 call({set_metadata, Key, Value}) ->
-    NewDict = dict:store(Key, Value, ReqState#wm_reqstate.metadata),
+    NewDict = orddict:store(Key, Value, ReqState#wm_reqstate.metadata),
     {ok, ReqState#wm_reqstate{metadata=NewDict}};
 call(path_tokens) -> {wrq:path_tokens(ReqState#wm_reqstate.reqdata), ReqState};
 call(req_cookie) -> {wrq:req_cookie(ReqState#wm_reqstate.reqdata), ReqState};
 call(req_qs) -> {wrq:req_qs(ReqState#wm_reqstate.reqdata), ReqState};
 call({load_dispatch_data, PathProps, HostTokens, Port,
       PathTokens, AppRoot, DispPath}) ->
-    PathInfo = dict:from_list(PathProps),
+    PathInfo = orddict:from_list(PathProps),
     NewState = ReqState#wm_reqstate{reqdata=wrq:load_dispatch_data(
                         PathInfo,HostTokens,Port,PathTokens,AppRoot,
                         DispPath,ReqState#wm_reqstate.reqdata)},

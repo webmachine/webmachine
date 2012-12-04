@@ -204,7 +204,7 @@ try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings,
         {ok, Remainder, NewBindings, Depth} ->
             AppRoot = calculate_app_root(Depth + ExtraDepth),
             StringPath = reconstitute(Remainder),
-            PathInfo = dict:from_list(NewBindings),
+            PathInfo = orddict:from_list(NewBindings),
             RD1 =
                 case RD of
                     testing ->
