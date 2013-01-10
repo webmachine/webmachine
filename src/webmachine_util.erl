@@ -398,6 +398,14 @@ choose_media_type_qval_test() ->
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
 
+format_content_type_test() ->
+    Types = ["audio/vnd.wave; codec=31",
+             "Text/x-Okie; charset=iso-8859-1; declaration=\"<f950118.AEB0@XIson.com>\""],
+    [?assertEqual(Type, format_content_type(
+                          webmachine_util:media_type_to_detail(Type)))
+     || Type <- Types],
+    ?assertEqual(hd(Types), format_content_type("audio/vnd.wave", [{codec, "31"}])).
+
 convert_request_date_test() ->
     ?assertMatch({{_,_,_},{_,_,_}},
                  convert_request_date("Wed, 30 Dec 2009 14:39:02 GMT")),
