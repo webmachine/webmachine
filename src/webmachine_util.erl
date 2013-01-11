@@ -402,7 +402,7 @@ media_type_extra_whitespace_test() ->
 
 format_content_type_test() ->
     Types = ["audio/vnd.wave; codec=31",
-             "text/x-okie; charset=iso-8859-1; declaration=\"<f950118.AEB0@XIson.com>\""],
+             "text/x-okie; charset=iso-8859-1; declaration=<f950118.AEB0@XIson.com>"],
     [?assertEqual(Type, format_content_type(
                           webmachine_util:media_type_to_detail(Type)))
      || Type <- Types],
