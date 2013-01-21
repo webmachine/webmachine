@@ -118,7 +118,7 @@ error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime) ->
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
                               Code, {webmachine_request,get(reqstate)}, Reason),
     put(reqstate, ReqState),
-    wrcall({set_resp_body, ErrorHTML}),
+    wrcall({set_resp_body, encode_body(ErrorHTML)}),
     finish_response(CodeAndPhrase, Resource, EndTime).
 
 decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
@@ -631,11 +631,23 @@ encode_body(Body) ->
     Charsetter =
     case resource_call(charsets_provided) of
         no_charset -> fun(X) -> X end;
-        CP -> hd([Fun || {CSet,Fun} <- CP, ChosenCSet =:= CSet])
+        CP ->
+            case [Fun || {CSet,Fun} <- CP, ChosenCSet =:= CSet] of
+                [] ->
+                    fun(X) -> X end;
+                [F | _] ->
+                    F
+            end
     end,
     ChosenEnc = wrcall({get_metadata, 'content-encoding'}),
-    Encoder = hd([Fun || {Enc,Fun} <- resource_call(encodings_provided),
-                         ChosenEnc =:= Enc]),
+    Encoder =
+        case [Fun || {Enc,Fun} <- resource_call(encodings_provided),
+                     ChosenEnc =:= Enc] of
+            [] ->
+                fun(X) -> X end;
+            [E | _] ->
+                E
+        end,
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
