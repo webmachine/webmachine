@@ -54,7 +54,7 @@ start(Options) ->
       {undefined, _} -> {?MODULE, Options5};
       {PN, O6} -> {PN, O6}
     end,
-    application_set_unless_env(webmachine, dispatch_list, DispatchList),
+    webmachine_router:init_routes(DispatchList),
     application_set_unless_env(webmachine, error_handler, ErrorHandler),
     case RewriteModule of
         undefined ->
@@ -73,7 +73,7 @@ stop() ->
 
 loop(MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
-    {ok, DispatchList} = application:get_env(webmachine, dispatch_list),
+    DispatchList = webmachine_router:get_routes(),
     Host = case host_headers(Req) of
                [H|_] -> H;
                [] -> []
