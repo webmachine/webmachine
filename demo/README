@@ -27,9 +27,17 @@ You probably want to do one of a couple of things at this point:
 1. Start up the skeleton application:
    $ ./start.sh
 
-2. Change the basic application:
+2. Test the basic application: 
+   Visit http://localhost:8000/demo
+
+3. Change the basic application:
    edit src/webmachine_demo_resource.erl
 
-3. Add some new resources:
+4. Test the filesystem resource:
+   $ mkdir /tmp/fs
+   $ echo "Hello World." > /tmp/fs/demo.txt
+   Visit http://localhost:8000/fs/demo.txt
+
+5. Add some new resources:
    edit src/YOUR_NEW_RESOURCE.erl
    edit priv/dispatch.conf
