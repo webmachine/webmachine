@@ -83,17 +83,32 @@ etag_prop() ->
                  end)).
 
 
-etag_test() ->
-    %% Setup ETS table to hold current etag value
-    ets:new(?MODULE, [named_table, public]),
+etag_test_() ->
+    {setup,
+     fun() ->
+                %% Setup ETS table to hold current etag value
+                ets:new(?MODULE, [named_table, public]),
 
-    %% Spin up webmachine
-    WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
-                 {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
-    {ok, Pid} = webmachine_mochiweb:start(WebConfig),
-    link(Pid),
-
-    ?assert(eqc:quickcheck(eqc:numtests(250, ?QC_OUT(etag_prop())))).
+                %% Spin up webmachine
+                WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
+                             {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
+                {ok, Pid0} = webmachine_sup:start_link(),
+                {ok, Pid} = webmachine_mochiweb:start(WebConfig),
+                link(Pid),
+                {Pid0, Pid}
+        end,
+     fun({Pid0, Pid1}) ->
+                %% clean up
+                unlink(Pid0),
+                exit(Pid0, kill),
+                unlink(Pid1),
+                exit(Pid1, kill)
+        end,
+     [
+            fun() ->
+                    ?assert(eqc:quickcheck(eqc:numtests(250, ?QC_OUT(etag_prop()))))
+            end
+            ]}.
 
 
 init([]) ->
