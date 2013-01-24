@@ -26,7 +26,8 @@
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
-         split_quoted_strings/1]).
+         split_quoted_strings/1
+	]).
 
 -ifdef(TEST).
 -ifdef(EQC).
@@ -186,6 +187,8 @@ prioritize_media(Type,Params,Acc) ->
                     QVal = case Val of
                                "1" ->
                                    1;
+				"0" ->
+				   0;
                                [$.|_] ->
                                    %% handle strange FeedBurner Accept
                                    list_to_float([$0|Val]); 
