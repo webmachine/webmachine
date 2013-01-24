@@ -26,18 +26,18 @@
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
-         split_quoted_strings/1
-	]).
+         split_quoted_strings/1]).
 
 -ifdef(TEST).
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -endif.
 -include_lib("eunit/include/eunit.hrl").
+-export([accept_header_to_media_types/1]).
 -endif.
 
 convert_request_date(Date) ->
-    try 
+    try
         case httpd_util:convert_request_date(Date) of
             ReqDate -> ReqDate
         end
@@ -175,7 +175,7 @@ media_params_match(Req,Prov) ->
 
 prioritize_media(TyParam) ->
     {Type, Params} = TyParam,
-    prioritize_media(Type,Params,[]).    
+    prioritize_media(Type,Params,[]).
 prioritize_media(Type,Params,Acc) ->
     case Params of
         [] ->
@@ -187,11 +187,11 @@ prioritize_media(Type,Params,Acc) ->
                     QVal = case Val of
                                "1" ->
                                    1;
-				"0" ->
-				   0;
+                               "0" ->
+                                   0;
                                [$.|_] ->
                                    %% handle strange FeedBurner Accept
-                                   list_to_float([$0|Val]); 
+                                   list_to_float([$0|Val]);
                                _ -> list_to_float(Val)
                            end,
                     {QVal, Type, Rest ++ Acc};
@@ -293,7 +293,7 @@ do_choose(Default, DefaultOkay, AnyOkay, Choices, [AccPair|AccRest]) ->
             % doing this a little more work than needed in
             % order to be easily insensitive but preserving
             case lists:member(LAcc, LChoices) of
-                true -> 
+                true ->
                     hd([X || X <- Choices,
                              string:to_lower(X) =:= LAcc]);
                 false -> do_choose(Default, DefaultOkay, AnyOkay,
@@ -396,6 +396,29 @@ choose_media_type_qval_test() ->
       || I <- HtmlMatch ],
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
+
+accept_header_to_media_types_test() ->
+    Header1 = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0.5",
+    Header2 = "audio/*; q=0, audio/basic",
+    OddHeader = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0,5",
+    Result1 = accept_header_to_media_types(Header1),
+    Result2 = accept_header_to_media_types(Header2),
+    Result3 = accept_header_to_media_types(OddHeader),
+    ExpResult1 = [{1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0.5,"*/*",[]}],
+    ExpResult2 = [{1,"audio/basic",[]},{0,"audio/*",[]}],
+    ExpResult3 = [{1, "5", []},
+                  {1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0,"*/*",[]}],
+    ?assertEqual(ExpResult1, Result1),
+    ?assertEqual(ExpResult2, Result2),
+    ?assertEqual(ExpResult3, Result3).
 
 media_type_extra_whitespace_test() ->
     MType = "application/x-www-form-urlencoded          ;      charset      =       utf8",
