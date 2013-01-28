@@ -579,6 +579,7 @@ parts_to_body([{Start, End, Body0}], Size) ->
                 CT
         end,
     HeaderList = [{"Content-Type", ContentType},
+                  {"Content-Length", End - Start + 1},
                   {"Content-Range",
                    ["bytes ",
                     mochiweb_util:make_io(Start), "-", 
