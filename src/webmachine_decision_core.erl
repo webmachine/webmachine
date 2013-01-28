@@ -634,7 +634,12 @@ encode_body(Body) ->
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
         {known_length_stream, Size, StreamBody} ->
-            {known_length_stream, Size, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+            case method() of
+                'HEAD' ->
+                    {known_length_stream, Size, empty_stream()};
+                _ ->
+                    {known_length_stream, Size, make_encoder_stream(Encoder, Charsetter, StreamBody)}
+            end;
         {stream, Size, Fun} ->
             {stream, Size, make_size_encoder_stream(Encoder, Charsetter, Fun)};
         {writer, BodyFun} ->
@@ -642,6 +647,10 @@ encode_body(Body) ->
         _ ->
             Encoder(Charsetter(iolist_to_binary(Body)))
     end.
+
+%% @private
+empty_stream() ->
+    {<<>>, fun() -> {<<>>, done} end}.
 
 make_encoder_stream(Encoder, Charsetter, {Body, done}) ->
     {Encoder(Charsetter(Body)), done};
