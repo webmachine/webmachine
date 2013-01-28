@@ -185,12 +185,12 @@ call({req_body, MaxRecvBody}, {?MODULE, ReqState}) ->
             {NewBody, NewReqState#wm_reqstate{
                         bodyfetch=standard,reqdata=NewRD,reqbody=NewBody}}
     end;
-call({stream_req_body, MaxHunk}, {?MODULE, ReqState}=Req) ->
+call({stream_req_body, MaxHunk}, {?MODULE, ReqState}) ->
     case ReqState#wm_reqstate.bodyfetch of
         standard ->
             {stream_conflict, ReqState};
         _ ->
-            {recv_stream_body(MaxHunk, Req),
+            {recv_stream_body(ReqState, MaxHunk),
              ReqState#wm_reqstate{bodyfetch=stream}}
     end;
 call(resp_headers, {?MODULE, ReqState}) ->
