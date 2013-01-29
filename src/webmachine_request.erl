@@ -545,6 +545,8 @@ range_skip_length(Spec, Size) ->
             invalid_range;
         {Start, End} when 0 =< Start, Start =< End, End < Size ->
             {Start, End - Start + 1};
+        {Start, End} when 0 =< Start, Start =< End ->
+            {Start, Size - Start};
         {_OutOfRange, _End} ->
             invalid_range
     end.
