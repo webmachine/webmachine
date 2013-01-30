@@ -78,6 +78,34 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
         {NewHeaders, NewPath} -> {NewHeaders,NewPath}
     end.
 
+%%
+%% TEST
+%%
+-ifdef(TEST).
 
+-include_lib("eunit/include/eunit.hrl").
 
+start_stop_test() ->
+    application:start(inets),
+    application:start(mochiweb),
+    ?assertEqual(ok, webmachine:start()),
+    ?assertEqual(ok, webmachine:stop()),
+    application:stop(mochiweb),
+    application:stop(inets),
+    ok.
 
+start_stop_application_test() ->
+    {setup,
+     fun() ->
+             application:start(webmachine)
+     end,
+     fun(_) ->
+             application:stop(webmachine)
+     end,
+     [{<<"Nop">>, fun just_ok/0}]
+    }.
+
+just_ok() ->
+    ok.
+
+-endif.
