@@ -1,0 +1,18 @@
+%%-*- mode: erlang -*-
+{application, mock_resource,
+ [
+  {description, "mock_resource"},
+  {vsn, "1"},
+  {modules, []},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  inets,
+                  crypto,
+                  mochiweb,
+                  webmachine
+                 ]},
+  {mod, { mock_resource_app, []}},
+  {env, []}
+ ]}.
