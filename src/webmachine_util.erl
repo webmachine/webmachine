@@ -20,7 +20,7 @@
 -module(webmachine_util).
 -export([guess_mime/1]).
 -export([convert_request_date/1, compare_ims_dates/2]).
--export([choose_media_type/2]).
+-export([choose_media_type/2, format_content_type/1]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
 -export([now_diff_milliseconds/2]).
@@ -35,10 +35,11 @@
 -include_lib("eqc/include/eqc.hrl").
 -endif.
 -include_lib("eunit/include/eunit.hrl").
+-export([accept_header_to_media_types/1]).
 -endif.
 
 convert_request_date(Date) ->
-    try 
+    try
         case httpd_util:convert_request_date(Date) of
             ReqDate -> ReqDate
         end
@@ -176,7 +177,7 @@ media_params_match(Req,Prov) ->
 
 prioritize_media(TyParam) ->
     {Type, Params} = TyParam,
-    prioritize_media(Type,Params,[]).    
+    prioritize_media(Type,Params,[]).
 prioritize_media(Type,Params,Acc) ->
     case Params of
         [] ->
@@ -188,9 +189,11 @@ prioritize_media(Type,Params,Acc) ->
                     QVal = case Val of
                                "1" ->
                                    1;
+                               "0" ->
+                                   0;
                                [$.|_] ->
                                    %% handle strange FeedBurner Accept
-                                   list_to_float([$0|Val]); 
+                                   list_to_float([$0|Val]);
                                _ -> list_to_float(Val)
                            end,
                     {QVal, Type, Rest ++ Acc};
@@ -216,10 +219,29 @@ accept_header_to_media_types(HeadVal) ->
 normalize_provided(Provided) ->
     [normalize_provided1(X) || X <- Provided].
 normalize_provided1(Type) when is_list(Type) -> {Type, []};
-normalize_provided1({Type,Params}) -> {Type, Params}.
+normalize_provided1({Type,Params}) -> {Type, normalize_media_params(Params)}.
+
+normalize_media_params(Params) ->
+    normalize_media_params(Params,[]).
+
+normalize_media_params([],Acc) ->
+    Acc;
+normalize_media_params([{K,V}|T], Acc) when is_atom(K) ->
+    normalize_media_params(T,[{atom_to_list(K),V}|Acc]);
+normalize_media_params([H|T], Acc) ->
+    normalize_media_params(T, [H|Acc]).
+
+
+format_content_type(Type) when is_list(Type) ->
+    Type;
+format_content_type({Type,Params}) ->
+    format_content_type(Type,Params).
 
 format_content_type(Type,[]) -> Type;
-format_content_type(Type,[H|T]) -> format_content_type(Type ++ "; " ++ H, T).
+format_content_type(Type,[{K,V}|T]) when is_atom(K) ->
+    format_content_type(Type, [{atom_to_list(K),V}|T]);
+format_content_type(Type,[{K,V}|T]) ->
+    format_content_type(Type ++ "; " ++ K ++ "=" ++ V, T).
 
 choose_charset(CSets, AccCharHdr) -> do_choose(CSets, AccCharHdr, "ISO-8859-1").
 
@@ -273,7 +295,7 @@ do_choose(Default, DefaultOkay, AnyOkay, Choices, [AccPair|AccRest]) ->
             % doing this a little more work than needed in
             % order to be easily insensitive but preserving
             case lists:member(LAcc, LChoices) of
-                true -> 
+                true ->
                     hd([X || X <- Choices,
                              string:to_lower(X) =:= LAcc]);
                 false -> do_choose(Default, DefaultOkay, AnyOkay,
@@ -383,10 +405,41 @@ choose_media_type_qval_test() ->
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
 
+accept_header_to_media_types_test() ->
+    Header1 = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0.5",
+    Header2 = "audio/*; q=0, audio/basic",
+    OddHeader = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0,5",
+    Result1 = accept_header_to_media_types(Header1),
+    Result2 = accept_header_to_media_types(Header2),
+    Result3 = accept_header_to_media_types(OddHeader),
+    ExpResult1 = [{1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0.5,"*/*",[]}],
+    ExpResult2 = [{1,"audio/basic",[]},{0,"audio/*",[]}],
+    ExpResult3 = [{1, "5", []},
+                  {1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0,"*/*",[]}],
+    ?assertEqual(ExpResult1, Result1),
+    ?assertEqual(ExpResult2, Result2),
+    ?assertEqual(ExpResult3, Result3).
+
 media_type_extra_whitespace_test() ->
     MType = "application/x-www-form-urlencoded          ;      charset      =       utf8",
     ?assertEqual({"application/x-www-form-urlencoded",[{"charset","utf8"}]},
                  webmachine_util:media_type_to_detail(MType)).
+
+format_content_type_test() ->
+    Types = ["audio/vnd.wave; codec=31",
+             "text/x-okie; charset=iso-8859-1; declaration=<f950118.AEB0@XIson.com>"],
+    [?assertEqual(Type, format_content_type(
+                          webmachine_util:media_type_to_detail(Type)))
+     || Type <- Types],
+    ?assertEqual(hd(Types), format_content_type("audio/vnd.wave", [{codec, "31"}])).
 
 convert_request_date_test() ->
     ?assertMatch({{_,_,_},{_,_,_}},
