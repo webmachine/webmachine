@@ -190,7 +190,7 @@ decision(v3b9a) ->
         {halt, Code} ->
             respond(Code);
         not_validated ->
-            Checksum = mochihex:to_bin(get_header_val("content-md5")),
+            Checksum = base64:decode(get_header_val("content-md5")),
             BodyHash = compute_body_md5(),
             case BodyHash =:= Checksum of
                 true -> d(v3b9b);
@@ -718,6 +718,6 @@ compute_body_md5_stream() ->
 compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     %% Save the body so it can be retrieved later
     put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
-    crypto:md5final(crypto:md5update(MD5, Hunk));
+    crypto:md5_final(crypto:md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
-    compute_body_md5_stream(crypto:md5update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+    compute_body_md5_stream(crypto:md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
