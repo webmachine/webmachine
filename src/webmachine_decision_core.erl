@@ -190,7 +190,7 @@ decision(v3b9a) ->
         {halt, Code} ->
             respond(Code);
         not_validated ->
-            Checksum = mochihex:to_bin(get_header_val("content-md5")),
+            Checksum = base64:decode(get_header_val("content-md5")),
             BodyHash = compute_body_md5(),
             case BodyHash =:= Checksum of
                 true -> d(v3b9b);
@@ -633,6 +633,13 @@ encode_body(Body) ->
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        {known_length_stream, Size, StreamBody} ->
+            case method() of
+                'HEAD' ->
+                    {known_length_stream, Size, empty_stream()};
+                _ ->
+                    {known_length_stream, Size, make_encoder_stream(Encoder, Charsetter, StreamBody)}
+            end;
         {stream, Size, Fun} ->
             {stream, Size, make_size_encoder_stream(Encoder, Charsetter, Fun)};
         {writer, BodyFun} ->
@@ -640,6 +647,10 @@ encode_body(Body) ->
         _ ->
             Encoder(Charsetter(iolist_to_binary(Body)))
     end.
+
+%% @private
+empty_stream() ->
+    {<<>>, fun() -> {<<>>, done} end}.
 
 make_encoder_stream(Encoder, Charsetter, {Body, done}) ->
     {Encoder(Charsetter(Body)), done};
@@ -718,6 +729,6 @@ compute_body_md5_stream() ->
 compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     %% Save the body so it can be retrieved later
     put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
-    crypto:md5final(crypto:md5update(MD5, Hunk));
+    crypto:md5_final(crypto:md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
-    compute_body_md5_stream(crypto:md5update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+    compute_body_md5_stream(crypto:md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
