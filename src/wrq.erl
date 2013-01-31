@@ -141,6 +141,7 @@ resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
 resp_body(_RD = #wm_reqdata{resp_body={stream,X}}) -> {stream,X};
+resp_body(_RD = #wm_reqdata{resp_body={known_length_stream,X,Y}}) -> {known_length_stream,X,Y};
 resp_body(_RD = #wm_reqdata{resp_body={stream,X,Y}}) -> {stream,X,Y};
 resp_body(_RD = #wm_reqdata{resp_body={writer,X}}) -> {writer,X};
 resp_body(_RD = #wm_reqdata{resp_body=RespB}) when is_binary(RespB) -> RespB;
