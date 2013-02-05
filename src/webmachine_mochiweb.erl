@@ -20,35 +20,20 @@
 -author('Andy Gross <andy@basho.com>').
 -export([start/1, stop/0, loop/1]).
 
+%% The `log_dir' option is deprecated, but remove it from the
+%% options list if it is present
+-define(WM_OPTIONS, [error_handler,
+                     log_dir,
+                     rewrite_module,
+                     resource_module_option]).
+
+-define (WM_OPTION_DEFAULTS, [{error_handler, webmachine_error_handler}]).
+
 start(Options) ->
-    {DispatchList, Options1} = get_option(dispatch, Options),
-    {ErrorHandler0, Options2} = get_option(error_handler, Options1),
-    {RewriteModule, Options3} = get_option(rewrite_module, Options2),
-    %% The `log_dir' option is deprecated, but remove it from the
-    %% options list if it is present
-    {_, Options4} = get_option(log_dir, Options3),
-    ErrorHandler =
-        case ErrorHandler0 of
-            undefined ->
-                webmachine_error_handler;
-            EH -> EH
-        end,
-    {PName, Options5} = case get_option(name, Options4) of
-      {undefined, _} -> {?MODULE, Options4};
-      {PN, O6} -> {PN, O6}
-    end,
+    {DispatchList, PName, WMOptions, OtherOptions} = get_wm_options(Options),
     webmachine_router:init_routes(DispatchList),
-    application_set_unless_env(webmachine, error_handler, ErrorHandler),
-    case RewriteModule of
-        undefined ->
-            %% webmachine:new_request/2 will explode if
-            %% application:get_env returns {ok, undefined}
-            ok;
-        _ ->
-            application_set_unless_env(
-              webmachine, rewrite_module, RewriteModule)
-    end,
-    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options5]).
+    [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
+    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | OtherOptions]).
 
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),
@@ -76,7 +61,8 @@ loop(MochiReq) ->
             XReq1 = {webmachine_request,RS1},
             try
                 {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
-                {ok,RS2} = XReq1:set_metadata('resource_module', Mod),
+                {ok,RS2} = XReq1:set_metadata('resource_module',
+                                              resource_module(Mod, ModOpts)),
                 webmachine_decision_core:handle_request(Resource, RS2)
             catch
                 error:Error ->
@@ -103,13 +89,32 @@ handle_error(Code, Error, Req) ->
         _ -> nop
     end.
 
+get_wm_option(OptName, {WMOptions, OtherOptions}) ->
+    {Value, UpdOtherOptions} =
+        handle_get_option_result(get_option(OptName, OtherOptions), OptName),
+    {[{OptName, Value} | WMOptions], UpdOtherOptions}.
 
+handle_get_option_result({undefined, Options}, Name) ->
+    {proplists:get_value(Name, ?WM_OPTION_DEFAULTS), Options};
+handle_get_option_result(GetOptRes, _) ->
+    GetOptRes.
+
+get_wm_options(Options) ->
+    {DispatchList, Options1} = get_option(dispatch, Options),
+    {Name, Options2} = get_option(dispatch, Options1),
+    {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options2}, ?WM_OPTIONS),
+    {DispatchList, Name, WMOptions, RestOptions}.
 
 get_option(Option, Options) ->
     case lists:keytake(Option, 1, Options) of
        false -> {undefined, Options};
        {value, {Option, Value}, NewOptions} -> {Value, NewOptions}
     end.
+
+application_set_unless_env_or_undef(_Var, undefined) ->
+    ok;
+application_set_unless_env_or_undef(Var, Value) ->
+    application_set_unless_env(webmachine, Var, Value).
 
 application_set_unless_env(App, Var, Value) ->
     Current = application:get_all_env(App),
@@ -127,3 +132,22 @@ host_headers(Req) ->
                                       "x-forwarded-server",
                                       "host"]],
            V /= undefined].
+
+get_app_env(Key) ->
+    application:get_env(webmachine, Key).
+
+%% @private
+%% @doc This function is used for cases where it may be desirable to
+%% override the value that is set in the request metadata under the
+%% `resource_module' key. An example would be a pattern where a set of
+%% resource modules shares a lot of common functionality that is
+%% contained in a single module and is used as the resource in all
+%% dispatch rules and the%% `ModOpts' are used to specify a smaller
+%% set of callbacks for resource specialization.
+resource_module(Mod, ModOpts) ->
+    resource_module(Mod, ModOpts, get_app_env(resource_module_option)).
+
+resource_module(Mod, _, undefined) ->
+    Mod;
+resource_module(Mod, ModOpts, {ok, OptionVal}) ->
+    proplists:get_value(OptionVal, ModOpts, Mod).
