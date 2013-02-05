@@ -84,7 +84,7 @@ datehour(TS) ->
 defer_refresh(Mod) ->
     {_, {_, M, S}} = calendar:universal_time(),
     Time = 1000 * (3600 - ((M * 60) + S)),
-    timer:apply_after(Time, ?MODULE, refresh, [Mod, Time]).
+    timer:apply_after(Time, ?MODULE, refresh, [Mod, os:timestamp()]).
 
 %% @doc Remove a log handler
 -type delete_handler_result() :: term() | {error, module_not_found} | {'EXIT', term()}.
