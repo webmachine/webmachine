@@ -588,7 +588,8 @@ parts_to_body([{Start, End, Body0}], Size) ->
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
     Body = if is_function(Body0) ->
-                   {stream, Body0(Start, End)};
+                   {BodyBin, done} = Body0(Start, End),
+                   BodyBin;
               true ->
                    Body0
            end,
