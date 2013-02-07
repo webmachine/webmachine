@@ -197,10 +197,11 @@ month(11) ->
 month(12) ->
     "Dec".
 
-%% @doc Send a refresh event to registered log handlers
--spec refresh(atom(), erlang:timestamp()) -> ok.
+%% @doc Make a synchronous call to instruct a log handler to refresh
+%% itself.
+-spec refresh(atom(), erlang:timestamp()) -> ok | {error, term()}.
 refresh(Mod, Time) ->
-    gen_event:notify(?EVENT_LOGGER, {refresh, Mod, Time}).
+    call(Mod, {refresh, Time}, infinity).
 
 -spec suffix(datehour()) -> string().
 suffix({Y, M, D, H}) ->
