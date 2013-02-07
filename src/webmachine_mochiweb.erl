@@ -142,7 +142,7 @@ get_app_env(Key) ->
 %% `resource_module' key. An example would be a pattern where a set of
 %% resource modules shares a lot of common functionality that is
 %% contained in a single module and is used as the resource in all
-%% dispatch rules and the%% `ModOpts' are used to specify a smaller
+%% dispatch rules and the `ModOpts' are used to specify a smaller
 %% set of callbacks for resource specialization.
 resource_module(Mod, ModOpts) ->
     resource_module(Mod, ModOpts, get_app_env(resource_module_option)).
