@@ -45,6 +45,9 @@ start(Options0) ->
     {SConf, GConf} = convert_options(Options, SConf0, []),
     Docroot = "/tmp",
     ok = yaws:start_embedded(Docroot, SConf, GConf, "webmachine-yaws"),
+    {yaws, _, Version} = lists:keyfind(yaws, 1,
+        proplists:get_value(loaded, application_controller:info())),
+    application:set_env(webmachine, server_version, "Yaws/" ++ Version),
     {ok, whereis(yaws_server)}.
 
 stop() ->
