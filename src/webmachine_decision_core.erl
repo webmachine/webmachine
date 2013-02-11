@@ -32,7 +32,7 @@ handle_request(Resource, ReqState) ->
     try
         d(v3b13)
     catch
-        error:_ ->            
+        error:_ ->
             error_response(erlang:get_stacktrace())
     end.
 
@@ -58,7 +58,7 @@ d(DecisionID) ->
     put(decision, DecisionID),
     log_decision(DecisionID),
     decision(DecisionID).
-    
+
 respond(Code) ->
     Resource = get(resource),
     EndTime = now(),
@@ -140,18 +140,9 @@ decision_flow(X, TestResult) when is_integer(X) ->
 decision_flow(X, _TestResult) when is_atom(X) -> d(X).
 
 do_log(LogData) ->
-    case application:get_env(webmachine, webmachine_logger_module) of
-        {ok, LoggerModule} -> LoggerModule:log_access(LogData);
-        _ -> nop
-    end,
-    case application:get_env(webmachine, enable_perf_logger) of
-        {ok, true} ->
-            webmachine_perf_logger:log(LogData);
-        _ ->
-            ignore
-    end.
+    webmachine_log:log_access(LogData).
 
-log_decision(DecisionID) -> 
+log_decision(DecisionID) ->
     Resource = get(resource),
     Resource:log_d(DecisionID).
 
@@ -230,7 +221,7 @@ decision(v3b4) ->
     decision_test(resource_call(valid_entity_length), true, v3b3, 413);
 %% "OPTIONS?"
 decision(v3b3) ->
-    case method() of 
+    case method() of
         'OPTIONS' ->
             Hdrs = resource_call(options),
             respond(200, Hdrs);
@@ -406,7 +397,7 @@ decision(v3l7) ->
 decision(v3l13) ->
     decision_test(get_header_val("if-modified-since"), undefined, v3m16, v3l14);
 %% "IMS is valid date?"
-decision(v3l14) -> 
+decision(v3l14) ->
     IMSDate = get_header_val("if-modified-since"),
     decision_test(webmachine_util:convert_request_date(IMSDate),
                   bad_date, v3m16, v3l15);
@@ -419,7 +410,7 @@ decision(v3l15) ->
                   true, v3m16, v3l17);
 %% "Last-Modified > IMS?"
 decision(v3l17) ->
-    ReqDate = get_header_val("if-modified-since"),    
+    ReqDate = get_header_val("if-modified-since"),
     ReqErlDate = webmachine_util:convert_request_date(ReqDate),
     ResErlDate = resource_call(last_modified),
     decision_test(ResErlDate =:= undefined orelse ResErlDate > ReqErlDate,
@@ -479,7 +470,7 @@ decision(v3n11) ->
             end;
         _ ->
             case resource_call(process_post) of
-                true -> 
+                true ->
                     encode_body_if_set(),
                     stage1_ok;
                 {halt, Code} -> respond(Code);
@@ -523,7 +514,7 @@ decision(v3o16) ->
     decision_test(method(), 'PUT', v3o14, v3o18);
 %% Multiple representations?
 % (also where body generation for GET and HEAD is done)
-decision(v3o18) ->    
+decision(v3o18) ->
     BuildBody = case method() of
         'GET' -> true;
         'HEAD' -> true;
@@ -622,7 +613,7 @@ encode_body_if_set() ->
 
 encode_body(Body) ->
     ChosenCSet = wrcall({get_metadata, 'chosen-charset'}),
-    Charsetter = 
+    Charsetter =
     case resource_call(charsets_provided) of
         no_charset -> fun(X) -> X end;
         CP -> hd([Fun || {CSet,Fun} <- CP, ChosenCSet =:= CSet])
