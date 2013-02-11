@@ -38,7 +38,11 @@
 
 start(Options0) ->
     {PName, Options} = webmachine_ws:start(Options0, ?MODULE),
-    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options]).
+    Res = mochiweb_http:start([{name, PName}, {loop, fun loop/1} | Options]),
+    {mochiweb, _, Version} = lists:keyfind(mochiweb, 1,
+        proplists:get_value(loaded, application_controller:info())),
+    application:set_env(webmachine, server_version, "MochiWeb/" ++ Version),
+    Res.
 
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),

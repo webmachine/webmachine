@@ -750,9 +750,17 @@ make_headers(Code, Length, RD, {?MODULE, ReqState}) ->
                       WSMod:make_headers(wrq:resp_headers(RD)))
             end
     end,
+    ServerVersion = case application:get_env(webmachine, server_version) of
+        undefined  ->
+            "Unknown/?";
+        {ok, Val} ->
+            Val
+    end,
     case application:get_env(webmachine, server_name) of
-      undefined -> ServerHeader = "MochiWeb/1.1 WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")";
-      {ok, ServerHeader} when is_list(ServerHeader) -> ok
+        undefined ->
+            ServerHeader = ServerVersion ++ " WebMachine/" ++ ?WMVSN ++ " (" ++ ?QUIP ++ ")";
+        {ok, ServerHeader} when is_list(ServerHeader) ->
+            ok
     end,
     WithSrv = WSMod:add_header("Server", ServerHeader, Hdrs0),
     Hdrs = case WSMod:get_header_value("date", WithSrv) of

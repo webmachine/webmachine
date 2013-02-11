@@ -39,6 +39,9 @@
 start(Options0) ->
     {_PName, Options} = webmachine_ws:start(Options0, ?MODULE),
     application:start(cowboy),
+    {cowboy, _, Version} = lists:keyfind(cowboy, 1,
+        proplists:get_value(loaded, application_controller:info())),
+    application:set_env(webmachine, server_version, "Cowboy/" ++ Version),
     Conf = convert_options(Options, []),
     Dispatch = [
             %% {Host, list({Path, Handler, Opts})}
