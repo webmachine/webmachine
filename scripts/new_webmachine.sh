@@ -13,7 +13,7 @@ WSAPP='webserver_app=mochiweb,'
 usage() {
     cat <<EOF
 usage: $SCRIPT [-s webserver] name [destdir]
-       supported web servers: mochiweb, yaws
+       supported web servers: mochiweb, yaws, cowboy
 EOF
 }
 
@@ -28,6 +28,9 @@ while getopts ":hs:" option; do
                     : ;;
                 yaws)
                     WS=yaws
+                    WSAPP="" ;;
+                cowboy)
+                    WS=cowboy
                     WSAPP="" ;;
                 *)
                     echo error: $0: $OPTARG is not a supported web server
