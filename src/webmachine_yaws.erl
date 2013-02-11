@@ -64,7 +64,11 @@ get_req_info([method|T], #arg{req=Req}=Arg, Acc) ->
     get_req_info(T, Arg, [{method, Method}|Acc]);
 get_req_info([scheme|T], Arg, Acc) ->
     Uri = yaws_api:request_url(Arg),
-    get_req_info(T, Arg, [{scheme, Uri#url.scheme}|Acc]);
+    Scheme = case Uri#url.scheme of
+                 "http" -> http;
+                 "https" -> https
+             end,
+    get_req_info(T, Arg, [{scheme, Scheme}|Acc]);
 get_req_info([path|T], #arg{req=Req}=Arg, Acc) ->
     {abs_path, Path} = Req#http_request.path,
     get_req_info(T, Arg, [{path, Path}|Acc]);
