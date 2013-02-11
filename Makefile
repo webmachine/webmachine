@@ -1,23 +1,24 @@
 ERL          ?= erl
 APP          := webmachine
+WEBMACHINE_SERVER := mochiweb
 
 .PHONY: deps
 
 all: deps
-	@(./rebar compile)
+	@WEBMACHINE_SERVER=$(WEBMACHINE_SERVER) ./rebar compile
 
 deps:
-	@(./rebar get-deps)
+	@WEBMACHINE_SERVER=$(WEBMACHINE_SERVER) ./rebar get-deps
 
 clean:
-	@(./rebar clean)
+	@WEBMACHINE_SERVER=$(WEBMACHINE_SERVER) ./rebar clean
 
 distclean: clean
-	@(./rebar delete-deps)
+	@WEBMACHINE_SERVER=$(WEBMACHINE_SERVER) ./rebar delete-deps
 
 edoc:
 	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
 
 test: all
-	@(./rebar skip_deps=true eunit)
+	@WEBMACHINE_SERVER=$(WEBMACHINE_SERVER) ./rebar skip_deps=true eunit
 

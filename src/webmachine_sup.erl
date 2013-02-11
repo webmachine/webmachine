@@ -35,7 +35,7 @@ start_link() ->
 start_logger(BaseDir) ->
     case application:get_env(webmachine, webmachine_logger_module) of
         {ok, LoggerModule} ->
-            ChildSpec = 
+            ChildSpec =
                 {webmachine_logger,
                  {LoggerModule, start_link, [BaseDir]},
                  permanent, 5000, worker, dynamic},
@@ -44,7 +44,7 @@ start_logger(BaseDir) ->
     end.
 
 start_perf_logger(BaseDir) ->
-    ChildSpec = 
+    ChildSpec =
         {webmachine_perf_logger,
          {webmachine_perf_logger, start_link, [BaseDir]},
          permanent, 5000, worker, [webmachine_perf_logger]},

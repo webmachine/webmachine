@@ -8,14 +8,24 @@
 %%               default = "../.."
 %%   prefix: path where the application should be created
 %%           default = "."
+%%   webserver: name of the webserver to host webmachine
+%%              default = "mochiweb"
+%%   webserver_app: application dependency for .app file
+%%                  default = ""
+%%                  (The default is empty because rebar doesn't
+%%                  seem to handle passing empty variables
+%%                  from the command line)
 {variables, [{appid, "wmskel"},
              {webmachine, "../.."},
-             {prefix, "."}]}.
+             {prefix, "."},
+             {webserver, "mochiweb"},
+             {webserver_app, ""}]}.
 
 %% main project files
 {template, "README", "{{prefix}}/README"}.
 {template, "Makefile", "{{prefix}}/Makefile"}.
 {template, "rebar.config", "{{prefix}}/rebar.config"}.
+{file, "rebar.config.script", "{{prefix}}/rebar.config.script"}.
 {file, "{{webmachine}}/rebar", "{{prefix}}/rebar"}.
 {chmod, 8#744, "{{prefix}}/rebar"}.
 {template, "start.sh", "{{prefix}}/start.sh"}.

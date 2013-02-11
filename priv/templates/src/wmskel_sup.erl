@@ -54,9 +54,9 @@ init([]) ->
                  {port, Port},
                  {log_dir, "priv/log"},
                  {dispatch, Dispatch}],
-    Web = {webmachine_mochiweb,
-           {webmachine_mochiweb, start, [WebConfig]},
-           permanent, 5000, worker, [mochiweb_socket_server]},
+    Web = {webmachine_{{webserver}},
+           {webmachine_{{webserver}}, start, [WebConfig]},
+           permanent, 5000, worker, [webmachine_{{webserver}}]},
     Processes = [Web],
     {ok, { {one_for_one, 10, 10}, Processes} }.
 

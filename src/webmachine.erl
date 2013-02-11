@@ -40,25 +40,36 @@ new_request(mochiweb, Request) ->
     Method = Request:get(method),
     Scheme = Request:get(scheme),
     Version = Request:get(version),
-    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
-        {ok, RewriteMod} ->
-            do_rewrite(RewriteMod, 
-                       Method, 
-                       Scheme, 
-                       Version, 
-                       Request:get(headers), 
-                       Request:get(raw_path));
-        undefined ->
-            {Request:get(headers), Request:get(raw_path)}
-    end,
     Socket = Request:get(socket),
+    RawPath = Request:get(raw_path),
+    Version = Request:get(version),
+    Headers = Request:get(headers),
+    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_mochiweb);
+
+new_request(yaws, {Module, Arg}) ->
+    Props = [socket, method, scheme, path, version, headers],
+    PList = Module:get_req_info(Props, Arg),
+    {_, [Socket, Method, Scheme, RawPath, Version, Headers]} = lists:unzip(PList),
+    new_request_common(Socket, Method, Scheme, RawPath, Version, Headers, webmachine_yaws).
+
+new_request_common(Socket, Method, Scheme, RawPath0, Version, Headers0, WSMod) ->
+    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
+                             {ok, RewriteMod} ->
+                                 do_rewrite(RewriteMod,
+                                            Method,
+                                            Scheme,
+                                            Version,
+                                            Headers0,
+                                            RawPath0);
+                             undefined ->
+                                 {Headers0, RawPath0}
+                         end,
     InitState = #wm_reqstate{socket=Socket,
-                          reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
-    
+                             reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers,WSMod)},
     InitReq = {webmachine_request,InitState},
     {Peer, ReqState} = InitReq:get_peer(),
-    PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer,
-                                              ReqState#wm_reqstate.reqdata)},
+    ReqData = ReqState#wm_reqstate.reqdata,
+    PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer, ReqData)},
     LogData = #wm_log_data{start_time=now(),
                            method=Method,
                            headers=Headers,
@@ -72,12 +83,9 @@ new_request(mochiweb, Request) ->
 do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
     case RewriteMod:rewrite(Method, Scheme, Version, Headers, RawPath) of
         %% only raw path has been rewritten (older style rewriting)
-        NewPath when is_list(NewPath) -> {Headers, NewPath};
-
+        NewPath when is_list(NewPath) ->
+            {Headers, NewPath};
         %% headers and raw path rewritten (new style rewriting)
-        {NewHeaders, NewPath} -> {NewHeaders,NewPath}
+        {NewHeaders, NewPath} ->
+            {NewHeaders,NewPath}
     end.
-
-
-
-

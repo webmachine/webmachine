@@ -81,7 +81,7 @@ log_open(FileName, DateHour) ->
 
 log_write({?MODULE, _Name, FD}, IoData) ->
     file:write(FD, lists:flatten(IoData)).
-    
+
 
 log_close({?MODULE, Name, FD}) ->
     io:format("~p: closing log file: ~p~n", [?MODULE, Name]),
@@ -96,11 +96,11 @@ maybe_rotate(State, Time) ->
             log_close(State#state.handle),
             Handle = log_open(State#state.filename, ThisHour),
             State#state{hourstamp=ThisHour, handle=Handle}
-    end.    
+    end.
 
-format_req(#wm_log_data{method=Method, 
-                        headers=Headers, 
-                        peer=Peer, 
+format_req(#wm_log_data{method=Method,
+                        headers=Headers,
+                        peer=Peer,
                         path=Path,
                         version=Version,
                         response_code=ResponseCode,
@@ -109,13 +109,14 @@ format_req(#wm_log_data{method=Method,
     Time = fmtnow(),
     Status = integer_to_list(ResponseCode),
     Length = integer_to_list(ResponseLength),
-    Referer = 
-        case mochiweb_headers:get_value("Referer", Headers) of
+    WSMod = webmachine_ws:get_webserver_mod(),
+    Referer =
+        case WSMod:get_header_value("Referer", Headers) of
             undefined -> "";
             R -> R
         end,
-    UserAgent = 
-        case mochiweb_headers:get_value("User-Agent", Headers) of
+    UserAgent =
+        case WSMod:get_header_value("User-Agent", Headers) of
             undefined -> "";
             U -> U
         end,
