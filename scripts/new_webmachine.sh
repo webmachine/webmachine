@@ -47,7 +47,7 @@ shift $(($OPTIND - 1))
 NAME=$1
 DESTDIR=${2:-.}
 
-if [ -z $NAME ] || [[ $NAME =~ ^[\.\~\/] ]]; then
+if [[ -z $NAME ]] || [[ $NAME =~ ^[\.\~\/] ]]; then
     echo error: $0: illegal name \"$NAME\"
     usage
     exit 1
@@ -62,11 +62,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-if [ -z $DESTDIR ]; then
-    DESTDIR="."
-elif [[ $DESTDIR =~ /${NAME}$ ]]; then
-    DESTDIR=${DESTDIR%/*}
-fi
+[[ $DESTDIR =~ /${NAME}$ ]] && DESTDIR=${DESTDIR%/*}
 
 [[ -e $DESTDIR ]] || mkdir -p $DESTDIR
 

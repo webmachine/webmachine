@@ -28,9 +28,6 @@
          socket_send/2,
          socket_recv/3,
          socket_setopts/2,
-         urlsplit_path/1,
-         parse_qs/1,
-         parse_cookie/1,
          make_reqdata/1
         ]).
 
@@ -124,24 +121,6 @@ socket_recv(S, Length, Timeout) ->
 socket_setopts(S, Options) ->
     {Transport, Socket} = get_transport(S),
     Transport:setopts(Socket, Options).
-
-urlsplit_path(Path) ->
-    URLDecode = fun(Bin) -> cowboy_http:urldecode(Bin, crash) end,
-    {_, P, QueryString} = cowboy_dispatcher:split_path(list_to_binary(Path), URLDecode),
-    case binary:split(QueryString, <<"#">>) of
-        [QS, Fragment] ->
-            {binary_to_list(P), binary_to_list(QS), binary_to_list(Fragment)};
-        [QS] ->
-            {binary_to_list(P), binary_to_list(QS), []}
-    end.
-
-parse_qs(QueryString) ->
-    %% is there any point doing this ourselves?
-    mochiweb_util:parse_qs(QueryString).
-
-parse_cookie(Value) ->
-    %% is there any point doing this ourselves?
-    mochiweb_cookies:parse_cookie(Value).
 
 make_reqdata(Path) ->
     %% Helper function to construct a request and return the ReqData

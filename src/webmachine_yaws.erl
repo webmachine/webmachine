@@ -15,10 +15,10 @@
 
 %% @doc Yaws interface for webmachine.
 -module(webmachine_yaws).
+-author('Steve Vinoski <vinoski@ieee.org>').
 
 -ifdef(WEBMACHINE_YAWS).
--author('Steve Vinoski <vinoski@ieee.org>').
--export([start/1, stop/0, out/1, get_req_info/2]).
+-export([start/1, stop/0, dispatch/1, get_req_info/2]).
 -export([get_header_value/2,
          new_headers/0,
          make_headers/1,
@@ -29,9 +29,6 @@
          socket_send/2,
          socket_recv/3,
          socket_setopts/2,
-         urlsplit_path/1,
-         parse_qs/1,
-         parse_cookie/1,
          make_reqdata/1
         ]).
 
@@ -41,7 +38,7 @@
 
 start(Options0) ->
     {_PName, Options} = webmachine_ws:start(Options0, ?MODULE),
-    SConf0 = [{appmods, [{"/", ?MODULE}]}],
+    SConf0 = [{dispatchmod, ?MODULE}],
     {SConf, GConf} = convert_options(Options, SConf0, []),
     Docroot = "/tmp",
     ok = yaws:start_embedded(Docroot, SConf, GConf, "webmachine-yaws"),
@@ -53,10 +50,10 @@ start(Options0) ->
 stop() ->
     yaws:stop().
 
-out(Arg) ->
+dispatch(Arg) ->
     Req = webmachine:new_request(yaws, {?MODULE, Arg}),
     webmachine_ws:dispatch_request(Req),
-    ok.
+    done.
 
 get_req_info(Want, Arg) ->
     get_req_info(Want, Arg, []).
@@ -85,6 +82,10 @@ get_req_info([], _Arg, Acc) ->
 
 convert_options([], SConf, GConf) ->
     {SConf, GConf};
+convert_options([{backlog, Backlog}|Opts], SConf, GConf) ->
+    convert_options(Opts, [{listen_backlog, Backlog}|SConf], GConf);
+convert_options([{log_dir, LogDir}|Opts], SConf, GConf) ->
+    convert_options(Opts, SConf, [{logdir, LogDir}|GConf]);
 convert_options([{ip, IpAddr0}|Opts], SConf, GConf) ->
     {ok, IpAddr} = inet_parse:address(IpAddr0),
     convert_options(Opts, [{listen, IpAddr}|SConf], GConf);
@@ -148,18 +149,6 @@ socket_recv(Socket, Length, Timeout) ->
 socket_setopts(Socket, Options) ->
     SC = get(sc),
     yaws:setopts(Socket, Options, yaws:is_ssl(SC)).
-
-urlsplit_path(Path) ->
-    Url = yaws_api:parse_url(Path),
-    {Url#url.path, Url#url.querypart, ""}.
-
-parse_qs(QueryString) ->
-    yaws_api:parse_query(#arg{querydata=QueryString}).
-
-parse_cookie(Value) ->
-    lists:foldl(fun(#cookie{key=Key, value=Val}, Acc) ->
-                        [{Key,Val}|Acc]
-                end, [], yaws_api:parse_cookie(Value)).
 
 make_reqdata(Path) ->
     %% Helper function to construct a request and return the ReqData
