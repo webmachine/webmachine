@@ -627,7 +627,7 @@ parts_to_body([{Start, End, Body0}], Size, Req) ->
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
     Body = if is_function(Body0) ->
-                   {stream, Body0(Start, End)};
+                   {known_length_stream, End - Start + 1, Body0(Start, End)};
               true ->
                    Body0
            end,
