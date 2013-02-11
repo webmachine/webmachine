@@ -98,6 +98,11 @@ maybe_rotate(State, Time) ->
             State#state{hourstamp=ThisHour, handle=Handle}
     end.    
 
+format_length(chunked) ->
+	"chunked";
+format_length(C) ->
+	integer_to_list(C).
+	
 format_req(#wm_log_data{method=Method, 
                         headers=Headers, 
                         peer=Peer, 
@@ -108,7 +113,7 @@ format_req(#wm_log_data{method=Method,
     User = "-",
     Time = fmtnow(),
     Status = integer_to_list(ResponseCode),
-    Length = integer_to_list(ResponseLength),
+    Length = format_length(ResponseLength),
     Referer = 
         case mochiweb_headers:get_value("Referer", Headers) of
             undefined -> "";
