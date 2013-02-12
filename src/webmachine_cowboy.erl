@@ -66,12 +66,7 @@ terminate(_Req, _State) ->
 get_header_value(RawHeaderName, Headers) ->
     HeaderName = string:to_lower(RawHeaderName),
     Res = lists:foldl(fun({H, V}, undefined) ->
-                H1 = if
-                    is_atom(H) -> string:to_lower(atom_to_list(H));
-                    is_binary(H) -> string:to_lower(binary_to_list(H));
-                    is_list(H) -> string:to_lower(H)
-                end,
-                case H1 == HeaderName of
+                case normalize(H) == HeaderName of
                     true ->
                         case is_binary(V) of
                             true ->
@@ -99,7 +94,13 @@ add_header(Header, Value, Headers) ->
 merge_header(Header, Value, Headers) ->
     case lists:keytake(Header, 1, Headers) of
         {value, {Header, OldValue}, Rest} ->
-            [{Header, OldValue ++ ", " ++ Value} | Rest];
+            case normalize(Header) of
+                "set-cookie" ->
+                    %% set-cookie headers are space delineated
+                    [{Header, OldValue}, {Header, Value} | Rest];
+                _ ->
+                    [{Header, OldValue ++ ", " ++ Value} | Rest]
+            end;
         false ->
             [{Header, Value} | Headers]
     end.
@@ -182,5 +183,12 @@ get_transport({ssl, SSLSocket}) ->
     {cowboy_ssl_transport, SSLSocket};
 get_transport(Socket) ->
     {cowboy_tcp_transport, Socket}.
+
+normalize(H) when is_atom(H) ->
+    string:to_lower(atom_to_list(H));
+normalize(H) when is_binary(H) ->
+    string:to_lower(binary_to_list(H));
+normalize(H) when is_list(H) ->
+    string:to_lower(H).
 
 -endif. %% WEBMACHINE_COWBOY
