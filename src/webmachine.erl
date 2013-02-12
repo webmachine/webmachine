@@ -42,11 +42,11 @@ new_request(mochiweb, Request) ->
     Version = Request:get(version),
     {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
         {ok, RewriteMod} ->
-            do_rewrite(RewriteMod, 
-                       Method, 
-                       Scheme, 
-                       Version, 
-                       Request:get(headers), 
+            do_rewrite(RewriteMod,
+                       Method,
+                       Scheme,
+                       Version,
+                       Request:get(headers),
                        Request:get(raw_path));
         undefined ->
             {Request:get(headers), Request:get(raw_path)}
@@ -54,7 +54,7 @@ new_request(mochiweb, Request) ->
     Socket = Request:get(socket),
     InitState = #wm_reqstate{socket=Socket,
                           reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
-    
+
     InitReq = {webmachine_request,InitState},
     {Peer, ReqState} = InitReq:get_peer(),
     PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer,
@@ -92,20 +92,6 @@ start_stop_test() ->
     ?assertEqual(ok, webmachine:stop()),
     application:stop(mochiweb),
     application:stop(inets),
-    ok.
-
-start_stop_application_test() ->
-    {setup,
-     fun() ->
-             application:start(webmachine)
-     end,
-     fun(_) ->
-             application:stop(webmachine)
-     end,
-     [{<<"Nop">>, fun just_ok/0}]
-    }.
-
-just_ok() ->
     ok.
 
 -endif.

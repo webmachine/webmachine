@@ -20,27 +20,28 @@
 
 -compile(export_all).
 
--define(port, 12001).
--define(url, "http://localhost:12001/decisioncore").
-
--define(html_content, "<html><body>Foo</body></html>").
+-define(PORT, 12001).
+-define(URL, "http://localhost:12001/decisioncore").
+-define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
 decision_core_test_() ->
-    {setup,
+    {foreach,
      fun() ->
              %% Spin up webmachine
              application:start(inets),
              WebConfig = [{ip, "0.0.0.0"},
-                          {port, ?port},
+                          {port, ?PORT},
                           {dispatch, [{["decisioncore", '*'],
                                        ?MODULE, []}]}
                          ],
              {ok, Pid0} = webmachine_sup:start_link(),
              {ok, Pid} = webmachine_mochiweb:start(WebConfig),
              link(Pid),
+             meck:new(webmachine_resource, [passthrough]),
              {Pid0, Pid}
      end,
      fun({Pid0, Pid1}) ->
+             meck:unload(webmachine_resource),
              %% clean up
              unlink(Pid0),
              exit(Pid0, kill),
@@ -57,30 +58,49 @@ decision_core_test_() ->
       },
       {<<"204 from a put">>,
        fun simple_put/0
+      },
+      {<<"a post">>,
+       fun simple_post/0
       }
      ]}.
 
+get_decision_ids() ->
+    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
+                       <- meck:history(webmachine_resource)].
+
+
 head_method_not_allowed() ->
-    {ok, Result} = httpc:request(head, {?url, []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result).
+    {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
+    io:format(user, "~p~n", [get_decision_ids()]),
+    ok.
 
 simple_get() ->
-    {ok, Result} = httpc:request(get, {?url, []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?html_content}, Result).
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
+    io:format(user, "~p~n", [get_decision_ids()]),
+    ok.
 
 simple_put() ->
-    Body = {?url, [], "binary/octet-stream", <<1,1,2,3,5>>},
+    Body = {?URL ++ "/bar", [], "binary/octet-stream", <<1,1,2,3,5>>},
     {ok, Result} = httpc:request(put, Body, [], []),
-    ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result).
+    ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
+    io:format(user, "~p~n", [get_decision_ids()]),
+    ok.
+
+simple_post() ->
+    Body = {?URL ++ "/bar", [], "binary/octet-stream", <<1,1,2,3,5>>},
+    {ok, Result} = httpc:request(post, Body, [], []),
+    io:format(user, "\n<<~p>>\n", [Result]).
 
 init([]) ->
     {ok, undefined}.
 
 allowed_methods(ReqData, Context) ->
-    {['GET', 'PUT'], ReqData, Context}.
+    {['GET', 'POST', 'PUT'], ReqData, Context}.
 
 to_html(ReqData, Context) ->
-    {?html_content, ReqData, Context}.
+    {?HTML_CONTENT, ReqData, Context}.
 
 content_types_provided(ReqData, Context) ->
     {[{"text/html", to_html}], ReqData, Context}.
