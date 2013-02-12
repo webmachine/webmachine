@@ -52,6 +52,7 @@ stop() ->
     cowboy:stop_listener('webmachine-cowboy').
 
 init({tcp, http}, Req, _Opts) ->
+    put(request, Req),
     {ok, Req, {}}.
 
 handle(CowboyReq, State) ->
@@ -62,8 +63,8 @@ handle(CowboyReq, State) ->
 terminate(_Req, _State) ->
     ok.
 
-get_header_value(HeaderName, Headers) ->
-    %io:format("get header ~p ~p~n", [HeaderName, Headers]),
+get_header_value(RawHeaderName, Headers) ->
+    HeaderName = string:to_lower(RawHeaderName),
     Res = lists:foldl(fun({H, V}, undefined) ->
                 H1 = if
                     is_atom(H) -> string:to_lower(atom_to_list(H));
@@ -84,7 +85,6 @@ get_header_value(HeaderName, Headers) ->
             (_, Acc) ->
                 Acc
         end, undefined, Headers),
-    %io:format("result is ~p~n", [Res]),
     Res.
 
 new_headers() ->
@@ -115,8 +115,45 @@ socket_send(S, Data) ->
     Transport:send(Socket, Data).
 
 socket_recv(S, Length, Timeout) ->
-    {Transport, Socket} = get_transport(S),
-    Transport:recv(Socket, Length, Timeout).
+    Req = get(request),
+    %% cowboy automagically reads the body into the request, so we have to
+    %% buffer it by hand
+    case cowboy_http_req:stream_body(Req) of
+        {ok, Data0, Req2} ->
+            put(request, Req2),
+            Data = case get(body_buffer) of
+                undefined ->
+                    Data0;
+                Buff ->
+                    iolist_to_binary([Buff, Data0])
+            end,
+            case Length =< byte_size(Data) of
+                true ->
+                    Res = binary:part(Data, {0, Length}),
+                    Rem = binary:part(Data, {Length, byte_size(Data) - Length}),
+                    put(body_buffer, Rem),
+                    {ok, Res};
+                false ->
+                    put(body_buffer, Data),
+                    socket_recv(S, Length, Timeout)
+            end;
+        {done, Req} ->
+            Data = case get(body_buffer) of
+                undefined ->
+                    <<>>;
+                Buff ->
+                    Buff
+            end,
+            case Length =< byte_size(Data) of
+                true ->
+                    Res = binary:part(Data, {0, Length}),
+                    Rem = binary:part(Data, {Length, byte_size(Data) - Length}),
+                    put(body_buffer, Rem),
+                    {ok, Res};
+                false ->
+                    {error, no_more_bytes}
+            end
+    end.
 
 socket_setopts(S, Options) ->
     {Transport, Socket} = get_transport(S),

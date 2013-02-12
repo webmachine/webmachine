@@ -62,9 +62,11 @@ new_request(cowboy, Req) ->
             {{ssl, S}, https}
     end,
     {RawPath, Req2} = cowboy_http_req:raw_path(Req1),
-    {Version, Req3} = cowboy_http_req:version(Req2),
-    {Headers, _Req4} = cowboy_http_req:headers(Req3),
-    new_request_common(Socket, Method, Scheme, binary_to_list(RawPath), Version, Headers, webmachine_cowboy).
+    {RawQS, Req3} = cowboy_http_req:raw_qs(Req2),
+    {Version, Req4} = cowboy_http_req:version(Req3),
+    {Headers, _Req5} = cowboy_http_req:headers(Req4),
+    RealRawPath = binary_to_list(RawPath) ++ "?" ++ binary_to_list(RawQS),
+    new_request_common(Socket, Method, Scheme, RealRawPath, Version, Headers, webmachine_cowboy).
 
 
 new_request_common(Socket, Method, Scheme, RawPath0, Version, Headers0, WSMod) ->
