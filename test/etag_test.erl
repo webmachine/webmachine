@@ -101,10 +101,12 @@ etag_test_() ->
        ]}]}.
 
 setup() ->
+    error_logger:tty(false),
     %% Setup ETS table to hold current etag value
     ets:new(?MODULE, [named_table, public]),
 
     %% Spin up webmachine
+    application:start(inets),
     WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
                  {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
     {ok, Pid0} = webmachine_sup:start_link(),
@@ -117,7 +119,8 @@ cleanup({Pid0, Pid1}) ->
     unlink(Pid0),
     exit(Pid0, kill),
     unlink(Pid1),
-    exit(Pid1, kill).
+    exit(Pid1, kill),
+    application:stop(inets).
 
 init([]) ->
     {ok, undefined}.
