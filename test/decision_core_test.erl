@@ -25,6 +25,9 @@
 -define(URL, "http://localhost:12001/decisioncore").
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
+-define(TRACE_TO_C4, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8,
+                      v3b7, v3b6, v3b5, v3b4, v3b3, v3c3, v3c4]).
+
 decision_core_test_() ->
     {foreach,
      fun setup/0,
@@ -34,7 +37,9 @@ decision_core_test_() ->
       {<<"503 ping doesn't return pong">>, fun ping_invalid/0},
       {<<"200 head method allowed">>, fun head_method_allowed/0},
       {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
-      {<<"200 get method">>, fun simple_get/0}
+      {<<"200 get method">>, fun simple_get/0},
+      {<<"406 not acceptable - media type">>,
+       fun acceptable_media_type_not_available/0}
      ]}.
 
 setup() ->
@@ -114,6 +119,18 @@ head_method_not_allowed() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+acceptable_media_type_not_available() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_accepted, [{"text/html", accept_html_on_put}]),
+    {ok, Result} = httpc:request(get, {?URL, [{"Accept", "video/mp4"}]}, [], []),
+    ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
+    ExpectedDecisionTrace = ?TRACE_TO_C4,
+    ?assertMatch(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+accept_html_on_put(ReqData, Context) ->
+    {ok, ReqData, Context}.
+
 simple_get() ->
     put_setting(allowed_methods, ['GET']),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
@@ -148,6 +165,7 @@ initialize_resource_settings() ->
     %% Defaults
     put_setting(service_available, true),
     put_setting(ping, pong),
+    put_setting(content_types_provided, [{"text/html", to_html}]),
     ok.
 
 clear_resource_settings() ->
@@ -178,16 +196,15 @@ allowed_methods(ReqData, Context) ->
     Setting = lookup_setting(allowed_methods),
     {Setting, ReqData, Context}.
 
-to_html(ReqData, Context) ->
-    {?HTML_CONTENT, ReqData, Context}.
-
 content_types_provided(ReqData, Context) ->
-    {[{"text/html", to_html}], ReqData, Context}.
+    Setting = lookup_setting(content_types_provided),
+    {Setting, ReqData, Context}.
 
 content_types_accepted(ReqData, Context) ->
-    {[{"binary/octet-stream", on_put}], ReqData, Context}.
+    Setting = lookup_setting(content_types_accepted),
+    {Setting, ReqData, Context}.
 
-on_put(ReqData, Context) ->
-    {ok, ReqData, Context}.
+to_html(ReqData, Context) ->
+    {?HTML_CONTENT, ReqData, Context}.
 
 -endif.
