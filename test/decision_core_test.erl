@@ -16,6 +16,7 @@
 
 -ifdef(TEST).
 
+-include_lib("webmachine/include/wm_reqdata.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).
@@ -29,15 +30,11 @@ decision_core_test_() ->
      fun setup/0,
      fun cleanup/1,
      [
+      {<<"503 it's not you, it's me">>, fun service_unavailable/0},
+      {<<"503 ping doesn't return pong">>, fun ping_invalid/0},
       {<<"200 head method allowed">>, fun head_method_allowed/0},
       {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
       {<<"200 get method">>, fun simple_get/0}
-%      {<<"204 from a put">>,
-%       fun simple_put/0
-%      },
-%      {<<"a post">>,
-%       fun simple_post/0
-%      }
      ]}.
 
 setup() ->
@@ -70,10 +67,33 @@ get_decision_ids() ->
                        <- meck:history(webmachine_resource)].
 
 %%
-%% Test cases
+%% TEST CASES
 %%
-%% Note: The expected decision traces in these tests is simply the output
-%% from the test itself. These have not yet been hand-verified!
+%% The decision trace is the path through the HTTP/1.1 activity diagram, which
+%% has nodes labeled from A-P on the x-axis and 1-26 on the y-axis.
+%%
+%% Note: The expected decision traces in these tests is simply the output from
+%% the test itself. These have not yet been hand-verified!
+
+service_unavailable() ->
+    put_setting(service_available, false),
+    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
+    ExpectedDecisionTrace =
+        [v3b13, v3b13b],
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+ping_invalid() ->
+    % "breakout" for "anything other than pong"
+    put_setting(ping, breakout),
+    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
+    ExpectedDecisionTrace =
+        [v3b13],
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
@@ -118,7 +138,7 @@ simple_post() ->
     io:format(user, "\n<<~p>>\n", [Result]).
 
 %%
-%% Webmachine resource functions and configuration
+%% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
 
 initialize_resource_settings() ->
@@ -126,7 +146,9 @@ initialize_resource_settings() ->
     ets:new(?MODULE, [named_table, public]),
     
     %% Defaults
-    put_setting(service_available, true).
+    put_setting(service_available, true),
+    put_setting(ping, pong),
+    ok.
 
 clear_resource_settings() ->
     ets:delete(?MODULE).
@@ -142,11 +164,15 @@ init([]) ->
     {ok, undefined}.
 
 ping(ReqData, State) ->
-    {pong, ReqData, State}.
+    Setting = lookup_setting(ping),
+    case Setting of
+        ping_raise_error -> error(foobar);
+        _ -> {Setting, ReqData, State}
+    end.
 
-service_available() ->
-%    Setting = lookup_setting(service_available),
-    true.
+service_available(ReqData, Context) ->
+    Setting = lookup_setting(service_available),
+    {Setting, ReqData, Context}.
 
 allowed_methods(ReqData, Context) ->
     Setting = lookup_setting(allowed_methods),

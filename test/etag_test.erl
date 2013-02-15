@@ -16,12 +16,12 @@
 
 -module(etag_test).
 
-
 -ifdef(EQC).
 
--include("wm_reqdata.hrl").
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+-include_lib("webmachine/include/webmachine.hrl").
 
 -compile(export_all).
 
@@ -142,7 +142,7 @@ generate_etag(ReqData, Context) ->
             {ETag, ReqData, Context}
     end.
 
-ping(ReqData, State) ->
-    {pong, ReqData, State}.
+service_available(R, C) ->
+    {true, R, C}.
 
 -endif.
