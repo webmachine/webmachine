@@ -25,8 +25,47 @@
 -define(URL, "http://localhost:12001/decisioncore").
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
--define(TRACE_TO_C4, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8,
-                      v3b7, v3b6, v3b5, v3b4, v3b3, v3c3, v3c4]).
+%% B3 - There is one path to state B3
+-define(PATH_TO_B3, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8,
+                      v3b7, v3b6, v3b5, v3b4, v3b3]).
+
+%% C3 - There is one path to state C3
+-define(PATH_TO_C3, ?PATH_TO_B3 ++ [v3c3]).
+
+%% C4 - There is one path to state C4
+-define(PATH_TO_C4, ?PATH_TO_C3 ++ [v3c4]).
+
+%% D4 - There are two paths to D4:
+%%  via C3 or
+%%  via C4
+-define(PATH_TO_D4_VIA_C3, ?PATH_TO_C3 ++ [v3d4]).
+-define(PATH_TO_D4_VIA_C4, ?PATH_TO_C4 ++ [v3d4]).
+
+%% D5 - There are two paths to D5:
+%%  via C3 or
+%%  via C4
+-define(PATH_TO_D5_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3d5]).
+-define(PATH_TO_D5_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3d5]).
+
+%% E5 - There are four paths to E5:
+%%  via D5 (via C3 or
+%%          via C4) or
+%%  via D4 (via C3 or
+%%          via C4)
+-define(PATH_TO_E5_VIA_D5_VIA_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D5_VIA_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D4_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D4_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3e5]).
+
+%% E6 - There are four paths to E6:
+%%  via D5 (via C3 or
+%%          via C4) or
+%%  via D4 (via C3 or
+%%          via C4)
+-define(PATH_TO_E6_VIA_D5_VIA_C3, ?PATH_TO_E5_VIA_D5_VIA_C3 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D5_VIA_C4, ?PATH_TO_E5_VIA_D5_VIA_C4 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D4_VIA_C3, ?PATH_TO_E5_VIA_D4_VIA_C3 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D4_VIA_C4, ?PATH_TO_E5_VIA_D4_VIA_C4 ++ [v3e6]).
 
 decision_core_test_() ->
     {foreach,
@@ -38,8 +77,10 @@ decision_core_test_() ->
       {<<"200 head method allowed">>, fun head_method_allowed/0},
       {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
       {<<"200 get method">>, fun simple_get/0},
-      {<<"406 not acceptable - media type">>,
-       fun acceptable_media_type_not_available/0}
+      {<<"406 via c4">>, fun not_acceptable_c4/0},
+      {<<"406 via d5 via c4">>, fun not_acceptable_d5_c4/0},
+      {<<"406 via d5 via c3">>, fun not_acceptable_d5_c3/0},
+      {<<"406 via e6 via d5 via c3">>, fun not_acceptable_e6_d5_c3/0}
      ]}.
 
 setup() ->
@@ -119,13 +160,57 @@ head_method_not_allowed() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-acceptable_media_type_not_available() ->
+%% 406 via C4
+not_acceptable_c4() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_accepted, [{"text/html", accept_html_on_put}]),
-    {ok, Result} = httpc:request(get, {?URL, [{"Accept", "video/mp4"}]}, [], []),
+    Headers = [{"Accept", "video/mp4"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?TRACE_TO_C4,
-    ?assertMatch(ExpectedDecisionTrace, get_decision_ids()),
+    ExpectedDecisionTrace = ?PATH_TO_C4,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 406 via D5 via C4
+not_acceptable_d5_c4() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_provided, [{"text/plain", to_html}]),
+    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
+    put_setting(language_available, false),
+    Headers = [{"Accept", "text/plain"},
+               {"Accept-Language", "x-pig-latin"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_D5_VIA_C4,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 406 result via D5 via C3
+not_acceptable_d5_c3() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_provided, [{"text/plain", to_html}]),
+    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
+    put_setting(language_available, false),
+    Headers = [{"Accept-Language", "x-pig-latin"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_D5_VIA_C3,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 406 result via E6 via D5 via C3
+not_acceptable_e6_d5_c3() ->
+%    no charset available
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_provided, [{"text/plain", to_html}]),
+    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
+    put_setting(charsets_provided, [{"utf-8", make_utf8}]),
+    Headers = [{"Accept-Language", "en-US"},
+               {"Accept-Charset", "ISO-8859-1"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_E6_VIA_D5_VIA_C3,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
 accept_html_on_put(ReqData, Context) ->
@@ -166,6 +251,8 @@ initialize_resource_settings() ->
     put_setting(service_available, true),
     put_setting(ping, pong),
     put_setting(content_types_provided, [{"text/html", to_html}]),
+    put_setting(language_available, true),
+    put_setting(charsets_provided, no_charset),
     ok.
 
 clear_resource_settings() ->
@@ -202,6 +289,14 @@ content_types_provided(ReqData, Context) ->
 
 content_types_accepted(ReqData, Context) ->
     Setting = lookup_setting(content_types_accepted),
+    {Setting, ReqData, Context}.
+
+language_available(ReqData, Context) ->
+    Setting = lookup_setting(language_available),
+    {Setting, ReqData, Context}.
+
+charsets_provided(ReqData, Context) ->
+    Setting = lookup_setting(charsets_provided),
     {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->

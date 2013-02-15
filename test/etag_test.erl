@@ -142,7 +142,4 @@ generate_etag(ReqData, Context) ->
             {ETag, ReqData, Context}
     end.
 
-service_available(R, C) ->
-    {true, R, C}.
-
 -endif.
