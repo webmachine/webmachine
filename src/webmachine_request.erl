@@ -559,6 +559,13 @@ range_parts(RD=#wm_reqdata{resp_body={stream, {Hunk,Next}}}, Ranges) ->
     MRB = RD#wm_reqdata.max_recv_body,
     range_parts(read_whole_stream({Hunk,Next}, [], MRB, 0), Ranges);
 
+range_parts(_RD=#wm_reqdata{resp_body={known_length_stream, Size, StreamBody}},
+            Ranges) ->
+    SkipLengths = [ mochiweb_http:range_skip_length(R, Size) || R <- Ranges],
+    {[ {Skip, Skip+Length-1, {known_length_stream, Length, StreamBody}} ||
+         {Skip, Length} <- SkipLengths ],
+     Size};
+
 range_parts(_RD=#wm_reqdata{resp_body={stream, Size, StreamFun}}, Ranges) ->
     SkipLengths = [ mochiweb_http:range_skip_length(R, Size) || R <- Ranges],
     {[ {Skip, Skip+Length-1, StreamFun} || {Skip, Length} <- SkipLengths ],
@@ -595,9 +602,12 @@ parts_to_body([{Start, End, Body0}], Size, Req) ->
                     mochiweb_util:make_io(Start), "-",
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
-    Body = if is_function(Body0) ->
+    Body = case Body0 of
+              _ when is_function(Body0) ->
                    {known_length_stream, End - Start + 1, Body0(Start, End)};
-              true ->
+              {known_length_stream, ContentSize, StreamBody} ->
+                   {known_length_stream, ContentSize, StreamBody};
+              _ ->
                    Body0
            end,
     {HeaderList, Body};
