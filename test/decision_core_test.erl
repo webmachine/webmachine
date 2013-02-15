@@ -25,6 +25,15 @@
 -define(URL, "http://localhost:12001/decisioncore").
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
+%% DECISION TRACE PATHS
+%%
+%% Not all possible paths will be tested at this point. The current testing
+%% goal is decision/condition coverage: "It requires sufficient test cases that
+%% each condition in a decision takes on all possible outcomes at least once,
+%% and each point of entry is invoked at least once" (The Art of Software
+%% Testing, 2nd, p 49). (Exercising all possible paths is called
+%% multiple-condition coverage.)
+
 %% B3 - There is one path to state B3
 -define(PATH_TO_B3, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8,
                       v3b7, v3b6, v3b5, v3b4, v3b3]).
@@ -35,53 +44,53 @@
 %% C4 - There is one path to state C4
 -define(PATH_TO_C4, ?PATH_TO_C3 ++ [v3c4]).
 
-%% D4 - There are two paths to D4:
-%%  via C3 or
-%%  via C4
+%% D4 - There are two paths to D4: via C3 or via C4
 -define(PATH_TO_D4_VIA_C3, ?PATH_TO_C3 ++ [v3d4]).
 -define(PATH_TO_D4_VIA_C4, ?PATH_TO_C4 ++ [v3d4]).
 
-%% D5 - There are two paths to D5:
-%%  via C3 or
-%%  via C4
+%% D5 - There are two paths to D5: via C3 or via C4
 -define(PATH_TO_D5_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3d5]).
 -define(PATH_TO_D5_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3d5]).
 
 %% E5 - There are four paths to E5:
-%%  via D5 (via C3 or
-%%          via C4) or
-%%  via D4 (via C3 or
-%%          via C4)
+%%  via D5 (via C3 or via C4) or
+%%  via D4 (via C3 or via C4)
+%% Only two of these paths to E5 are tested
 -define(PATH_TO_E5_VIA_D5_VIA_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
 -define(PATH_TO_E5_VIA_D5_VIA_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
--define(PATH_TO_E5_VIA_D4_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3e5]).
--define(PATH_TO_E5_VIA_D4_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3e5]).
 
 %% E6 - There are four paths to E6:
-%%  via D5 (via C3 or
-%%          via C4) or
-%%  via D4 (via C3 or
-%%          via C4)
+%%  via D5 (via C3 or via C4) or
+%%  via D4 (via C3 or via C4)
+%% Only two of these paths to E6 are tested
 -define(PATH_TO_E6_VIA_D5_VIA_C3, ?PATH_TO_E5_VIA_D5_VIA_C3 ++ [v3e6]).
 -define(PATH_TO_E6_VIA_D5_VIA_C4, ?PATH_TO_E5_VIA_D5_VIA_C4 ++ [v3e6]).
--define(PATH_TO_E6_VIA_D4_VIA_C3, ?PATH_TO_E5_VIA_D4_VIA_C3 ++ [v3e6]).
--define(PATH_TO_E6_VIA_D4_VIA_C4, ?PATH_TO_E5_VIA_D4_VIA_C4 ++ [v3e6]).
 
+%% F6 - The path to F6 via E6, D5, C4
+-define(PATH_TO_F6_VIA_E6_VIA_D5_VIA_C4, ?PATH_TO_E6_VIA_D5_VIA_C4 ++ [v3f6]).
+
+%% F7 - That path to F7 via E6, D5, C4
+-define(PATH_TO_F7_VIA_E6_VIA_D5_VIA_C4,
+        ?PATH_TO_F6_VIA_E6_VIA_D5_VIA_C4 ++ [v3f7]).
+
+%%
+%% TEST SETUP AND CLEANUP
+%%
 decision_core_test_() ->
-    {foreach,
-     fun setup/0,
-     fun cleanup/1,
-     [
-      {<<"503 it's not you, it's me">>, fun service_unavailable/0},
-      {<<"503 ping doesn't return pong">>, fun ping_invalid/0},
-      {<<"200 head method allowed">>, fun head_method_allowed/0},
-      {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
-      {<<"200 get method">>, fun simple_get/0},
-      {<<"406 via c4">>, fun not_acceptable_c4/0},
-      {<<"406 via d5 via c4">>, fun not_acceptable_d5_c4/0},
-      {<<"406 via d5 via c3">>, fun not_acceptable_d5_c3/0},
-      {<<"406 via e6 via d5 via c3">>, fun not_acceptable_e6_d5_c3/0}
-     ]}.
+    Tests =
+        [
+         {<<"503 it's not you, it's me">>, fun service_unavailable/0},
+         {<<"503 ping doesn't return pong">>, fun ping_invalid/0},
+         {<<"200 head method allowed">>, fun head_method_allowed/0},
+         {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
+         {<<"200 get method">>, fun simple_get/0},
+         {<<"406 via c4">>, fun not_acceptable_c4/0},
+         {<<"406 via d5<-c4">>, fun not_acceptable_d5_c4/0},
+         {<<"406 via d5<-c3">>, fun not_acceptable_d5_c3/0},
+         {<<"406 via e6<-d5<-c3">>, fun not_acceptable_e6_d5_c3/0},
+         {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0}
+        ],
+    {foreach, fun setup/0, fun cleanup/1, Tests}.
 
 setup() ->
     error_logger:tty(false),
@@ -163,7 +172,6 @@ head_method_not_allowed() ->
 %% 406 via C4
 not_acceptable_c4() ->
     put_setting(allowed_methods, ['GET']),
-    put_setting(content_types_accepted, [{"text/html", accept_html_on_put}]),
     Headers = [{"Accept", "video/mp4"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
@@ -175,7 +183,6 @@ not_acceptable_c4() ->
 not_acceptable_d5_c4() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_provided, [{"text/plain", to_html}]),
-    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
     put_setting(language_available, false),
     Headers = [{"Accept", "text/plain"},
                {"Accept-Language", "x-pig-latin"}],
@@ -189,7 +196,6 @@ not_acceptable_d5_c4() ->
 not_acceptable_d5_c3() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_provided, [{"text/plain", to_html}]),
-    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
     put_setting(language_available, false),
     Headers = [{"Accept-Language", "x-pig-latin"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
@@ -200,16 +206,31 @@ not_acceptable_d5_c3() ->
 
 %% 406 result via E6 via D5 via C3
 not_acceptable_e6_d5_c3() ->
-%    no charset available
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_provided, [{"text/plain", to_html}]),
-    put_setting(content_types_accepted, [{"text/plain", accept_html_on_put}]),
     put_setting(charsets_provided, [{"utf-8", make_utf8}]),
     Headers = [{"Accept-Language", "en-US"},
                {"Accept-Charset", "ISO-8859-1"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_E6_VIA_D5_VIA_C3,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 406 result via F7 via E6 via D5 via C4
+not_acceptable_f7_e6_d5_c4() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_provided, [{"text/plain", to_html}]),
+    put_setting(language_available, true),
+    put_setting(charsets_provided, [{"utf-8", fun(X) -> X end}]),
+    put_setting(encodings_provided, none),
+    Headers = [{"Accept", "text/plain"},
+               {"Accept-Language", "en-US"},
+               {"Accept-Charset", "utf-8"},
+               {"Accept-Encoding", "gzip"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_F7_VIA_E6_VIA_D5_VIA_C4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -253,6 +274,7 @@ initialize_resource_settings() ->
     put_setting(content_types_provided, [{"text/html", to_html}]),
     put_setting(language_available, true),
     put_setting(charsets_provided, no_charset),
+    put_setting(encodings_provided, use_identity),
     ok.
 
 clear_resource_settings() ->
@@ -298,6 +320,20 @@ language_available(ReqData, Context) ->
 charsets_provided(ReqData, Context) ->
     Setting = lookup_setting(charsets_provided),
     {Setting, ReqData, Context}.
+
+encodings_provided(ReqData, Context) ->
+    Setting = lookup_setting(encodings_provided),
+    %% Since we can't store Erlang funs in term storage, we use a case to
+    %% match atoms to intended sets of funs
+    Value =
+        case Setting of
+            use_identity ->
+                [{"identity", fun(X) -> X end}];
+            none ->
+                [];
+            Setting -> Setting
+        end,
+    {Value, ReqData, Context}.
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
