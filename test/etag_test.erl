@@ -41,6 +41,8 @@ unique(L) ->
 etag(Bin) ->
     integer_to_list(erlang:crc32(Bin)).
 
+etag_list([]) ->
+    "*";
 etag_list(Bins) ->
     string:join([[$", etag(B), $"] || B <- Bins], ",").
 
@@ -59,57 +61,63 @@ http_request(Match, IfVals, NewVal, Count) ->
             http_request(Match, IfVals, NewVal, Count-1)
     end.
 
-
 etag_prop() ->
     ?LET({AllVals, Match}, {non_empty(list(binary())), oneof(["If-Match", "If-None-Match"])},
          ?FORALL({IfVals0, CurVal, NewVal},
-              {list(oneof(AllVals)), oneof(AllVals), oneof(AllVals)},
-              begin
-                  ets:insert(?MODULE, [{etag, etag(CurVal)}]),
-                  IfVals = unique(IfVals0),
-                  {ok, Result} = http_request(Match, IfVals, NewVal, 3),
-                  Code = element(2, element(1, Result)),
-                  case {Match, lists:member(CurVal, IfVals)} of
-                      {"If-Match", true} ->
-                          ?assertEqual(204, Code);
-                      {"If-Match", false} ->
-                          ?assertEqual(412, Code);
-                      {"If-None-Match", true} ->
-                          ?assertEqual(412, Code);
-                      {"If-None-Match", false} ->
-                          ?assertEqual(204, Code)
-                  end,
-                  true
+                 {list(oneof(AllVals)), oneof(AllVals), oneof(AllVals)},
+                 begin
+                     ets:insert(?MODULE, [{etag, etag(CurVal)}]),
+                     IfVals = unique(IfVals0),
+                     {ok, Result} = http_request(Match, IfVals, NewVal, 3),
+                     Code = element(2, element(1, Result)),
+                     ExpectedCode =
+                         expected_response_code(Match,
+                                                IfVals,
+                                                lists:member(CurVal, IfVals)),
+                     equals(ExpectedCode, Code)
                  end)).
 
+expected_response_code("If-Match", _, true) ->
+    204;
+expected_response_code("If-Match", [], false) ->
+    204;
+expected_response_code("If-Match", _, false) ->
+    412;
+expected_response_code("If-None-Match", _, true) ->
+    412;
+expected_response_code("If-None-Match", [], false) ->
+    412;
+expected_response_code("If-None-Match", _, false) ->
+    204.
 
 etag_test_() ->
-    {setup,
-     fun() ->
-                %% Setup ETS table to hold current etag value
-                ets:new(?MODULE, [named_table, public]),
+    {spawn,
+     [{setup,
+       fun setup/0,
+       fun cleanup/1,
+       [
+        {timeout, 12,
+         ?_assert(eqc:quickcheck(eqc:testing_time(10, ?QC_OUT(etag_prop()))))}
+       ]}]}.
 
-                %% Spin up webmachine
-                WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
-                             {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
-                {ok, Pid0} = webmachine_sup:start_link(),
-                {ok, Pid} = webmachine_mochiweb:start(WebConfig),
-                link(Pid),
-                {Pid0, Pid}
-        end,
-     fun({Pid0, Pid1}) ->
-                %% clean up
-                unlink(Pid0),
-                exit(Pid0, kill),
-                unlink(Pid1),
-                exit(Pid1, kill)
-        end,
-     [
-            fun() ->
-                    ?assert(eqc:quickcheck(eqc:numtests(250, ?QC_OUT(etag_prop()))))
-            end
-            ]}.
+setup() ->
+    %% Setup ETS table to hold current etag value
+    ets:new(?MODULE, [named_table, public]),
 
+    %% Spin up webmachine
+    WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
+                 {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
+    {ok, Pid0} = webmachine_sup:start_link(),
+    {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
+    link(Pid1),
+    {Pid0, Pid1}.
+
+cleanup({Pid0, Pid1}) ->
+    %% clean up
+    unlink(Pid0),
+    exit(Pid0, kill),
+    unlink(Pid1),
+    exit(Pid1, kill).
 
 init([]) ->
     {ok, undefined}.

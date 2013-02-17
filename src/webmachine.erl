@@ -42,11 +42,11 @@ new_request(mochiweb, Request) ->
     Version = Request:get(version),
     {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
         {ok, RewriteMod} ->
-            do_rewrite(RewriteMod, 
-                       Method, 
-                       Scheme, 
-                       Version, 
-                       Request:get(headers), 
+            do_rewrite(RewriteMod,
+                       Method,
+                       Scheme,
+                       Version,
+                       Request:get(headers),
                        Request:get(raw_path));
         undefined ->
             {Request:get(headers), Request:get(raw_path)}
@@ -54,7 +54,7 @@ new_request(mochiweb, Request) ->
     Socket = Request:get(socket),
     InitState = #wm_reqstate{socket=Socket,
                           reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
-    
+
     InitReq = {webmachine_request,InitState},
     {Peer, ReqState} = InitReq:get_peer(),
     PeerState = ReqState#wm_reqstate{reqdata=wrq:set_peer(Peer,
@@ -77,7 +77,3 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
         %% headers and raw path rewritten (new style rewriting)
         {NewHeaders, NewPath} -> {NewHeaders,NewPath}
     end.
-
-
-
-
