@@ -527,14 +527,14 @@ get_range({?MODULE, ReqState}=Req) ->
         {undefined, _} ->
             {undefined, ReqState#wm_reqstate{range=undefined}};
         {RawRange, _} ->
-            Range = parse_range_request(RawRange),
+            Range = mochiweb_http:parse_range_request(RawRange),
             {Range, ReqState#wm_reqstate{range=Range}}
     end.
 
 range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
     Size = mochiweb_io:iodevice_size(IoDevice),
     F = fun (Spec, Acc) ->
-                case range_skip_length(Spec, Size) of
+                case mochiweb_http:range_skip_length(Spec, Size) of
                     invalid_range ->
                         Acc;
                     V ->
@@ -555,7 +555,7 @@ range_parts(RD=#wm_reqdata{resp_body={stream, {Hunk,Next}}}, Ranges) ->
     range_parts(read_whole_stream({Hunk,Next}, [], MRB, 0), Ranges);
 
 range_parts(_RD=#wm_reqdata{resp_body={stream, Size, StreamFun}}, Ranges) ->
-    SkipLengths = [ range_skip_length(R, Size) || R <- Ranges],
+    SkipLengths = [ mochiweb_http:range_skip_length(R, Size) || R <- Ranges],
     {[ {Skip, Skip+Length-1, StreamFun} || {Skip, Length} <- SkipLengths ],
      Size};
 
@@ -563,7 +563,7 @@ range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
     Body = iolist_to_binary(Body0),
     Size = size(Body),
     F = fun(Spec, Acc) ->
-                case range_skip_length(Spec, Size) of
+                case mochiweb_http:range_skip_length(Spec, Size) of
                     invalid_range ->
                         Acc;
                     {Skip, Length} ->
@@ -574,42 +574,6 @@ range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
                 end
         end,
     {lists:foldr(F, [], Ranges), Size}.
-
-range_skip_length(Spec, Size) ->
-    case Spec of
-        {none, R} when R =< Size, R >= 0 ->
-            {Size - R, R};
-        {none, _OutOfRange} ->
-            {0, Size};
-        {R, none} when R >= 0, R < Size ->
-            {R, Size - R};
-        {_OutOfRange, none} ->
-            invalid_range;
-        {Start, End} when 0 =< Start, Start =< End, End < Size ->
-            {Start, End - Start + 1};
-        {_OutOfRange, _End} ->
-            invalid_range
-    end.
-
-parse_range_request(RawRange) when is_list(RawRange) ->
-    try
-        "bytes=" ++ RangeString = RawRange,
-        Ranges = string:tokens(RangeString, ","),
-        lists:map(fun ("-" ++ V)  ->
-                          {none, list_to_integer(V)};
-                      (R) ->
-                          case string:tokens(R, "-") of
-                              [S1, S2] ->
-                                  {list_to_integer(S1), list_to_integer(S2)};
-                              [S] ->
-                                  {list_to_integer(S), none}
-                          end
-                  end,
-                  Ranges)
-    catch
-        _:_ ->
-            fail
-    end.
 
 parts_to_body([{Start, End, Body0}], Size, Req) ->
     %% return body for a range reponse with a single body
