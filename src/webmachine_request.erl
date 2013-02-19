@@ -354,7 +354,7 @@ send_ok_response({?MODULE, ReqState}=Req) ->
     RD0 = ReqState#wm_reqstate.reqdata,
     {Range, State} = get_range(Req),
     case Range of
-        X when X =:= undefined; X =:= fail ->
+        X when X =:= undefined; X =:= fail; X =:= ignore ->
             send_response(200, Req);
         Ranges ->
             {PartList, Size} = range_parts(RD0, Ranges),
@@ -522,13 +522,18 @@ read_chunk_length(Socket, MaybeLastChunk) ->
             exit(normal)
     end.
 
-get_range({?MODULE, ReqState}=Req) ->
-    case get_header_value("range", Req) of
-        {undefined, _} ->
-            {undefined, ReqState#wm_reqstate{range=undefined}};
-        {RawRange, _} ->
-            Range = mochiweb_http:parse_range_request(RawRange),
-            {Range, ReqState#wm_reqstate{range=Range}}
+get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
+    case RD#wm_reqdata.resp_range of
+        ignore_request ->
+            {ignore, ReqState#wm_reqstate{range=undefined}};
+        follow_request ->
+            case get_header_value("range", Req) of
+                {undefined, _} ->
+                    {undefined, ReqState#wm_reqstate{range=undefined}};
+                {RawRange, _} ->
+                    Range = mochiweb_http:parse_range_request(RawRange),
+                    {Range, ReqState#wm_reqstate{range=Range}}
+            end
     end.
 
 range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
