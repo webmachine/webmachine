@@ -55,23 +55,31 @@
 %% E5 - There are four paths to E5:
 %%  via D5 (via C3 or via C4) or
 %%  via D4 (via C3 or via C4)
-%% Only two of these paths to E5 are tested
--define(PATH_TO_E5_VIA_D5_VIA_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
--define(PATH_TO_E5_VIA_D5_VIA_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
+%% Only some of these paths are tested.
+-define(PATH_TO_E5_VIA_D5_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D5_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D4_C3, ?PATH_TO_D4_VIA_C3 ++ [v3e5]).
 
 %% E6 - There are four paths to E6:
 %%  via D5 (via C3 or via C4) or
 %%  via D4 (via C3 or via C4)
 %% Only two of these paths to E6 are tested
--define(PATH_TO_E6_VIA_D5_VIA_C3, ?PATH_TO_E5_VIA_D5_VIA_C3 ++ [v3e6]).
--define(PATH_TO_E6_VIA_D5_VIA_C4, ?PATH_TO_E5_VIA_D5_VIA_C4 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D5_C3, ?PATH_TO_E5_VIA_D5_C3 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D5_C4, ?PATH_TO_E5_VIA_D5_C4 ++ [v3e6]).
 
-%% F6 - The path to F6 via E6, D5, C4
--define(PATH_TO_F6_VIA_E6_VIA_D5_VIA_C4, ?PATH_TO_E6_VIA_D5_VIA_C4 ++ [v3f6]).
+%% F6 - Selection of the paths to F6
+-define(PATH_TO_F6_VIA_E6_D5_C4, ?PATH_TO_E6_VIA_D5_C4 ++ [v3f6]).
+-define(PATH_TO_F6_VIA_E5_D4_C3, ?PATH_TO_E5_VIA_D4_C3 ++ [v3f6]).
 
-%% F7 - That path to F7 via E6, D5, C4
--define(PATH_TO_F7_VIA_E6_VIA_D5_VIA_C4,
-        ?PATH_TO_F6_VIA_E6_VIA_D5_VIA_C4 ++ [v3f7]).
+%% F7 - A path to F7
+-define(PATH_TO_F7_VIA_E6_D5_C4, ?PATH_TO_F6_VIA_E6_D5_C4 ++ [v3f7]).
+
+% G7 - The path to G7, without accept headers in the request
+-define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3 ++ [v3g7]).
+-define(PATH_TO_G7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
+
+% H7 - The path to H7 without accept headers
+-define(PATH_TO_H7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_NO_ACCEPT_HEADERS ++ [v3h7]).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -88,7 +96,8 @@ decision_core_test_() ->
          {<<"406 via d5<-c4">>, fun not_acceptable_d5_c4/0},
          {<<"406 via d5<-c3">>, fun not_acceptable_d5_c3/0},
          {<<"406 via e6<-d5<-c3">>, fun not_acceptable_e6_d5_c3/0},
-         {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0}
+         {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0},
+         {<<"412 no headers, no resource">>, fun precond_fail_no_resource/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -213,7 +222,7 @@ not_acceptable_e6_d5_c3() ->
                {"Accept-Charset", "ISO-8859-1"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_E6_VIA_D5_VIA_C3,
+    ExpectedDecisionTrace = ?PATH_TO_E6_VIA_D5_C3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -230,7 +239,19 @@ not_acceptable_f7_e6_d5_c4() ->
                {"Accept-Encoding", "gzip"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_F7_VIA_E6_VIA_D5_VIA_C4,
+    ExpectedDecisionTrace = ?PATH_TO_F7_VIA_E6_D5_C4,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 412 result via G7, no accept headers and no resource
+precond_fail_no_resource() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(content_types_provided, [{"text/plain", to_html}]),
+    put_setting(resource_exists, false),
+    Headers = [{"If-Match", "*"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_H7_NO_ACCEPT_HEADERS,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -248,18 +269,6 @@ simple_get() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-simple_put() ->
-    Body = {?URL ++ "/bar", [], "binary/octet-stream", <<1,1,2,3,5>>},
-    {ok, Result} = httpc:request(put, Body, [], []),
-    ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
-    io:format(user, "~p~n", [get_decision_ids()]),
-    ok.
-
-simple_post() ->
-    Body = {?URL ++ "/bar", [], "binary/octet-stream", <<1,1,2,3,5>>},
-    {ok, Result} = httpc:request(post, Body, [], []),
-    io:format(user, "\n<<~p>>\n", [Result]).
-
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
@@ -275,6 +284,7 @@ initialize_resource_settings() ->
     put_setting(language_available, true),
     put_setting(charsets_provided, no_charset),
     put_setting(encodings_provided, use_identity),
+    put_setting(resource_exists, true),
     ok.
 
 clear_resource_settings() ->
@@ -334,6 +344,10 @@ encodings_provided(ReqData, Context) ->
             Setting -> Setting
         end,
     {Value, ReqData, Context}.
+
+resource_exists(ReqData, Context) ->
+    Setting = lookup_setting(resource_exists),
+    {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.

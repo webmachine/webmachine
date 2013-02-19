@@ -354,7 +354,7 @@ send_ok_response({?MODULE, ReqState}=Req) ->
     RD0 = ReqState#wm_reqstate.reqdata,
     {Range, State} = get_range(Req),
     case Range of
-        X when X =:= undefined; X =:= fail ->
+        X when X =:= undefined; X =:= fail; X =:= ignore ->
             send_response(200, Req);
         Ranges ->
             {PartList, Size} = range_parts(RD0, Ranges),
@@ -522,19 +522,24 @@ read_chunk_length(Socket, MaybeLastChunk) ->
             exit(normal)
     end.
 
-get_range({?MODULE, ReqState}=Req) ->
-    case get_header_value("range", Req) of
-        {undefined, _} ->
-            {undefined, ReqState#wm_reqstate{range=undefined}};
-        {RawRange, _} ->
-            Range = parse_range_request(RawRange),
-            {Range, ReqState#wm_reqstate{range=Range}}
+get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
+    case RD#wm_reqdata.resp_range of
+        ignore_request ->
+            {ignore, ReqState#wm_reqstate{range=undefined}};
+        follow_request ->
+            case get_header_value("range", Req) of
+                {undefined, _} ->
+                    {undefined, ReqState#wm_reqstate{range=undefined}};
+                {RawRange, _} ->
+                    Range = mochiweb_http:parse_range_request(RawRange),
+                    {Range, ReqState#wm_reqstate{range=Range}}
+            end
     end.
 
 range_parts(_RD=#wm_reqdata{resp_body={file, IoDevice}}, Ranges) ->
     Size = mochiweb_io:iodevice_size(IoDevice),
     F = fun (Spec, Acc) ->
-                case range_skip_length(Spec, Size) of
+                case mochiweb_http:range_skip_length(Spec, Size) of
                     invalid_range ->
                         Acc;
                     V ->
@@ -554,16 +559,26 @@ range_parts(RD=#wm_reqdata{resp_body={stream, {Hunk,Next}}}, Ranges) ->
     MRB = RD#wm_reqdata.max_recv_body,
     range_parts(read_whole_stream({Hunk,Next}, [], MRB, 0), Ranges);
 
+range_parts(_RD=#wm_reqdata{resp_body={known_length_stream, Size, StreamBody}},
+            Ranges) ->
+    SkipLengths = [ mochiweb_http:range_skip_length(R, Size) || R <- Ranges],
+    {[ {Skip, Skip+Length-1, {known_length_stream, Length, StreamBody}} ||
+         {Skip, Length} <- SkipLengths ],
+     Size};
+
 range_parts(_RD=#wm_reqdata{resp_body={stream, Size, StreamFun}}, Ranges) ->
-    SkipLengths = [ range_skip_length(R, Size) || R <- Ranges],
+    SkipLengths = [ mochiweb_http:range_skip_length(R, Size) || R <- Ranges],
     {[ {Skip, Skip+Length-1, StreamFun} || {Skip, Length} <- SkipLengths ],
      Size};
+
+range_parts(#wm_reqdata{resp_body=Body}, Ranges) when is_binary(Body); is_list(Body) ->
+    range_parts(Body, Ranges);
 
 range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
     Body = iolist_to_binary(Body0),
     Size = size(Body),
     F = fun(Spec, Acc) ->
-                case range_skip_length(Spec, Size) of
+                case mochiweb_http:range_skip_length(Spec, Size) of
                     invalid_range ->
                         Acc;
                     {Skip, Length} ->
@@ -574,42 +589,6 @@ range_parts(Body0, Ranges) when is_binary(Body0); is_list(Body0) ->
                 end
         end,
     {lists:foldr(F, [], Ranges), Size}.
-
-range_skip_length(Spec, Size) ->
-    case Spec of
-        {none, R} when R =< Size, R >= 0 ->
-            {Size - R, R};
-        {none, _OutOfRange} ->
-            {0, Size};
-        {R, none} when R >= 0, R < Size ->
-            {R, Size - R};
-        {_OutOfRange, none} ->
-            invalid_range;
-        {Start, End} when 0 =< Start, Start =< End, End < Size ->
-            {Start, End - Start + 1};
-        {_OutOfRange, _End} ->
-            invalid_range
-    end.
-
-parse_range_request(RawRange) when is_list(RawRange) ->
-    try
-        "bytes=" ++ RangeString = RawRange,
-        Ranges = string:tokens(RangeString, ","),
-        lists:map(fun ("-" ++ V)  ->
-                          {none, list_to_integer(V)};
-                      (R) ->
-                          case string:tokens(R, "-") of
-                              [S1, S2] ->
-                                  {list_to_integer(S1), list_to_integer(S2)};
-                              [S] ->
-                                  {list_to_integer(S), none}
-                          end
-                  end,
-                  Ranges)
-    catch
-        _:_ ->
-            fail
-    end.
 
 parts_to_body([{Start, End, Body0}], Size, Req) ->
     %% return body for a range reponse with a single body
@@ -626,9 +605,12 @@ parts_to_body([{Start, End, Body0}], Size, Req) ->
                     mochiweb_util:make_io(Start), "-",
                     mochiweb_util:make_io(End),
                     "/", mochiweb_util:make_io(Size)]}],
-    Body = if is_function(Body0) ->
-                   {stream, Body0(Start, End)};
-              true ->
+    Body = case Body0 of
+              _ when is_function(Body0) ->
+                   {known_length_stream, End - Start + 1, Body0(Start, End)};
+              {known_length_stream, ContentSize, StreamBody} ->
+                   {known_length_stream, ContentSize, StreamBody};
+              _ ->
                    Body0
            end,
     {HeaderList, Body};
