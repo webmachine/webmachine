@@ -78,7 +78,7 @@ guess_mime(File) ->
         ".js" ->
             "application/x-javascript";
         ".less" ->
-            "text/less";
+            "text/css";
         ".m4v" ->
             "video/mp4";
         ".manifest" ->
