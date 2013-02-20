@@ -74,17 +74,23 @@
 %% F7 - A path to F7
 -define(PATH_TO_F7_VIA_E6_D5_C4, ?PATH_TO_F6_VIA_E6_D5_C4 ++ [v3f7]).
 
-% G7 - The path to G7, without accept headers in the request
+%% G7 - The path to G7, without accept headers in the request
 -define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3 ++ [v3g7]).
 -define(PATH_TO_G7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
 
-% G11 - The path to G11, without accept headers in the request
+%% G11 - The path to G11, without accept headers in the request
 -define(PATH_TO_G11_VIA_F6_E6_D5_C4,
         ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9, v3g11]).
 -define(PATH_TO_G11_NO_ACCEPT_HEADERS, ?PATH_TO_G11_VIA_F6_E6_D5_C4).
 
-% H7 - The path to H7 without accept headers
+%% H7 - The path to H7 without accept headers
 -define(PATH_TO_H7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_NO_ACCEPT_HEADERS ++ [v3h7]).
+
+%% H12 - The path to H12 without accept headers
+-define(PATH_TO_H12_VIA_G8_F6_E6_D5_C4,
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10, v3h11, v3h12]).
+-define(PATH_TO_H12_NO_ACCEPT_HEADERS, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
+
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -103,7 +109,8 @@ decision_core_test_() ->
          {<<"406 via e6<-d5<-c3">>, fun not_acceptable_e6_d5_c3/0},
          {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0},
          {<<"412 no headers, no resource">>, fun precond_fail_no_resource/0},
-         {<<"412 if-match, no etag">>, fun precond_fail_g11/0}
+         {<<"412 via g11 if-match, no etag">>, fun precond_fail_g11/0},
+         {<<"412 via h12, greater last modified">>, fun precond_fail_h12/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -260,7 +267,7 @@ precond_fail_no_resource() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 412 results via G11, no accept headers
+%% 412 result via G11, no accept headers
 precond_fail_g11() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(generate_etag, "v2"),
@@ -268,6 +275,20 @@ precond_fail_g11() ->
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_G11_NO_ACCEPT_HEADERS,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 412 result via H12, greater last modified
+precond_fail_h12() ->
+    put_setting(allowed_methods, ['GET']),
+    TenAM = "Wed, 20 Feb 2013 10:00:00 GMT",
+    FivePM = "Wed, 20 Feb 2013 17:00:00 GMT",
+    ResErlDate = httpd_util:convert_request_date(FivePM),
+    put_setting(last_modified, ResErlDate),
+    Headers = [{"If-Unmodified-Since", TenAM}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_H12_NO_ACCEPT_HEADERS,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -302,6 +323,7 @@ initialize_resource_settings() ->
     put_setting(encodings_provided, use_identity),
     put_setting(resource_exists, true),
     put_setting(generate_etag, undefined),
+    put_setting(last_modified, undefined),
     ok.
 
 clear_resource_settings() ->
@@ -368,6 +390,10 @@ resource_exists(ReqData, Context) ->
 
 generate_etag(ReqData, Context) ->
     Setting = lookup_setting(generate_etag),
+    {Setting, ReqData, Context}.
+
+last_modified(ReqData, Context) ->
+    Setting = lookup_setting(last_modified),
     {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->
