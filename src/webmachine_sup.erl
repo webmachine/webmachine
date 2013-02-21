@@ -62,5 +62,4 @@ init([]) ->
                    permanent, 5000, worker, [dynamic]},
                   {webmachine_logger_watcher_sup, {webmachine_logger_watcher_sup, start_link, []},
                    permanent, 5000, supervisor, [webmachine_logger_watcher_sup]}],
-    Processes = LogHandler ++ [Router],
-    {ok, {{one_for_one, 9, 10}, Processes}}.
+    {ok, {{one_for_one, 9, 10},  LogHandler ++ [Router]}}.

@@ -18,11 +18,12 @@
 -module(webmachine_mochiweb).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([start/1, stop/0, loop/1]).
+-export([start/1, stop/0, loop/2]).
 
 %% The `log_dir' option is deprecated, but remove it from the
 %% options list if it is present
--define(WM_OPTIONS, [error_handler,
+-define(WM_OPTIONS, [default_router,
+                     error_handler,
                      log_dir,
                      rewrite_module,
                      resource_module_option]).
@@ -31,17 +32,37 @@
 
 start(Options) ->
     {DispatchList, PName, WMOptions, OtherOptions} = get_wm_options(Options),
-    webmachine_router:init_routes(DispatchList),
+    webmachine_router:init_routes(PName, DispatchList),
     [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
-    mochiweb_http:start([{name, PName}, {loop, fun loop/1} | OtherOptions]).
+    maybe_stop_default_router(),
+    MochiName = list_to_atom(atom_to_list(PName) ++ "_mochiweb"),
+    LoopFun = fun(X) -> loop(PName, X) end,
+    mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
+
+maybe_stop_default_router() ->
+    case application:get_env(webmachine, default_router) of
+        {ok, false} ->
+            delete_default_router(stop_default_router());
+        _ ->
+            ok
+    end.
+
+stop_default_router() ->
+    supervisor:terminate_child(webmachine_sup, webmachine_router).
+
+delete_default_router(ok) ->
+    supervisor:delete_child(webmachine_sup, webmachine_router);
+delete_default_router({error, _Reason}) ->
+    ok.
 
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),
-    mochiweb_http:stop(PName).
+    MochiName = list_to_atom(atom_to_list(PName) ++ "_mochiweb"),
+    mochiweb_http:stop(MochiName).
 
-loop(MochiReq) ->
+loop(Name, MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),
-    DispatchList = webmachine_router:get_routes(),
+    DispatchList = webmachine_router:get_routes(Name),
     Host = case host_headers(Req) of
                [H|_] -> H;
                [] -> []
@@ -101,14 +122,20 @@ handle_get_option_result(GetOptRes, _) ->
 
 get_wm_options(Options) ->
     {DispatchList, Options1} = get_option(dispatch, Options),
-    {Name, Options2} = get_option(dispatch, Options1),
+    {Name, Options2} =
+        case get_option(name, Options1) of
+            {undefined, Opts2} ->
+                {webmachine_router, Opts2};
+            Res ->
+                Res
+        end,
     {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options2}, ?WM_OPTIONS),
     {DispatchList, Name, WMOptions, RestOptions}.
 
 get_option(Option, Options) ->
     case lists:keytake(Option, 1, Options) of
-       false -> {undefined, Options};
-       {value, {Option, Value}, NewOptions} -> {Value, NewOptions}
+        false -> {undefined, Options};
+        {value, {Option, Value}, NewOptions} -> {Value, NewOptions}
     end.
 
 application_set_unless_env_or_undef(_Var, undefined) ->
