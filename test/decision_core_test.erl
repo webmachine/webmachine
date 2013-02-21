@@ -86,11 +86,36 @@
 %% H7 - The path to H7 without accept headers
 -define(PATH_TO_H7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_NO_ACCEPT_HEADERS ++ [v3h7]).
 
+%% H10 - The path to H10 without accept headers
+-define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10]).
+
+%% H11 - The path to H11 without accept headers, via G11
+-define(PATH_TO_H11_VIA_G11_F6_E6_D5_C4,
+        ?PATH_TO_G11_NO_ACCEPT_HEADERS ++ [v3h10, v3h11]).
+
 %% H12 - The path to H12 without accept headers
 -define(PATH_TO_H12_VIA_G8_F6_E6_D5_C4,
-        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10, v3h11, v3h12]).
+        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3h11, v3h12]).
 -define(PATH_TO_H12_NO_ACCEPT_HEADERS, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
 
+%% I13 - Two paths to I13 without accept headers
+-define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
+        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3i12, v3i13]).
+-define(PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4,
+        ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4 ++ [v3i12, v3i13]).
+
+%% K13 - The path to K13 without accept headers, via I13, I12, H11, G11
+-define(PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4,
+        ?PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3k13]).
+
+%% J18 - Two paths to J18 without accept headers (one via H10, and one via
+%% H11 and K13)
+-define(PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4,
+        ?PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4 ++ [v3j18]).
+-define(PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
+        ?PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3j18]).
+-define(PATH_TO_J18_NO_ACCEPT_HEADERS, ?PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -110,7 +135,9 @@ decision_core_test_() ->
          {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0},
          {<<"412 no headers, no resource">>, fun precond_fail_no_resource/0},
          {<<"412 via g11 if-match, no etag">>, fun precond_fail_g11/0},
-         {<<"412 via h12, greater last modified">>, fun precond_fail_h12/0}
+         {<<"412 via h12, greater last modified">>, fun precond_fail_h12/0},
+         {<<"412 via j18<-i13<-i12<-h10">>, fun precond_fail_j18/0},
+         {<<"412 via j18<-k13<-h11<-g11">>, fun precond_fail_j18_via_k13/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -289,6 +316,31 @@ precond_fail_h12() ->
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_H12_NO_ACCEPT_HEADERS,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 412 result via J18 via I13 via I12 via H10
+precond_fail_j18() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    Headers = [{"If-None-Match", "*"}],
+    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 412 result via J18 via K13 via H11 via G11
+precond_fail_j18_via_k13() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(generate_etag, "v1"),
+    Headers = [{"If-Match", "\"v1\""},
+               {"If-None-Match", "\"v1\""},
+               {"If-Unmodified-Since", "{{INVALID DATE}}"}],
+    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
