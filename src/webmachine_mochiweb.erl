@@ -104,12 +104,17 @@ handle_get_option_result(GetOptRes, _) ->
 
 get_wm_options(Options) ->
     {DispatchList, Options1} = get_option(dispatch, Options),
-    {Name, Options2} = get_option(name, Options1),
+    {Name, Options2} =
+        case get_option(name, Options1) of
+            {undefined, Opts2} ->
+                {webmachine, Opts2};
+            NRes -> NRes
+        end,
     {RName, Options3} =
         case get_option(router_name, Options2) of
             {undefined, Opts3} ->
                 {webmachine_router, Opts3};
-            Res -> Res
+            RRes -> RRes
         end,
     {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options3}, ?WM_OPTIONS),
     {DispatchList, Name, RName, WMOptions, RestOptions}.
