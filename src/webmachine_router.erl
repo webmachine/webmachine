@@ -23,10 +23,12 @@
 
 %% API
 -export([start_link/0,
-         start_link/1,
          add_route/1,
+         add_route/2,
          remove_route/1,
+         remove_route/2,
          remove_resource/1,
+         remove_resource/2,
          get_routes/0,
          get_routes/1,
          init_routes/1,
@@ -67,42 +69,41 @@
 % arguments to the resource module handling the matching request.
 
 -define(SERVER, ?MODULE).
-
--record(state, {name :: atom()}).
+-define(DEFAULT, ?MODULE).
 
 %% @spec add_route(hostmatchterm() | pathmatchterm()) -> ok
 %% @doc Adds a route to webmachine's route table. The route should
 %%      be the format documented here:
 %% http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
 add_route(Route) ->
-    add_route(?SERVER, Route).
+    add_route(?DEFAULT, Route).
 
 add_route(Name, Route) ->
-    gen_server:call(Name, {add_route, Route}, infinity).
+    gen_server:call(?SERVER, {add_route, Name, Route}, infinity).
 
 %% @spec remove_route(hostmatchterm() | pathmatchterm()) -> ok
 %% @doc Removes a route from webamchine's route table. The route
 %%      route must be properly formatted
 %% @see add_route/2
 remove_route(Route) ->
-    remove_route(?SERVER, Route).
+    remove_route(?DEFAULT, Route).
 
 remove_route(Name, Route) ->
-    gen_server:call(Name, {remove_route, Route}, infinity).
+    gen_server:call(?SERVER, {remove_route, Name, Route}, infinity).
 
 %% @spec remove_resource(atom()) -> ok
 %% @doc Removes all routes for a specific resource module.
 remove_resource(Resource) when is_atom(Resource) ->
-    remove_resource(?SERVER, Resource).
+    remove_resource(?DEFAULT, Resource).
 
 remove_resource(Name, Resource) when is_atom(Resource) ->
-    gen_server:call(Name, {remove_resource, Resource}, infinity).
+    gen_server:call(?SERVER, {remove_resource, Name, Resource}, infinity).
 
 %% @spec get_routes() -> [{[], res, []}]
 %% @doc Retrieve a list of routes and resources set in webmachine's
 %%      route table.
 get_routes() ->
-    get_routes(?MODULE).
+    get_routes(?DEFAULT).
 
 get_routes(Name) ->
     get_dispatch_list(Name).
@@ -110,21 +111,18 @@ get_routes(Name) ->
 %% @spec init_routes() -> ok
 %% @doc Set the default routes, unless the routing table isn't empty.
 init_routes(DefaultRoutes) ->
-    init_routes(?SERVER, DefaultRoutes).
+    init_routes(?DEFAULT, DefaultRoutes).
 
 init_routes(Name, DefaultRoutes) ->
-    gen_server:call(Name, {init_routes, DefaultRoutes}, infinity).
+    gen_server:call(?SERVER, {init_routes, Name, DefaultRoutes}, infinity).
 
 %% @spec start_link() -> {ok, pid()} | {error, any()}
 %% @doc Starts the webmachine_router gen_server.
 start_link() ->
-    start_link(?SERVER).
-
-start_link(Name) ->
     %% We expect to only be called from webmachine_sup
     %%
     %% Set up the ETS configuration table.
-    try ets:new(Name, [named_table, public, set, {keypos, 1},
+    try ets:new(?MODULE, [named_table, public, set, {keypos, 1},
                 {read_concurrency, true}]) of
         _Result ->
             ok
@@ -134,30 +132,30 @@ start_link(Name) ->
             %% probably crashed and this is a restart.
             ok
     end,
-    gen_server:start_link({local, Name}, ?MODULE, [Name], []).
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %% @private
-init([Name]) ->
-  {ok, #state{name=Name}}.
+init([]) ->
+    {ok, undefined}.
 
 %% @private
-handle_call({remove_resource, Resource}, _From, State=#state{name=Name}) ->
+handle_call({remove_resource, Name, Resource}, _From, State) ->
     DL = filter_by_resource(Resource, get_dispatch_list(Name)),
     {reply, set_dispatch_list(Name, DL), State};
 
-handle_call({remove_route, Route}, _From, State=#state{name=Name}) ->
+handle_call({remove_route, Name, Route}, _From, State) ->
     DL = [D || D <- get_dispatch_list(Name),
                D /= Route],
     {reply, set_dispatch_list(Name, DL), State};
 
-handle_call({add_route, Route}, _From, State=#state{name=Name}) ->
+handle_call({add_route, Name, Route}, _From, State) ->
     DL = [Route|[D || D <- get_dispatch_list(Name),
                       D /= Route]],
     {reply, set_dispatch_list(Name, DL), State};
 
-handle_call({init_routes, DefaultRoutes}, _From, State=#state{name=Name}) ->
+handle_call({init_routes, Name, DefaultRoutes}, _From, State) ->
     %% if the table lacks a dispatch_list row, set it
-    ets:insert_new(Name, {dispatch_list, DefaultRoutes}),
+    ets:insert_new(?MODULE, {Name, DefaultRoutes}),
     {reply, ok, State};
 
 handle_call(_Request, _From, State) ->
@@ -197,15 +195,15 @@ filter_by_resource(Resource) ->
     end.
 
 get_dispatch_list(Name) ->
-    case ets:lookup(Name, dispatch_list) of
-        [{dispatch_list, Dispatch}] ->
+    case ets:lookup(?MODULE, Name) of
+        [{Name, Dispatch}] ->
             Dispatch;
         [] ->
             []
     end.
 
 set_dispatch_list(Name, DispatchList) ->
-    true = ets:insert(Name, {dispatch_list, DispatchList}),
+    true = ets:insert(?MODULE, {Name, DispatchList}),
     ok.
 
 %%
