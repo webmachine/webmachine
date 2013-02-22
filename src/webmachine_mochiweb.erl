@@ -33,7 +33,7 @@ start(Options) ->
     {DispatchList, PName, RName, WMOptions, OtherOptions} = get_wm_options(Options),
     webmachine_router:init_routes(RName, DispatchList),
     [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
-    MochiName = list_to_atom(atom_to_list(PName) ++ "_mochiweb"),
+    MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
     LoopFun = fun(X) -> loop(RName, X) end,
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
 
@@ -160,3 +160,8 @@ resource_module(Mod, _, undefined) ->
     Mod;
 resource_module(Mod, ModOpts, {ok, OptionVal}) ->
     proplists:get_value(OptionVal, ModOpts, Mod).
+
+to_list(L) when is_list(L) ->
+    L;
+to_list(A) when is_atom(A) ->
+    atom_to_list(A).
