@@ -303,27 +303,31 @@ get_outheader_value(K, ReqState) ->
     get_outheader_value(K, {?MODULE, ReqState}).
 
 send(Socket, Data) ->
-    case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of
-        ok -> ok;
-        {error,closed} -> ok;
-        _ -> exit(normal)
-    end.
+    mochiweb_socket:send(Socket, iolist_to_binary(Data)).
 
 send_stream_body(Socket, X) -> send_stream_body(Socket, X, 0).
 send_stream_body(Socket, {<<>>, done}, SoFar) ->
     send_chunk(Socket, <<>>),
     SoFar;
 send_stream_body(Socket, {Data, done}, SoFar) ->
-    Size = send_chunk(Socket, Data),
-    send_chunk(Socket, <<>>),
-    Size + SoFar;
+    case send_chunk(Socket, Data) of
+        {error, _Reason} ->
+            SoFar;
+        Size ->
+            send_chunk(Socket, <<>>),
+            Size + SoFar
+    end;
 send_stream_body(Socket, {<<>>, Next}, SoFar) ->
     send_stream_body(Socket, Next(), SoFar);
 send_stream_body(Socket, {[], Next}, SoFar) ->
     send_stream_body(Socket, Next(), SoFar);
 send_stream_body(Socket, {Data, Next}, SoFar) ->
-    Size = send_chunk(Socket, Data),
-    send_stream_body(Socket, Next(), Size + SoFar).
+    case send_chunk(Socket, Data) of
+        {error, _Reason} ->
+            SoFar;
+        Size ->
+            send_stream_body(Socket, Next(), Size + SoFar)
+    end.
 
 send_stream_body_no_chunk(Socket, {Data, done}) ->
     send(Socket, Data);
@@ -344,11 +348,13 @@ send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
 
 send_chunk(Socket, Data) ->
     Size = iolist_size(Data),
-    send(Socket, mochihex:to_hex(Size)),
-    send(Socket, <<"\r\n">>),
-    send(Socket, Data),
-    send(Socket, <<"\r\n">>),
-    Size.
+    Chunk = [mochihex:to_hex(Size),<<"\r\n">>,Data,<<"\r\n">>],
+    case send(Socket, Chunk) of
+        ok ->
+            Size;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 send_ok_response({?MODULE, ReqState}=Req) ->
     RD0 = ReqState#wm_reqstate.reqdata,
