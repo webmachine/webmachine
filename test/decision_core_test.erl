@@ -34,9 +34,17 @@
 %% Testing, 2nd, p 49). (Exercising all possible paths is called
 %% multiple-condition coverage.)
 
+%% B9 - There is one path to state B9
+-define(PATH_TO_B9, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9]).
+
+%% B9A - There is one path to the sub-state B9A
+-define(PATH_TO_B9A, ?PATH_TO_B9 ++ [v3b9a]).
+
+%% B8 - There is one path to state B8 (skips sub-state B9A?)
+-define(PATH_TO_B8, ?PATH_TO_B9 ++ [v3b9b, v3b8]).
+
 %% B3 - There is one path to state B3
--define(PATH_TO_B3, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8,
-                      v3b7, v3b6, v3b5, v3b4, v3b3]).
+-define(PATH_TO_B3, ?PATH_TO_B8 ++ [v3b7, v3b6, v3b5, v3b4, v3b3]).
 
 %% C3 - There is one path to state C3
 -define(PATH_TO_C3, ?PATH_TO_B3 ++ [v3c3]).
@@ -149,7 +157,9 @@ decision_core_test_() ->
          {"412 via h12, greater last modified", fun precond_fail_h12/0},
          {"412 via j18<-i13<-i12<-h10", fun precond_fail_j18/0},
          {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
-         {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0}
+         {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
+         {"400 content-md5 header does not match", fun content_md5_valid_b9a/0},
+         {"401 result, unauthorized", fun authorized_b8/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -373,6 +383,33 @@ precond_fail_j18_via_h12() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%%%% TODO: Cover b9a, b8, b3 and the 'Vary' case of g7
+
+%% 400 result, content-md5 header does not match
+content_md5_valid_b9a() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    ContentType = "text/plain",
+    Body = "foo",
+    InvalidMD5Sum = base64:encode_to_string("this is invalid for foo"),
+    Headers = [{"Content-MD5", InvalidMD5Sum}],
+    PutRequest = {?URL, Headers, ContentType, Body},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B9A,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 401 result, unauthorized
+authorized_b8() ->
+    put_setting(is_authorized, "Basic"),
+    put_setting(allowed_methods, ['GET']),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 401, "Unauthorized"},
+                  [_, _, {"www-authenticate", "Basic"}, _], _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B8,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 accept_html_on_put(ReqData, Context) ->
     {ok, ReqData, Context}.
 
@@ -398,6 +435,8 @@ initialize_resource_settings() ->
     %% Defaults
     put_setting(service_available, true),
     put_setting(ping, pong),
+    put_setting(validate_content_checksum, not_validated),
+    put_setting(is_authorized, true),
     put_setting(content_types_provided, [{"text/html", to_html}]),
     put_setting(language_available, true),
     put_setting(charsets_provided, no_charset),
@@ -429,6 +468,14 @@ ping(ReqData, State) ->
 
 service_available(ReqData, Context) ->
     Setting = lookup_setting(service_available),
+    {Setting, ReqData, Context}.
+
+validate_content_checksum(ReqData, Context) ->
+    Setting = lookup_setting(validate_content_checksum),
+    {Setting, ReqData, Context}.
+
+is_authorized(ReqData, Context) ->
+    Setting = lookup_setting(is_authorized),
     {Setting, ReqData, Context}.
 
 allowed_methods(ReqData, Context) ->
