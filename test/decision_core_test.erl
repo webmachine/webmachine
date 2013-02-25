@@ -78,6 +78,10 @@
 -define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3 ++ [v3g7]).
 -define(PATH_TO_G7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
 
+%% G9 - The path to G9, without accept headers in the request
+-define(PATH_TO_G9_VIA_F6_E6_D5_C4,
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9]).
+
 %% G11 - The path to G11, without accept headers in the request
 -define(PATH_TO_G11_VIA_F6_E6_D5_C4,
         ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9, v3g11]).
@@ -94,10 +98,13 @@
 -define(PATH_TO_H11_VIA_G11_F6_E6_D5_C4,
         ?PATH_TO_G11_NO_ACCEPT_HEADERS ++ [v3h10, v3h11]).
 
-%% H12 - The path to H12 without accept headers
+%% H12 - Two paths to H12 without accept headers
 -define(PATH_TO_H12_VIA_G8_F6_E6_D5_C4,
         ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3h11, v3h12]).
+-define(PATH_TO_H12_VIA_G9_F6_E6_D5_C4,
+        ?PATH_TO_G9_VIA_F6_E6_D5_C4 ++ [v3h10, v3h11, v3h12]).
 -define(PATH_TO_H12_NO_ACCEPT_HEADERS, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
+-define(PATH_TO_H12_NO_ACCEPT_HEADERS_2, ?PATH_TO_H12_VIA_G9_F6_E6_D5_C4).
 
 %% I13 - Two paths to I13 without accept headers
 -define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
@@ -109,13 +116,17 @@
 -define(PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4,
         ?PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3k13]).
 
-%% J18 - Two paths to J18 without accept headers (one via H10, and one via
-%% H11 and K13)
+%% J18 - Three paths to J18 without accept headers (one via H10; one via H11
+%% and K13; one via H12)
 -define(PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4,
         ?PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4 ++ [v3j18]).
 -define(PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
         ?PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3j18]).
 -define(PATH_TO_J18_NO_ACCEPT_HEADERS, ?PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4).
+-define(PATH_TO_J18_NO_ACCEPT_HEADERS_2,
+        ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
+-define(PATH_TO_J18_NO_ACCEPT_HEADERS_3,
+       ?PATH_TO_H12_NO_ACCEPT_HEADERS_2 ++ [v3i12, v3i13, v3j18]).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -123,21 +134,22 @@
 decision_core_test_() ->
     Tests =
         [
-         {<<"503 it's not you, it's me">>, fun service_unavailable/0},
-         {<<"503 ping doesn't return pong">>, fun ping_invalid/0},
-         {<<"200 head method allowed">>, fun head_method_allowed/0},
-         {<<"405 head method not allowed">>, fun head_method_not_allowed/0},
-         {<<"200 get method">>, fun simple_get/0},
-         {<<"406 via c4">>, fun not_acceptable_c4/0},
-         {<<"406 via d5<-c4">>, fun not_acceptable_d5_c4/0},
-         {<<"406 via d5<-c3">>, fun not_acceptable_d5_c3/0},
-         {<<"406 via e6<-d5<-c3">>, fun not_acceptable_e6_d5_c3/0},
-         {<<"406 via f7<-e6<-d5<-c4">>, fun not_acceptable_f7_e6_d5_c4/0},
-         {<<"412 no headers, no resource">>, fun precond_fail_no_resource/0},
-         {<<"412 via g11 if-match, no etag">>, fun precond_fail_g11/0},
-         {<<"412 via h12, greater last modified">>, fun precond_fail_h12/0},
-         {<<"412 via j18<-i13<-i12<-h10">>, fun precond_fail_j18/0},
-         {<<"412 via j18<-k13<-h11<-g11">>, fun precond_fail_j18_via_k13/0}
+         {"503 it's not you, it's me", fun service_unavailable/0},
+         {"503 ping doesn't return pong", fun ping_invalid/0},
+         {"200 head method allowed", fun head_method_allowed/0},
+         {"405 head method not allowed", fun head_method_not_allowed/0},
+         {"200 get method", fun simple_get/0},
+         {"406 via c4", fun not_acceptable_c4/0},
+         {"406 via d5<-c4", fun not_acceptable_d5_c4/0},
+         {"406 via d5<-c3", fun not_acceptable_d5_c3/0},
+         {"406 via e6<-d5<-c3", fun not_acceptable_e6_d5_c3/0},
+         {"406 via f7<-e6<-d5<-c4", fun not_acceptable_f7_e6_d5_c4/0},
+         {"412 no headers, no resource", fun precond_fail_no_resource/0},
+         {"412 via g11 if-match, no etag", fun precond_fail_g11/0},
+         {"412 via h12, greater last modified", fun precond_fail_h12/0},
+         {"412 via j18<-i13<-i12<-h10", fun precond_fail_j18/0},
+         {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
+         {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -340,7 +352,24 @@ precond_fail_j18_via_k13() ->
     PutRequest = {?URL, Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS_2,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 412 result via J18 via I13 via I12 via H12
+precond_fail_j18_via_h12() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    TenAM = "Wed, 20 Feb 2013 10:00:00 GMT",
+    FivePM = "Wed, 20 Feb 2013 17:00:00 GMT",
+    ResErlDate = httpd_util:convert_request_date(TenAM),
+    put_setting(last_modified, ResErlDate),
+    Headers = [{"If-Match", "*"},
+               {"If-None-Match", "*"},
+               {"If-Unmodified-Since", FivePM}],
+    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS_3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
