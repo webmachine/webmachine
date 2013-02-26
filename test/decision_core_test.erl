@@ -114,11 +114,17 @@
 -define(PATH_TO_H12_NO_ACCEPT_HEADERS, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
 -define(PATH_TO_H12_NO_ACCEPT_HEADERS_2, ?PATH_TO_H12_VIA_G9_F6_E6_D5_C4).
 
+%% I12 - Two paths to I12 without accept headers
+-define(PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4,
+        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3i12]).
+-define(PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4,
+        ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4 ++ [v3i12]).
+
 %% I13 - Two paths to I13 without accept headers
 -define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
-        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3i12, v3i13]).
+        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4 ++ [v3i13]).
 -define(PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4,
-        ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4 ++ [v3i12, v3i13]).
+        ?PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4 ++ [v3i13]).
 
 %% K13 - The path to K13 without accept headers, via I13, I12, H11, G11
 -define(PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4,
@@ -135,6 +141,11 @@
         ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
 -define(PATH_TO_J18_NO_ACCEPT_HEADERS_3,
        ?PATH_TO_H12_NO_ACCEPT_HEADERS_2 ++ [v3i12, v3i13, v3j18]).
+
+%% A Path to a 200 with most defaults used
+-define(PATH_TO_REGULAR_200,
+        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4
+        ++ [v3l13, v3m16, v3n16, v3o16, v3o18, v3o18b]).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -159,7 +170,9 @@ decision_core_test_() ->
          {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
          {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
          {"400 content-md5 header does not match", fun content_md5_valid_b9a/0},
-         {"401 result, unauthorized", fun authorized_b8/0}
+         {"401 result, unauthorized", fun authorized_b8/0},
+         {"200 result, via options", fun options_b3/0},
+         {"200 result with vary", fun variances_g7/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -383,7 +396,7 @@ precond_fail_j18_via_h12() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%%%% TODO: Cover b9a, b8, b3 and the 'Vary' case of g7
+%%%% TODO: Cover [b9a], [b8], [b3] and the ['Vary' case of g7]
 
 %% 400 result, content-md5 header does not match
 content_md5_valid_b9a() ->
@@ -410,6 +423,29 @@ authorized_b8() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 200 result, via OPTIONS
+options_b3() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT', 'OPTIONS']),
+    {ok, Result} = httpc:request(options, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B3,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 200 result with Vary
+variances_g7() ->
+    put_setting(allowed_methods, ['GET']),
+    Id = fun(X) -> X end,
+    Charsets = [{"utf-8", Id},
+                {"iso-8859-5", Id},
+                {"unicode-1-1", Id}],
+    put_setting(charsets_provided, Charsets),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 accept_html_on_put(ReqData, Context) ->
     {ok, ReqData, Context}.
 
@@ -417,10 +453,7 @@ simple_get() ->
     put_setting(allowed_methods, ['GET']),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
-    ExpectedDecisionTrace =
-        [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8, v3b7, v3b6,
-         v3b5, v3b4, v3b3, v3c3, v3d4, v3e5, v3f6, v3g7, v3g8, v3h10, v3i12,
-         v3l13, v3m16, v3n16, v3o16, v3o18, v3o18b],
+    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
