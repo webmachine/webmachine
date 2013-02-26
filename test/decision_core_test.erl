@@ -25,6 +25,8 @@
 -define(URL, "http://localhost:12001/decisioncore").
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
+-define(DEFAULT_ALLOWED_METHODS, ['GET', 'HEAD', 'PUT']).
+
 %% DECISION TRACE PATHS
 %%
 %% Not all possible paths will be tested at this point. The current testing
@@ -97,6 +99,12 @@
 
 %% H7 - The path to H7 without accept headers
 -define(PATH_TO_H7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_NO_ACCEPT_HEADERS ++ [v3h7]).
+
+%% I7 - The path to I7 without accept headers
+-define(PATH_TO_I7_NO_ACCEPT_HEADERS, ?PATH_TO_H7_NO_ACCEPT_HEADERS ++ [v3i7]).
+
+%% I4 - The path to I4 without accept headers
+-define(PATH_TO_I4_NO_ACCEPT_HEADERS, ?PATH_TO_I7_NO_ACCEPT_HEADERS ++ [v3i4]).
 
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
@@ -178,10 +186,12 @@ decision_core_test_() ->
          {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
          {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
          {"204 md5 header matches", fun content_md5_valid_b9a/0},
+         {"204 md5 header matches, 2", fun content_md5_valid_b9a_validated/0},
          {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
          {"401 result, unauthorized", fun authorized_b8/0},
          {"200 result, via options", fun options_b3/0},
-         {"200 result with vary", fun variances_g7/0}
+         {"200 result with vary", fun variances_g7/0},
+         {"301 via i4", fun moved_permanently_i4/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -365,7 +375,7 @@ precond_fail_h12() ->
 
 %% 412 result via J18 via I13 via I12 via H10
 precond_fail_j18() ->
-    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     Headers = [{"If-None-Match", "*"}],
     PutRequest = {?URL, Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
@@ -376,7 +386,7 @@ precond_fail_j18() ->
 
 %% 412 result via J18 via K13 via H11 via G11
 precond_fail_j18_via_k13() ->
-    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(generate_etag, "v1"),
     Headers = [{"If-Match", "\"v1\""},
                {"If-None-Match", "\"v1\""},
@@ -390,7 +400,7 @@ precond_fail_j18_via_k13() ->
 
 %% 412 result via J18 via I13 via I12 via H12
 precond_fail_j18_via_h12() ->
-    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     TenAM = "Wed, 20 Feb 2013 10:00:00 GMT",
     FivePM = "Wed, 20 Feb 2013 17:00:00 GMT",
     ResErlDate = httpd_util:convert_request_date(TenAM),
@@ -407,7 +417,24 @@ precond_fail_j18_via_h12() ->
 
 %% 204 result, content-md5 header matches
 content_md5_valid_b9a() ->
-    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    ContentType = "text/plain",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    Body = "foo",
+    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    Headers = [{"Content-MD5", MD5Sum}],
+    PutRequest = {?URL ++ "/new", Headers, ContentType, Body},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 204 result, content-md5 header matches, but checked by
+%% validate_content_checksum instead of webmachine_decision_core itself.
+content_md5_valid_b9a_validated() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(validate_content_checksum, true),
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     Body = "foo",
@@ -422,7 +449,7 @@ content_md5_valid_b9a() ->
 
 %% 400 result, content-md5 header does not match
 content_md5_invalid_b9a() ->
-    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     ContentType = "text/plain",
     Body = "foo",
     InvalidMD5Sum = base64:encode_to_string("this is invalid for foo"),
@@ -468,6 +495,18 @@ variances_g7() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 301 result via I4
+moved_permanently_i4() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    put_setting(moved_permanently, {true, ?URL ++ "/new"}),
+    PutRequest = {?URL ++ "/old", [], "text/plain", "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_I4_NO_ACCEPT_HEADERS,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 accept_html_on_put(ReqData, Context) ->
     {ok, ReqData, Context}.
 
@@ -499,6 +538,7 @@ initialize_resource_settings() ->
     put_setting(resource_exists, true),
     put_setting(generate_etag, undefined),
     put_setting(last_modified, undefined),
+    put_setting(moved_permanently, false),
     ok.
 
 clear_resource_settings() ->
@@ -577,6 +617,10 @@ generate_etag(ReqData, Context) ->
 
 last_modified(ReqData, Context) ->
     Setting = lookup_setting(last_modified),
+    {Setting, ReqData, Context}.
+
+moved_permanently(ReqData, Context) ->
+    Setting = lookup_setting(moved_permanently),
     {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->
