@@ -142,10 +142,18 @@
 -define(PATH_TO_J18_NO_ACCEPT_HEADERS_3,
        ?PATH_TO_H12_NO_ACCEPT_HEADERS_2 ++ [v3i12, v3i13, v3j18]).
 
-%% A Path to a 200 with most defaults used
+%% A path to a 200 with most defaults used
 -define(PATH_TO_REGULAR_200,
         ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4
         ++ [v3l13, v3m16, v3n16, v3o16, v3o18, v3o18b]).
+
+%% A path to a 204 with most defaults used, md5 checksum substate [Clever way
+%% to write this removed until a better solution for decision paths and
+%% substates is devised]
+-define(PATH_TO_204_WITH_MD5_CHECKSUM,
+        [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9a, v3b9b, v3b8, v3b7,
+         v3b6, v3b5, v3b4, v3b3, v3c3, v3d4, v3e5, v3f6, v3g7, v3g8, v3h10,
+         v3i12, v3l13, v3m16, v3n16, v3o16, v3o14, v3p11, v3o20]).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -169,7 +177,8 @@ decision_core_test_() ->
          {"412 via j18<-i13<-i12<-h10", fun precond_fail_j18/0},
          {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
          {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
-         {"400 content-md5 header does not match", fun content_md5_valid_b9a/0},
+         {"204 md5 header matches", fun content_md5_valid_b9a/0},
+         {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
          {"401 result, unauthorized", fun authorized_b8/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_g7/0}
@@ -396,10 +405,23 @@ precond_fail_j18_via_h12() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%%%% TODO: Cover [b9a], [b8], [b3] and the ['Vary' case of g7]
+%% 204 result, content-md5 header matches
+content_md5_valid_b9a() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
+    ContentType = "text/plain",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    Body = "foo",
+    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    Headers = [{"Content-MD5", MD5Sum}],
+    PutRequest = {?URL ++ "/new", Headers, ContentType, Body},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
 
 %% 400 result, content-md5 header does not match
-content_md5_valid_b9a() ->
+content_md5_invalid_b9a() ->
     put_setting(allowed_methods, ['GET', 'HEAD', 'PUT']),
     ContentType = "text/plain",
     Body = "foo",
