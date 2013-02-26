@@ -106,6 +106,12 @@
 %% I4 - The path to I4 without accept headers
 -define(PATH_TO_I4_NO_ACCEPT_HEADERS, ?PATH_TO_I7_NO_ACCEPT_HEADERS ++ [v3i4]).
 
+%% K7 - The path to K7 without accept headers
+-define(PATH_TO_K7_NO_ACCEPT_HEADERS, ?PATH_TO_I7_NO_ACCEPT_HEADERS ++ [v3k7]).
+
+%% K5 - The path to K5 without accept headers
+-define(PATH_TO_K5_NO_ACCEPT_HEADERS, ?PATH_TO_K7_NO_ACCEPT_HEADERS ++ [v3k5]).
+
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
         ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10]).
@@ -191,7 +197,8 @@ decision_core_test_() ->
          {"401 result, unauthorized", fun authorized_b8/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_g7/0},
-         {"301 via i4", fun moved_permanently_i4/0}
+         {"301 via i4", fun moved_permanently_i4/0},
+         {"301 via k5", fun moved_permanently_k5/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -507,6 +514,22 @@ moved_permanently_i4() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 301 result via K5
+moved_permanently_k5() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    put_setting(previously_existed, true),
+    put_setting(moved_permanently, {true, ?URL ++ "/new"}),
+    %% We just want to get the 301 from httpc, we don't want it to actually
+    %% try redirecting, so we turn off autoredirect
+    HTTPOptions = [{autoredirect, false}],
+    {ok, Result} = httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
+    ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_K5_NO_ACCEPT_HEADERS,
+    io:format(user, "~n~p~n~p", [ExpectedDecisionTrace, get_decision_ids()]),
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 accept_html_on_put(ReqData, Context) ->
     {ok, ReqData, Context}.
 
@@ -539,6 +562,7 @@ initialize_resource_settings() ->
     put_setting(generate_etag, undefined),
     put_setting(last_modified, undefined),
     put_setting(moved_permanently, false),
+    put_setting(previously_existed, false),
     ok.
 
 clear_resource_settings() ->
@@ -621,6 +645,10 @@ last_modified(ReqData, Context) ->
 
 moved_permanently(ReqData, Context) ->
     Setting = lookup_setting(moved_permanently),
+    {Setting, ReqData, Context}.
+
+previously_existed(ReqData, Context) ->
+    Setting = lookup_setting(previously_existed),
     {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->
