@@ -69,14 +69,13 @@
 % arguments to the resource module handling the matching request.
 
 -define(SERVER, ?MODULE).
--define(DEFAULT, ?MODULE).
 
 %% @spec add_route(hostmatchterm() | pathmatchterm()) -> ok
 %% @doc Adds a route to webmachine's route table. The route should
 %%      be the format documented here:
 %% http://bitbucket.org/justin/webmachine/wiki/DispatchConfiguration
 add_route(Route) ->
-    add_route(?DEFAULT, Route).
+    add_route(default, Route).
 
 add_route(Name, Route) ->
     gen_server:call(?SERVER, {add_route, Name, Route}, infinity).
@@ -86,7 +85,7 @@ add_route(Name, Route) ->
 %%      route must be properly formatted
 %% @see add_route/2
 remove_route(Route) ->
-    remove_route(?DEFAULT, Route).
+    remove_route(default, Route).
 
 remove_route(Name, Route) ->
     gen_server:call(?SERVER, {remove_route, Name, Route}, infinity).
@@ -94,7 +93,7 @@ remove_route(Name, Route) ->
 %% @spec remove_resource(atom()) -> ok
 %% @doc Removes all routes for a specific resource module.
 remove_resource(Resource) when is_atom(Resource) ->
-    remove_resource(?DEFAULT, Resource).
+    remove_resource(default, Resource).
 
 remove_resource(Name, Resource) when is_atom(Resource) ->
     gen_server:call(?SERVER, {remove_resource, Name, Resource}, infinity).
@@ -103,7 +102,7 @@ remove_resource(Name, Resource) when is_atom(Resource) ->
 %% @doc Retrieve a list of routes and resources set in webmachine's
 %%      route table.
 get_routes() ->
-    get_routes(?DEFAULT).
+    get_routes(default).
 
 get_routes(Name) ->
     get_dispatch_list(Name).
@@ -111,7 +110,7 @@ get_routes(Name) ->
 %% @spec init_routes() -> ok
 %% @doc Set the default routes, unless the routing table isn't empty.
 init_routes(DefaultRoutes) ->
-    init_routes(?DEFAULT, DefaultRoutes).
+    init_routes(default, DefaultRoutes).
 
 init_routes(Name, DefaultRoutes) ->
     gen_server:call(?SERVER, {init_routes, Name, DefaultRoutes}, infinity).

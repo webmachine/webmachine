@@ -30,11 +30,11 @@
 -define (WM_OPTION_DEFAULTS, [{error_handler, webmachine_error_handler}]).
 
 start(Options) ->
-    {DispatchList, PName, RName, WMOptions, OtherOptions} = get_wm_options(Options),
-    webmachine_router:init_routes(RName, DispatchList),
+    {DispatchList, PName, DGroup, WMOptions, OtherOptions} = get_wm_options(Options),
+    webmachine_router:init_routes(DGroup, DispatchList),
     [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
     MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
-    LoopFun = fun(X) -> loop(RName, X) end,
+    LoopFun = fun(X) -> loop(DGroup, X) end,
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
 
 stop() ->
@@ -110,14 +110,14 @@ get_wm_options(Options) ->
                 {webmachine, Opts2};
             NRes -> NRes
         end,
-    {RName, Options3} =
-        case get_option(router_name, Options2) of
+    {DGroup, Options3} =
+        case get_option(dispatch_group, Options2) of
             {undefined, Opts3} ->
-                {webmachine_router, Opts3};
+                {default, Opts3};
             RRes -> RRes
         end,
     {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options3}, ?WM_OPTIONS),
-    {DispatchList, Name, RName, WMOptions, RestOptions}.
+    {DispatchList, Name, DGroup, WMOptions, RestOptions}.
 
 get_option(Option, Options) ->
     case lists:keytake(Option, 1, Options) of
