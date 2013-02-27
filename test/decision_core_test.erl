@@ -112,6 +112,9 @@
 %% K5 - The path to K5 without accept headers
 -define(PATH_TO_K5_NO_ACCEPT_HEADERS, ?PATH_TO_K7_NO_ACCEPT_HEADERS ++ [v3k5]).
 
+%% L5 - The path to L5 without accept headers
+-define(PATH_TO_L5_NO_ACCEPT_HEADERS, ?PATH_TO_K5_NO_ACCEPT_HEADERS ++ [v3l5]).
+
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
         ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10]).
@@ -198,7 +201,9 @@ decision_core_test_() ->
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_g7/0},
          {"301 via i4", fun moved_permanently_i4/0},
-         {"301 via k5", fun moved_permanently_k5/0}
+         {"301 via k5", fun moved_permanently_k5/0},
+         {"307 via l5", fun moved_temporarily_l5/0},
+         {"304 via j18", fun not_modified_j18/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -526,7 +531,30 @@ moved_permanently_k5() ->
     {ok, Result} = httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
     ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_K5_NO_ACCEPT_HEADERS,
-    io:format(user, "~n~p~n~p", [ExpectedDecisionTrace, get_decision_ids()]),
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 307 result via L5
+moved_temporarily_l5() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    put_setting(previously_existed, true),
+    put_setting(moved_temporarily, {true, ?URL ++ "/new"}),
+    %% We just want to get the 307 from httpc - similar to note about 301 above
+    HTTPOptions = [{autoredirect, false}],
+    {ok, Result}= httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
+    ?assertMatch({{"HTTP/1.1", 307, "Temporary Redirect"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_L5_NO_ACCEPT_HEADERS,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 304 result via J18
+not_modified_j18() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    Headers = [{"If-None-Match", "*"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -562,6 +590,7 @@ initialize_resource_settings() ->
     put_setting(generate_etag, undefined),
     put_setting(last_modified, undefined),
     put_setting(moved_permanently, false),
+    put_setting(moved_temporarily, false),
     put_setting(previously_existed, false),
     ok.
 
@@ -645,6 +674,10 @@ last_modified(ReqData, Context) ->
 
 moved_permanently(ReqData, Context) ->
     Setting = lookup_setting(moved_permanently),
+    {Setting, ReqData, Context}.
+
+moved_temporarily(ReqData, Context) ->
+    Setting = lookup_setting(moved_temporarily),
     {Setting, ReqData, Context}.
 
 previously_existed(ReqData, Context) ->
