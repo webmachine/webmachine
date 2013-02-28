@@ -124,6 +124,13 @@
 %% N11 - The path to N11 without accept headers
 -define(PATH_TO_N11_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD ++ [v3n11]).
 
+%% P3 - The path to P3 without accept headers
+-define(PATH_TO_P3_NO_ACPTHEAD, ?PATH_TO_I4_NO_ACPTHEAD ++ [v3p3]).
+
+%% P11 - Two paths to P11 without accept headers, via N11 and P3
+-define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD, ?PATH_TO_N11_NO_ACPTHEAD ++ [v3p11]).
+-define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD ++ [v3p11]).
+
 %% K5 - The path to K5 without accept headers
 -define(PATH_TO_K5_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD ++ [v3k5]).
 
@@ -232,8 +239,13 @@ decision_core_test_() ->
          {"303 via n11 reqdata", fun see_other_n11/0},
          {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
          {"404 via l7", fun not_found_l7/0},
-         {"404 via m7", fun not_found_m7/0}
+         {"404 via m7", fun not_found_m7/0},
+         {"201 via p11 post", fun created_p11_post/0},
+         {"201 via p11 put", fun created_p11_put/0}
         ],
+    _Tests = [
+             {"201 via p11 put", fun created_p11_put/0}
+            ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
 setup() ->
@@ -694,6 +706,35 @@ not_found_m7() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 201 result via P11 from POST
+created_p11_post() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
+    put_setting(process_post, {new_resource, ?RESOURCE_PATH ++ "/new1"}),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 201 result via P11 from PUT
+created_p11_put() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(is_conflict, {new_location, ?URL ++ "/new"}),
+    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
@@ -721,6 +762,7 @@ initialize_resource_settings() ->
     put_setting(post_is_create, false),
     put_setting(process_post, false),
     put_setting(create_path, undefined),
+    put_setting(is_conflict, false),
     ok.
 
 clear_resource_settings() ->
@@ -824,10 +866,16 @@ post_is_create(ReqData, Context) ->
 process_post(ReqData, Context) ->
     Setting = lookup_setting(process_post),
     case Setting of
+        %% new resource, with a redirect
         {set_resp_redirect, Location} ->
             RDRedirect = wrq:do_redirect(true, ReqData),
             Headers = [{"Location", Location}],
             RDWithLocation = wrq:set_resp_headers(Headers, RDRedirect),
+            {true, RDWithLocation, Context};
+        %% new resource, no redirect (create instead)
+        {new_resource, Location} ->
+            Headers = [{"Location", Location}],
+            RDWithLocation = wrq:set_resp_headers(Headers, ReqData),
             {true, RDWithLocation, Context};
         _ ->
             {Setting, ReqData, Context}
@@ -841,6 +889,17 @@ create_path(ReqData, Context) ->
             %% the ReqData's header
             RDRedirect = wrq:do_redirect(true, ReqData),
             {Location, RDRedirect, Context};
+        _ ->
+            {Setting, ReqData, Context}
+    end.
+
+is_conflict(ReqData, Context) ->
+    Setting = lookup_setting(is_conflict),
+    case Setting of
+        {new_location, Location} ->
+            Headers = [{"Location", Location}],
+            RDWithLocation = wrq:set_resp_headers(Headers, ReqData),
+            {false, RDWithLocation, Context};
         _ ->
             {Setting, ReqData, Context}
     end.
