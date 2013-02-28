@@ -22,10 +22,20 @@
 -compile(export_all).
 
 -define(PORT, 12001).
--define(URL, "http://localhost:12001/decisioncore").
+-define(RESOURCE_PATH, "/decisioncore").
+-define(URL, "http://localhost:12001" ++ ?RESOURCE_PATH).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
 -define(DEFAULT_ALLOWED_METHODS, ['GET', 'HEAD', 'PUT']).
+
+-define(printThem,
+        begin
+            io:format(user, "~nResult: ~p", [Result]),
+            io:format(user, "~nExpected:~n~p", [ExpectedDecisionTrace]),
+            IDs = get_decision_ids(),
+            io:format(user, "~nGot:~n~p", [IDs]),
+            io:format(user, "~nMatch? ~p~n", [ExpectedDecisionTrace =:= IDs])
+        end).
 
 %% DECISION TRACE PATHS
 %%
@@ -62,18 +72,14 @@
 -define(PATH_TO_D5_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3d5]).
 -define(PATH_TO_D5_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3d5]).
 
-%% E5 - There are four paths to E5:
-%%  via D5 (via C3 or via C4) or
-%%  via D4 (via C3 or via C4)
-%% Only some of these paths are tested.
+%% E5 - There are four paths to E5: via D5 (via C3 or via C4) or via D4 (via C3
+%% or via C4). Only some of these paths are tested.
 -define(PATH_TO_E5_VIA_D5_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
 -define(PATH_TO_E5_VIA_D5_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
 -define(PATH_TO_E5_VIA_D4_C3, ?PATH_TO_D4_VIA_C3 ++ [v3e5]).
 
-%% E6 - There are four paths to E6:
-%%  via D5 (via C3 or via C4) or
-%%  via D4 (via C3 or via C4)
-%% Only two of these paths to E6 are tested
+%% E6 - There are four paths to E6: via D5 (via C3 or via C4) or via D4 (via C3
+%%  or via C4). Only two of these paths to E6 are tested
 -define(PATH_TO_E6_VIA_D5_C3, ?PATH_TO_E5_VIA_D5_C3 ++ [v3e6]).
 -define(PATH_TO_E6_VIA_D5_C4, ?PATH_TO_E5_VIA_D5_C4 ++ [v3e6]).
 
@@ -86,7 +92,7 @@
 
 %% G7 - The path to G7, without accept headers in the request
 -define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3 ++ [v3g7]).
--define(PATH_TO_G7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
+-define(PATH_TO_G7_NO_ACPTHEAD, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
 
 %% G9 - The path to G9, without accept headers in the request
 -define(PATH_TO_G9_VIA_F6_E6_D5_C4,
@@ -95,25 +101,34 @@
 %% G11 - The path to G11, without accept headers in the request
 -define(PATH_TO_G11_VIA_F6_E6_D5_C4,
         ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9, v3g11]).
--define(PATH_TO_G11_NO_ACCEPT_HEADERS, ?PATH_TO_G11_VIA_F6_E6_D5_C4).
+-define(PATH_TO_G11_NO_ACPTHEAD, ?PATH_TO_G11_VIA_F6_E6_D5_C4).
 
 %% H7 - The path to H7 without accept headers
--define(PATH_TO_H7_NO_ACCEPT_HEADERS, ?PATH_TO_G7_NO_ACCEPT_HEADERS ++ [v3h7]).
+-define(PATH_TO_H7_NO_ACPTHEAD, ?PATH_TO_G7_NO_ACPTHEAD ++ [v3h7]).
 
 %% I7 - The path to I7 without accept headers
--define(PATH_TO_I7_NO_ACCEPT_HEADERS, ?PATH_TO_H7_NO_ACCEPT_HEADERS ++ [v3i7]).
+-define(PATH_TO_I7_NO_ACPTHEAD, ?PATH_TO_H7_NO_ACPTHEAD ++ [v3i7]).
 
 %% I4 - The path to I4 without accept headers
--define(PATH_TO_I4_NO_ACCEPT_HEADERS, ?PATH_TO_I7_NO_ACCEPT_HEADERS ++ [v3i4]).
+-define(PATH_TO_I4_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD ++ [v3i4]).
 
 %% K7 - The path to K7 without accept headers
--define(PATH_TO_K7_NO_ACCEPT_HEADERS, ?PATH_TO_I7_NO_ACCEPT_HEADERS ++ [v3k7]).
+-define(PATH_TO_K7_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD ++ [v3k7]).
+
+%% L7 - The path to L7 without accept headers
+-define(PATH_TO_L7_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD ++ [v3l7]).
+
+%% M7 - The path to M7 without accept headers
+-define(PATH_TO_M7_NO_ACPTHEAD, ?PATH_TO_L7_NO_ACPTHEAD ++ [v3m7]).
+
+%% N11 - The path to N11 without accept headers
+-define(PATH_TO_N11_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD ++ [v3n11]).
 
 %% K5 - The path to K5 without accept headers
--define(PATH_TO_K5_NO_ACCEPT_HEADERS, ?PATH_TO_K7_NO_ACCEPT_HEADERS ++ [v3k5]).
+-define(PATH_TO_K5_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD ++ [v3k5]).
 
 %% L5 - The path to L5 without accept headers
--define(PATH_TO_L5_NO_ACCEPT_HEADERS, ?PATH_TO_K5_NO_ACCEPT_HEADERS ++ [v3l5]).
+-define(PATH_TO_L5_NO_ACPTHEAD, ?PATH_TO_K5_NO_ACPTHEAD ++ [v3l5]).
 
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
@@ -121,21 +136,29 @@
 
 %% H11 - The path to H11 without accept headers, via G11
 -define(PATH_TO_H11_VIA_G11_F6_E6_D5_C4,
-        ?PATH_TO_G11_NO_ACCEPT_HEADERS ++ [v3h10, v3h11]).
+        ?PATH_TO_G11_NO_ACPTHEAD ++ [v3h10, v3h11]).
 
 %% H12 - Two paths to H12 without accept headers
 -define(PATH_TO_H12_VIA_G8_F6_E6_D5_C4,
         ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3h11, v3h12]).
 -define(PATH_TO_H12_VIA_G9_F6_E6_D5_C4,
         ?PATH_TO_G9_VIA_F6_E6_D5_C4 ++ [v3h10, v3h11, v3h12]).
--define(PATH_TO_H12_NO_ACCEPT_HEADERS, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
--define(PATH_TO_H12_NO_ACCEPT_HEADERS_2, ?PATH_TO_H12_VIA_G9_F6_E6_D5_C4).
+-define(PATH_TO_H12_NO_ACPTHEAD, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
+-define(PATH_TO_H12_NO_ACPTHEAD_2, ?PATH_TO_H12_VIA_G9_F6_E6_D5_C4).
 
 %% I12 - Two paths to I12 without accept headers
 -define(PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4,
         ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3i12]).
 -define(PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4,
         ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4 ++ [v3i12]).
+
+%% L13 - A path to L13 without accept headers
+-define(PATH_TO_L13_NO_ACPTHEAD,
+        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4 ++ [v3l13]).
+
+%% L17 - A path to L17 without accept headers
+-define(PATH_TO_L17_NO_ACPTHEAD,
+       ?PATH_TO_L13_NO_ACPTHEAD ++ [v3l14, v3l15, v3l17]).
 
 %% I13 - Two paths to I13 without accept headers
 -define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
@@ -153,11 +176,10 @@
         ?PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4 ++ [v3j18]).
 -define(PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
         ?PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3j18]).
--define(PATH_TO_J18_NO_ACCEPT_HEADERS, ?PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4).
--define(PATH_TO_J18_NO_ACCEPT_HEADERS_2,
-        ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
--define(PATH_TO_J18_NO_ACCEPT_HEADERS_3,
-       ?PATH_TO_H12_NO_ACCEPT_HEADERS_2 ++ [v3i12, v3i13, v3j18]).
+-define(PATH_TO_J18_NO_ACPTHEAD, ?PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4).
+-define(PATH_TO_J18_NO_ACPTHEAD_2, ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
+-define(PATH_TO_J18_NO_ACPTHEAD_3,
+        ?PATH_TO_H12_NO_ACPTHEAD_2 ++ [v3i12, v3i13, v3j18]).
 
 %% A path to a 200 with most defaults used
 -define(PATH_TO_REGULAR_200,
@@ -203,7 +225,12 @@ decision_core_test_() ->
          {"301 via i4", fun moved_permanently_i4/0},
          {"301 via k5", fun moved_permanently_k5/0},
          {"307 via l5", fun moved_temporarily_l5/0},
-         {"304 via j18", fun not_modified_j18/0}
+         {"304 via j18<-i13<-i12<-h10", fun not_modified_j18/0},
+         {"304 via j18<-k13<-h11<-g11", fun not_modified_j18_via_k13/0},
+         {"304 via j18<-i13<-i12<-h12", fun not_modified_j18_via_h12/0},
+         {"304 via l17", fun not_modified_l17/0},
+         {"303 via n11 reqdata", fun see_other_n11/0},
+         {"303 via n11 resource calls", fun see_other_n11_resource_calls/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -245,25 +272,26 @@ get_decision_ids() ->
 %% Note: The expected decision traces in these tests is simply the output from
 %% the test itself. These have not yet been hand-verified!
 
+%% 503 at service_available
 service_unavailable() ->
     put_setting(service_available, false),
     {ok, Result} = httpc:request(head, {?URL, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace =
-        [v3b13, v3b13b],
+    ExpectedDecisionTrace = [v3b13, v3b13b],
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 503 at ping
 ping_invalid() ->
     % "breakout" for "anything other than pong"
     put_setting(ping, breakout),
     {ok, Result} = httpc:request(head, {?URL, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace =
-        [v3b13],
+    ExpectedDecisionTrace = [v3b13],
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 200 from head method allowed
 head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
@@ -275,12 +303,22 @@ head_method_allowed() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 405 from head method not allowed
 head_method_not_allowed() ->
     put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
     ExpectedDecisionTrace =
         [v3b13, v3b13b, v3b12, v3b11, v3b10],
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 200 from a get
+simple_get() ->
+    put_setting(allowed_methods, ['GET']),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -356,7 +394,7 @@ precond_fail_no_resource() ->
     Headers = [{"If-Match", "*"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_H7_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_H7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -367,7 +405,7 @@ precond_fail_g11() ->
     Headers = [{"If-Match", "\"v0\", \"v1\""}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_G11_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_G11_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -381,7 +419,7 @@ precond_fail_h12() ->
     Headers = [{"If-Unmodified-Since", TenAM}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_H12_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_H12_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -392,7 +430,7 @@ precond_fail_j18() ->
     PutRequest = {?URL, Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -406,7 +444,7 @@ precond_fail_j18_via_k13() ->
     PutRequest = {?URL, Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS_2,
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_2,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -423,7 +461,7 @@ precond_fail_j18_via_h12() ->
     PutRequest = {?URL, Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS_3,
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -515,7 +553,7 @@ moved_permanently_i4() ->
     PutRequest = {?URL ++ "/old", [], "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_I4_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_I4_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -530,7 +568,7 @@ moved_permanently_k5() ->
     HTTPOptions = [{autoredirect, false}],
     {ok, Result} = httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
     ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_K5_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_K5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -544,28 +582,90 @@ moved_temporarily_l5() ->
     HTTPOptions = [{autoredirect, false}],
     {ok, Result}= httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
     ?assertMatch({{"HTTP/1.1", 307, "Temporary Redirect"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_L5_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_L5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 304 result via J18
+%% 304 result via J18 via K13 via H11 via G11
 not_modified_j18() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     Headers = [{"If-None-Match", "*"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACCEPT_HEADERS,
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-accept_html_on_put(ReqData, Context) ->
-    {ok, ReqData, Context}.
+%% 304 result via J18 via K13 via H11 via G11
+not_modified_j18_via_k13() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(generate_etag, "v1"),
+    Headers = [{"If-Match", "\"v1\""},
+               {"If-None-Match", "\"v1\""},
+               {"If-Unmodified-Since", "{{INVALID DATE}}"}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_2,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
 
-simple_get() ->
-    put_setting(allowed_methods, ['GET']),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
+%% 304 result via J18 via I13 via I12 via H12
+not_modified_j18_via_h12() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    TenAM = "Wed, 20 Feb 2013 10:00:00 GMT",
+    FivePM = "Wed, 20 Feb 2013 17:00:00 GMT",
+    ResErlDate = httpd_util:convert_request_date(TenAM),
+    put_setting(last_modified, ResErlDate),
+    Headers = [{"If-Match", "*"},
+               {"If-None-Match", "*"},
+               {"If-Unmodified-Since", FivePM}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_3,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 304 result via L17
+not_modified_l17() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    {{Year, Month, Day}, HourMinuteSecond} = calendar:universal_time(),
+    LastYear = {{Year - 1, Month, Day}, HourMinuteSecond},
+    put_setting(last_modified, LastYear),
+    Headers = [{"If-Modified-Since", httpd_util:rfc1123_date(LastYear)}],
+    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_L17_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 303 result via N11 using request data rewriting
+see_other_n11() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_N11_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 303 result via N11 using the result of resource calls
+see_other_n11_resource_calls() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
+    put_setting(post_is_create, true),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(create_path, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_N11_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -592,6 +692,10 @@ initialize_resource_settings() ->
     put_setting(moved_permanently, false),
     put_setting(moved_temporarily, false),
     put_setting(previously_existed, false),
+    put_setting(allow_missing_post, false),
+    put_setting(post_is_create, false),
+    put_setting(process_post, false),
+    put_setting(create_path, undefined),
     ok.
 
 clear_resource_settings() ->
@@ -683,6 +787,38 @@ moved_temporarily(ReqData, Context) ->
 previously_existed(ReqData, Context) ->
     Setting = lookup_setting(previously_existed),
     {Setting, ReqData, Context}.
+
+allow_missing_post(ReqData, Context) ->
+    Setting = lookup_setting(allow_missing_post),
+    {Setting, ReqData, Context}.
+
+post_is_create(ReqData, Context) ->
+    Setting = lookup_setting(post_is_create),
+    {Setting, ReqData, Context}.
+
+process_post(ReqData, Context) ->
+    Setting = lookup_setting(process_post),
+    case Setting of
+        {set_resp_redirect, Location} ->
+            RDRedirect = wrq:do_redirect(true, ReqData),
+            Headers = [{"Location", Location}],
+            RDWithLocation = wrq:set_resp_headers(Headers, RDRedirect),
+            {true, RDWithLocation, Context};
+        _ ->
+            {Setting, ReqData, Context}
+    end.
+
+create_path(ReqData, Context) ->
+    Setting = lookup_setting(create_path),
+    case Setting of
+        {set_resp_redirect, Location} ->
+            %% Note, we return the Location instead of setting the location in
+            %% the ReqData's header
+            RDRedirect = wrq:do_redirect(true, ReqData),
+            {Location, RDRedirect, Context};
+        _ ->
+            {Setting, ReqData, Context}
+    end.
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
