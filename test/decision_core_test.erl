@@ -230,7 +230,9 @@ decision_core_test_() ->
          {"304 via j18<-i13<-i12<-h12", fun not_modified_j18_via_h12/0},
          {"304 via l17", fun not_modified_l17/0},
          {"303 via n11 reqdata", fun see_other_n11/0},
-         {"303 via n11 resource calls", fun see_other_n11_resource_calls/0}
+         {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
+         {"404 via l7", fun not_found_l7/0},
+         {"404 via m7", fun not_found_m7/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -666,6 +668,29 @@ see_other_n11_resource_calls() ->
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 404 result via L7
+not_found_l7() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    {ok, Result} = httpc:request(get, {?URL ++ "/nothere", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 404, "Object Not Found"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_L7_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 404 result via M7
+not_found_m7() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 404, "Object Not Found"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
