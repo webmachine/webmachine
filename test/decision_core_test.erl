@@ -121,17 +121,16 @@
 %% M7 - The path to M7 without accept headers
 -define(PATH_TO_M7_NO_ACPTHEAD, ?PATH_TO_L7_NO_ACPTHEAD++[v3m7]).
 
-%% N11 - The path to N11 without accept headers
--define(PATH_TO_N11_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD++[v3n11]).
-
-%% O14 - TODO COMMENT THIS AND ADD NEXT CASE (VIA O16)
--define(PATH_TO_O14_VIA_N11_NO_ACPTHEAD, PATH_TO_N11_NO_ACPTHEAD++[v3o14]).
+%% N11 - Two paths to N11 without accept headers
+-define(PATH_TO_N11_VIA_M7_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD++[v3n11]).
+-define(PATH_TO_N11_VIA_N5_NO_ACPTHEAD, ?PATH_TO_N5_NO_ACPTHEAD++[v3n11]).
 
 %% P3 - The path to P3 without accept headers
 -define(PATH_TO_P3_NO_ACPTHEAD, ?PATH_TO_I4_NO_ACPTHEAD++[v3p3]).
 
 %% P11 - Two paths to P11 without accept headers, via N11 and P3
--define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD, ?PATH_TO_N11_NO_ACPTHEAD++[v3p11]).
+-define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
+        ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD++[v3p11]).
 -define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD++[v3p11]).
 
 %% K5 - The path to K5 without accept headers
@@ -139,6 +138,12 @@
 
 %% L5 - The path to L5 without accept headers
 -define(PATH_TO_L5_NO_ACPTHEAD, ?PATH_TO_K5_NO_ACPTHEAD++[v3l5]).
+
+%% M5 - The path to M5 without accept headers
+-define(PATH_TO_M5_NO_ACPTHEAD, ?PATH_TO_L5_NO_ACPTHEAD++[v3m5]).
+
+%% N5 - The path to N5 without accept headers
+-define(PATH_TO_N5_NO_ACPTHEAD, ?PATH_TO_M5_NO_ACPTHEAD++[v3n5]).
 
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
@@ -252,15 +257,20 @@ decision_core_test_() ->
          {"304 via l17", fun not_modified_l17/0},
          {"303 via n11 reqdata", fun see_other_n11/0},
          {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
+         {"303 via n11 custom base_uri", fun see_other_n11_custom_base_uri/0},
+         {"303 via n11 passthrough base_uri", fun see_other_n11_wrq_base_uri/0},
+         {"303 via n5", fun see_other_n5/0},
          {"404 via l7", fun not_found_l7/0},
          {"404 via m7", fun not_found_m7/0},
          {"201 via p11 post", fun created_p11_post/0},
          {"201 via p11 put", fun created_p11_put/0},
          {"409 via p3", fun conflict_p3/0},
-         {"409 via o14", fun conflict_o14/0}
+         {"409 via o14", fun conflict_o14/0},
+         {"410 via m5", fun gone_m5/0},
+         {"410 via n5", fun gone_n5/0}
         ],
     _Tests = [
-
+              {"303 via n5", fun see_other_n5/0}
             ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -676,12 +686,27 @@ see_other_n11() ->
     PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_N11_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
 %% 303 result via N11 using the result of resource calls
 see_other_n11_resource_calls() ->
+    see_other_n11_resource_calls_base_uri(undefined).
+
+%% 303 result via N11 using the result of resource calls and a custom base_uri
+see_other_n11_custom_base_uri() ->
+    BaseURIFun = {decision_core_test, base_uri_add_slash},
+    see_other_n11_resource_calls_base_uri(BaseURIFun).
+
+%% 303 result via N11 using the result of resource calls and a passthrough
+%% base_uri
+see_other_n11_wrq_base_uri() ->
+    BaseURIFun = {wrq, base_uri},
+    see_other_n11_resource_calls_base_uri(BaseURIFun).
+
+%% helper function to remove common code
+see_other_n11_resource_calls_base_uri(Value) ->
     put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
     put_setting(resource_exists, false),
     put_setting(allow_missing_post, true),
@@ -689,10 +714,27 @@ see_other_n11_resource_calls() ->
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(create_path, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
+    put_setting(base_uri, Value),
     PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_N11_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 303 result via N5
+see_other_n5() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(resource_exists, false),
+    put_setting(previously_existed, true),
+    put_setting(allow_missing_post, true),
+    put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_N11_VIA_N5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -775,6 +817,31 @@ conflict_o14() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 410 result via M5
+gone_m5() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    put_setting(previously_existed, true),
+    {ok, Result} = httpc:request(get, {?URL ++ "/gone", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 410, "Gone"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_M5_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 410 result via N5
+gone_n5() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(resource_exists, false),
+    put_setting(previously_existed, true),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 410, "Gone"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_N5_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
@@ -803,6 +870,7 @@ initialize_resource_settings() ->
     put_setting(process_post, false),
     put_setting(create_path, undefined),
     put_setting(is_conflict, false),
+    put_setting(base_uri, undefined),
     ok.
 
 clear_resource_settings() ->
@@ -943,6 +1011,18 @@ is_conflict(ReqData, Context) ->
         _ ->
             {Setting, ReqData, Context}
     end.
+
+base_uri(ReqData, Context) ->
+    Setting = lookup_setting(base_uri),
+    case Setting of
+        {Mod, Fun} ->
+            {erlang:apply(Mod, Fun, [ReqData]), ReqData, Context};
+        _ ->
+            {Setting, ReqData, Context}
+    end.
+
+base_uri_add_slash(RD) ->
+    wrq:base_uri(RD) ++ "/".
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
