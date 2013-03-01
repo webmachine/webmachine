@@ -47,159 +47,173 @@
 %% multiple-condition coverage.)
 
 %% B9 - There is one path to state B9
--define(PATH_TO_B9, [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9]).
+-define(PATH_TO_B9, [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9]).
 
 %% B9A - There is one path to the sub-state B9A
--define(PATH_TO_B9A, ?PATH_TO_B9 ++ [v3b9a]).
+-define(PATH_TO_B9A, ?PATH_TO_B9++[v3b9a]).
 
 %% B8 - There is one path to state B8 (skips sub-state B9A?)
--define(PATH_TO_B8, ?PATH_TO_B9 ++ [v3b9b, v3b8]).
+-define(PATH_TO_B8, ?PATH_TO_B9++[v3b9b,v3b8]).
 
 %% B3 - There is one path to state B3
--define(PATH_TO_B3, ?PATH_TO_B8 ++ [v3b7, v3b6, v3b5, v3b4, v3b3]).
+-define(PATH_TO_B3, ?PATH_TO_B8++[v3b7,v3b6,v3b5,v3b4,v3b3]).
 
 %% C3 - There is one path to state C3
--define(PATH_TO_C3, ?PATH_TO_B3 ++ [v3c3]).
+-define(PATH_TO_C3, ?PATH_TO_B3++[v3c3]).
 
 %% C4 - There is one path to state C4
--define(PATH_TO_C4, ?PATH_TO_C3 ++ [v3c4]).
+-define(PATH_TO_C4, ?PATH_TO_C3++[v3c4]).
 
 %% D4 - There are two paths to D4: via C3 or via C4
--define(PATH_TO_D4_VIA_C3, ?PATH_TO_C3 ++ [v3d4]).
--define(PATH_TO_D4_VIA_C4, ?PATH_TO_C4 ++ [v3d4]).
+-define(PATH_TO_D4_VIA_C3, ?PATH_TO_C3++[v3d4]).
+-define(PATH_TO_D4_VIA_C4, ?PATH_TO_C4++[v3d4]).
 
 %% D5 - There are two paths to D5: via C3 or via C4
--define(PATH_TO_D5_VIA_C3, ?PATH_TO_D4_VIA_C3 ++ [v3d5]).
--define(PATH_TO_D5_VIA_C4, ?PATH_TO_D4_VIA_C4 ++ [v3d5]).
+-define(PATH_TO_D5_VIA_C3, ?PATH_TO_D4_VIA_C3++[v3d5]).
+-define(PATH_TO_D5_VIA_C4, ?PATH_TO_D4_VIA_C4++[v3d5]).
 
 %% E5 - There are four paths to E5: via D5 (via C3 or via C4) or via D4 (via C3
 %% or via C4). Only some of these paths are tested.
--define(PATH_TO_E5_VIA_D5_C3, ?PATH_TO_D5_VIA_C3 ++ [v3e5]).
--define(PATH_TO_E5_VIA_D5_C4, ?PATH_TO_D5_VIA_C4 ++ [v3e5]).
--define(PATH_TO_E5_VIA_D4_C3, ?PATH_TO_D4_VIA_C3 ++ [v3e5]).
+-define(PATH_TO_E5_VIA_D5_C3, ?PATH_TO_D5_VIA_C3++[v3e5]).
+-define(PATH_TO_E5_VIA_D5_C4, ?PATH_TO_D5_VIA_C4++[v3e5]).
+-define(PATH_TO_E5_VIA_D4_C3, ?PATH_TO_D4_VIA_C3++[v3e5]).
 
 %% E6 - There are four paths to E6: via D5 (via C3 or via C4) or via D4 (via C3
 %%  or via C4). Only two of these paths to E6 are tested
--define(PATH_TO_E6_VIA_D5_C3, ?PATH_TO_E5_VIA_D5_C3 ++ [v3e6]).
--define(PATH_TO_E6_VIA_D5_C4, ?PATH_TO_E5_VIA_D5_C4 ++ [v3e6]).
+-define(PATH_TO_E6_VIA_D5_C3, ?PATH_TO_E5_VIA_D5_C3++[v3e6]).
+-define(PATH_TO_E6_VIA_D5_C4, ?PATH_TO_E5_VIA_D5_C4++[v3e6]).
 
 %% F6 - Selection of the paths to F6
--define(PATH_TO_F6_VIA_E6_D5_C4, ?PATH_TO_E6_VIA_D5_C4 ++ [v3f6]).
--define(PATH_TO_F6_VIA_E5_D4_C3, ?PATH_TO_E5_VIA_D4_C3 ++ [v3f6]).
+-define(PATH_TO_F6_VIA_E6_D5_C4, ?PATH_TO_E6_VIA_D5_C4++[v3f6]).
+-define(PATH_TO_F6_VIA_E5_D4_C3, ?PATH_TO_E5_VIA_D4_C3++[v3f6]).
 
 %% F7 - A path to F7
--define(PATH_TO_F7_VIA_E6_D5_C4, ?PATH_TO_F6_VIA_E6_D5_C4 ++ [v3f7]).
+-define(PATH_TO_F7_VIA_E6_D5_C4, ?PATH_TO_F6_VIA_E6_D5_C4++[v3f7]).
 
 %% G7 - The path to G7, without accept headers in the request
--define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3 ++ [v3g7]).
+-define(PATH_TO_G7_VIA_F6_E6_D5_C4, ?PATH_TO_F6_VIA_E5_D4_C3++[v3g7]).
 -define(PATH_TO_G7_NO_ACPTHEAD, ?PATH_TO_G7_VIA_F6_E6_D5_C4).
 
 %% G9 - The path to G9, without accept headers in the request
 -define(PATH_TO_G9_VIA_F6_E6_D5_C4,
-        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9]).
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4++[v3g8,v3g9]).
 
 %% G11 - The path to G11, without accept headers in the request
 -define(PATH_TO_G11_VIA_F6_E6_D5_C4,
-        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3g9, v3g11]).
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4++[v3g8,v3g9,v3g11]).
 -define(PATH_TO_G11_NO_ACPTHEAD, ?PATH_TO_G11_VIA_F6_E6_D5_C4).
 
 %% H7 - The path to H7 without accept headers
--define(PATH_TO_H7_NO_ACPTHEAD, ?PATH_TO_G7_NO_ACPTHEAD ++ [v3h7]).
+-define(PATH_TO_H7_NO_ACPTHEAD, ?PATH_TO_G7_NO_ACPTHEAD++[v3h7]).
 
 %% I7 - The path to I7 without accept headers
--define(PATH_TO_I7_NO_ACPTHEAD, ?PATH_TO_H7_NO_ACPTHEAD ++ [v3i7]).
+-define(PATH_TO_I7_NO_ACPTHEAD, ?PATH_TO_H7_NO_ACPTHEAD++[v3i7]).
 
 %% I4 - The path to I4 without accept headers
--define(PATH_TO_I4_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD ++ [v3i4]).
+-define(PATH_TO_I4_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD++[v3i4]).
 
 %% K7 - The path to K7 without accept headers
--define(PATH_TO_K7_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD ++ [v3k7]).
+-define(PATH_TO_K7_NO_ACPTHEAD, ?PATH_TO_I7_NO_ACPTHEAD++[v3k7]).
 
 %% L7 - The path to L7 without accept headers
--define(PATH_TO_L7_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD ++ [v3l7]).
+-define(PATH_TO_L7_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD++[v3l7]).
 
 %% M7 - The path to M7 without accept headers
--define(PATH_TO_M7_NO_ACPTHEAD, ?PATH_TO_L7_NO_ACPTHEAD ++ [v3m7]).
+-define(PATH_TO_M7_NO_ACPTHEAD, ?PATH_TO_L7_NO_ACPTHEAD++[v3m7]).
 
 %% N11 - The path to N11 without accept headers
--define(PATH_TO_N11_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD ++ [v3n11]).
+-define(PATH_TO_N11_NO_ACPTHEAD, ?PATH_TO_M7_NO_ACPTHEAD++[v3n11]).
+
+%% O14 - TODO COMMENT THIS AND ADD NEXT CASE (VIA O16)
+-define(PATH_TO_O14_VIA_N11_NO_ACPTHEAD, PATH_TO_N11_NO_ACPTHEAD++[v3o14]).
 
 %% P3 - The path to P3 without accept headers
--define(PATH_TO_P3_NO_ACPTHEAD, ?PATH_TO_I4_NO_ACPTHEAD ++ [v3p3]).
+-define(PATH_TO_P3_NO_ACPTHEAD, ?PATH_TO_I4_NO_ACPTHEAD++[v3p3]).
 
 %% P11 - Two paths to P11 without accept headers, via N11 and P3
--define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD, ?PATH_TO_N11_NO_ACPTHEAD ++ [v3p11]).
--define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD ++ [v3p11]).
+-define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD, ?PATH_TO_N11_NO_ACPTHEAD++[v3p11]).
+-define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD++[v3p11]).
 
 %% K5 - The path to K5 without accept headers
--define(PATH_TO_K5_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD ++ [v3k5]).
+-define(PATH_TO_K5_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD++[v3k5]).
 
 %% L5 - The path to L5 without accept headers
--define(PATH_TO_L5_NO_ACPTHEAD, ?PATH_TO_K5_NO_ACPTHEAD ++ [v3l5]).
+-define(PATH_TO_L5_NO_ACPTHEAD, ?PATH_TO_K5_NO_ACPTHEAD++[v3l5]).
 
 %% H10 - The path to H10 without accept headers
 -define(PATH_TO_H10_VIA_G8_F6_E6_D5_C4,
-        ?PATH_TO_G7_VIA_F6_E6_D5_C4 ++ [v3g8, v3h10]).
+        ?PATH_TO_G7_VIA_F6_E6_D5_C4++[v3g8,v3h10]).
 
 %% H11 - The path to H11 without accept headers, via G11
 -define(PATH_TO_H11_VIA_G11_F6_E6_D5_C4,
-        ?PATH_TO_G11_NO_ACPTHEAD ++ [v3h10, v3h11]).
+        ?PATH_TO_G11_NO_ACPTHEAD++[v3h10,v3h11]).
 
 %% H12 - Two paths to H12 without accept headers
 -define(PATH_TO_H12_VIA_G8_F6_E6_D5_C4,
-        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3h11, v3h12]).
+        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4++[v3h11,v3h12]).
 -define(PATH_TO_H12_VIA_G9_F6_E6_D5_C4,
-        ?PATH_TO_G9_VIA_F6_E6_D5_C4 ++ [v3h10, v3h11, v3h12]).
+        ?PATH_TO_G9_VIA_F6_E6_D5_C4++[v3h10,v3h11,v3h12]).
 -define(PATH_TO_H12_NO_ACPTHEAD, ?PATH_TO_H12_VIA_G8_F6_E6_D5_C4).
 -define(PATH_TO_H12_NO_ACPTHEAD_2, ?PATH_TO_H12_VIA_G9_F6_E6_D5_C4).
 
 %% I12 - Two paths to I12 without accept headers
 -define(PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4,
-        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4 ++ [v3i12]).
+        ?PATH_TO_H10_VIA_G8_F6_E6_D5_C4++[v3i12]).
 -define(PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4,
-        ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4 ++ [v3i12]).
+        ?PATH_TO_H11_VIA_G11_F6_E6_D5_C4++[v3i12]).
 
 %% L13 - A path to L13 without accept headers
--define(PATH_TO_L13_NO_ACPTHEAD,
-        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4 ++ [v3l13]).
+-define(PATH_TO_L13_NO_ACPTHEAD, ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4++[v3l13]).
+
+%% M16 - A path to M16 without accept headers
+-define(PATH_TO_M16_NO_ACPTHEAD, ?PATH_TO_L13_NO_ACPTHEAD++[v3m16]).
+
+%% N16 - A path to N16 without accept headers
+-define(PATH_TO_N16_NO_ACPTHEAD, ?PATH_TO_M16_NO_ACPTHEAD++[v3n16]).
+
+%% O16 - A path to O16 without accept headers
+-define(PATH_TO_O16_NO_ACPTHEAD, ?PATH_TO_N16_NO_ACPTHEAD++[v3o16]).
+
+%% O14 - A path to O14 without accept headers
+-define(PATH_TO_O14_NO_ACPTHEAD, ?PATH_TO_O16_NO_ACPTHEAD++[v3o14]).
 
 %% L17 - A path to L17 without accept headers
 -define(PATH_TO_L17_NO_ACPTHEAD,
-       ?PATH_TO_L13_NO_ACPTHEAD ++ [v3l14, v3l15, v3l17]).
+       ?PATH_TO_L13_NO_ACPTHEAD++[v3l14,v3l15,v3l17]).
 
 %% I13 - Two paths to I13 without accept headers
 -define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
-        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4 ++ [v3i13]).
+        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4++[v3i13]).
 -define(PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4,
-        ?PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4 ++ [v3i13]).
+        ?PATH_TO_I12_VIA_H11_G11_F6_E6_D5_C4++[v3i13]).
 
 %% K13 - The path to K13 without accept headers, via I13, I12, H11, G11
 -define(PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4,
-        ?PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3k13]).
+        ?PATH_TO_I13_VIA_H11_G11_F6_E6_D5_C4++[v3k13]).
 
 %% J18 - Three paths to J18 without accept headers (one via H10; one via H11
 %% and K13; one via H12)
 -define(PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4,
-        ?PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4 ++ [v3j18]).
+        ?PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4++[v3j18]).
 -define(PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4,
-        ?PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4 ++ [v3j18]).
+        ?PATH_TO_K13_VIA_H11_G11_F6_E6_D5_C4++[v3j18]).
 -define(PATH_TO_J18_NO_ACPTHEAD, ?PATH_TO_J18_VIA_I13_H10_G8_F6_E6_D5_C4).
 -define(PATH_TO_J18_NO_ACPTHEAD_2, ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
 -define(PATH_TO_J18_NO_ACPTHEAD_3,
-        ?PATH_TO_H12_NO_ACPTHEAD_2 ++ [v3i12, v3i13, v3j18]).
+        ?PATH_TO_H12_NO_ACPTHEAD_2++[v3i12,v3i13,v3j18]).
 
 %% A path to a 200 with most defaults used
 -define(PATH_TO_REGULAR_200,
         ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4
-        ++ [v3l13, v3m16, v3n16, v3o16, v3o18, v3o18b]).
+        ++[v3l13,v3m16,v3n16,v3o16,v3o18,v3o18b]).
 
 %% A path to a 204 with most defaults used, md5 checksum substate [Clever way
 %% to write this removed until a better solution for decision paths and
 %% substates is devised]
 -define(PATH_TO_204_WITH_MD5_CHECKSUM,
-        [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9a, v3b9b, v3b8, v3b7,
-         v3b6, v3b5, v3b4, v3b3, v3c3, v3d4, v3e5, v3f6, v3g7, v3g8, v3h10,
-         v3i12, v3l13, v3m16, v3n16, v3o16, v3o14, v3p11, v3o20]).
+        [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9,v3b9a,v3b9b,v3b8,v3b7,v3b6,v3b5,
+         v3b4,v3b3,v3c3,v3d4,v3e5,v3f6,v3g7,v3g8,v3h10,v3i12,v3l13,v3m16,v3n16,
+         v3o16,v3o14,v3p11,v3o20]).
 
 %%
 %% TEST SETUP AND CLEANUP
@@ -241,10 +255,12 @@ decision_core_test_() ->
          {"404 via l7", fun not_found_l7/0},
          {"404 via m7", fun not_found_m7/0},
          {"201 via p11 post", fun created_p11_post/0},
-         {"201 via p11 put", fun created_p11_put/0}
+         {"201 via p11 put", fun created_p11_put/0},
+         {"409 via p3", fun conflict_p3/0},
+         {"409 via o14", fun conflict_o14/0}
         ],
     _Tests = [
-             {"201 via p11 put", fun created_p11_put/0}
+
             ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -310,10 +326,7 @@ head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace =
-        [v3b13, v3b13b, v3b12, v3b11, v3b10, v3b9, v3b9b, v3b8, v3b7, v3b6,
-         v3b5, v3b4, v3b3, v3c3, v3d4, v3e5, v3f6, v3g7, v3g8, v3h10, v3i12,
-         v3l13, v3m16, v3n16, v3o16, v3o18, v3o18b],
+    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -732,6 +745,33 @@ created_p11_put() ->
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 409 result via P3 (must be a PUT)
+conflict_p3() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(is_conflict, true),
+    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 409, "Conflict"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_P3_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 409 result via O14
+conflict_o14() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(is_conflict, true),
+    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 409, "Conflict"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O14_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
