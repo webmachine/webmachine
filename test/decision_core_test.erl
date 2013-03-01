@@ -173,6 +173,10 @@
 %% M16 - A path to M16 without accept headers
 -define(PATH_TO_M16_NO_ACPTHEAD, ?PATH_TO_L13_NO_ACPTHEAD++[v3m16]).
 
+%% M20 - A path to M20 without accept headers, and substate M20b
+-define(PATH_TO_M20_NO_ACPTHEAD, ?PATH_TO_M16_NO_ACPTHEAD++[v3m20]).
+-define(PATH_TO_M20B_NO_ACPTHEAD, ?PATH_TO_M20_NO_ACPTHEAD++[v3m20b]).
+
 %% N16 - A path to N16 without accept headers
 -define(PATH_TO_N16_NO_ACPTHEAD, ?PATH_TO_M16_NO_ACPTHEAD++[v3n16]).
 
@@ -245,6 +249,7 @@ decision_core_test_() ->
          {"204 md5 header matches", fun content_md5_valid_b9a/0},
          {"204 md5 header matches, 2", fun content_md5_valid_b9a_validated/0},
          {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
+         {"400 md5 header doesn't match 2", fun content_md5_custom_inval_b9a/0},
          {"401 result, unauthorized", fun authorized_b8/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_g7/0},
@@ -267,11 +272,11 @@ decision_core_test_() ->
          {"409 via p3", fun conflict_p3/0},
          {"409 via o14", fun conflict_o14/0},
          {"410 via m5", fun gone_m5/0},
-         {"410 via n5", fun gone_n5/0}
+         {"410 via n5", fun gone_n5/0},
+         {"202 via m20", fun accepted_m20/0}
         ],
     _Tests = [
-              {"303 via n5", fun see_other_n5/0}
-            ],
+             ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
 setup() ->
@@ -548,6 +553,22 @@ content_md5_invalid_b9a() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 400 result, resource's custom validate_content_checksum function rejects it
+content_md5_custom_inval_b9a() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(validate_content_checksum, false),
+    ContentType = "text/plain",
+    Body = "foo",
+    InvalidMD5Sum = base64:encode_to_string("this is invalid for foo"),
+    Headers = [{"Content-MD5", InvalidMD5Sum}],
+    PutRequest = {?URL, Headers, ContentType, Body},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B9A,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+
 %% 401 result, unauthorized
 authorized_b8() ->
     put_setting(is_authorized, "Basic"),
@@ -665,9 +686,12 @@ not_modified_j18_via_h12() ->
 %% 304 result via L17
 not_modified_l17() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
-    {{Year, Month, Day}, HourMinuteSecond} = calendar:universal_time(),
+    Now = calendar:universal_time(),
+    {{Year, Month, Day}, HourMinuteSecond} = Now,
     LastYear = {{Year - 1, Month, Day}, HourMinuteSecond},
+    NextYear = {{Year + 1, Month, Day}, HourMinuteSecond},
     put_setting(last_modified, LastYear),
+    put_setting(expires, NextYear),
     Headers = [{"If-Modified-Since", httpd_util:rfc1123_date(LastYear)}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
@@ -842,6 +866,19 @@ gone_n5() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 202 result via M20 - The delete has been "accepted" but it didn't actually
+%% happen (or, rather, may or may not happen in the future)
+accepted_m20() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS ++ ['DELETE']),
+    put_setting(delete_resource, true),
+    put_setting(delete_completed, false),
+    DeleteRequest = {?URL ++ "/doomed", []},
+    {ok, Result} = httpc:request(delete, DeleteRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 202, "Accepted"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_M20B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
@@ -871,6 +908,9 @@ initialize_resource_settings() ->
     put_setting(create_path, undefined),
     put_setting(is_conflict, false),
     put_setting(base_uri, undefined),
+    put_setting(expires, undefined),
+    put_setting(delete_resource, false),
+    put_setting(delete_completed, true),
     ok.
 
 clear_resource_settings() ->
@@ -1023,6 +1063,18 @@ base_uri(ReqData, Context) ->
 
 base_uri_add_slash(RD) ->
     wrq:base_uri(RD) ++ "/".
+
+expires(ReqData, Context) ->
+    Setting = lookup_setting(expires),
+    {Setting, ReqData, Context}.
+
+delete_resource(ReqData, Context) ->
+    Setting = lookup_setting(delete_resource),
+    {Setting, ReqData, Context}.
+
+delete_completed(ReqData, Context) ->
+    Setting = lookup_setting(delete_completed),
+    {Setting, ReqData, Context}.
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
