@@ -46,13 +46,19 @@
 %% Testing, 2nd, p 49). (Exercising all possible paths is called
 %% multiple-condition coverage.)
 
-%% B9 - There is one path to state B9
--define(PATH_TO_B9, [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9]).
+%% B13 - All state paths start at B13
+-define(PATH_TO_B13, [v3b13]).
 
-%% B9A - There is one path to the sub-state B9A
+%% B13b - The path to substate B13b
+-define(PATH_TO_B13B, ?PATH_TO_B13++[v3b13b]).
+
+%% B9 - There is one path to state B9
+-define(PATH_TO_B9, ?PATH_TO_B13B++[v3b12,v3b11,v3b10,v3b9]).
+
+%% B9A - There is one path to the substate B9a
 -define(PATH_TO_B9A, ?PATH_TO_B9++[v3b9a]).
 
-%% B8 - There is one path to state B8 (skips sub-state B9A?)
+%% B8 - There is one path to state B8 (skips substate B9a?)
 -define(PATH_TO_B8, ?PATH_TO_B9++[v3b9b,v3b8]).
 
 %% B3 - There is one path to state B3
@@ -186,6 +192,12 @@
 %% O14 - A path to O14 without accept headers
 -define(PATH_TO_O14_NO_ACPTHEAD, ?PATH_TO_O16_NO_ACPTHEAD++[v3o14]).
 
+%% O18 - A path to O18 without accept headers
+-define(PATH_TO_O18_NO_ACPTHEAD, ?PATH_TO_O16_NO_ACPTHEAD++[v3o18]).
+
+%% O18b - A path to substate O18b
+-define(PATH_TO_O18B_NO_ACPTHEAD, ?PATH_TO_O18_NO_ACPTHEAD++[v3o18b]).
+
 %% L17 - A path to L17 without accept headers
 -define(PATH_TO_L17_NO_ACPTHEAD,
        ?PATH_TO_L13_NO_ACPTHEAD++[v3l14,v3l15,v3l17]).
@@ -210,11 +222,6 @@
 -define(PATH_TO_J18_NO_ACPTHEAD_2, ?PATH_TO_J18_VIA_K13_H11_G11_F6_E6_D5_C4).
 -define(PATH_TO_J18_NO_ACPTHEAD_3,
         ?PATH_TO_H12_NO_ACPTHEAD_2++[v3i12,v3i13,v3j18]).
-
-%% A path to a 200 with most defaults used
--define(PATH_TO_REGULAR_200,
-        ?PATH_TO_I12_VIA_H10_G8_F6_E6_D5_C4
-        ++[v3l13,v3m16,v3n16,v3o16,v3o18,v3o18b]).
 
 %% A path to a 204 with most defaults used, md5 checksum substate [Clever way
 %% to write this removed until a better solution for decision paths and
@@ -252,7 +259,8 @@ decision_core_test_() ->
          {"400 md5 header doesn't match 2", fun content_md5_custom_inval_b9a/0},
          {"401 result, unauthorized", fun authorized_b8/0},
          {"200 result, via options", fun options_b3/0},
-         {"200 result with vary", fun variances_g7/0},
+         {"200 result with vary", fun variances_o18/0},
+         {"300 multiple choices", fun multiple_choices_o18/0},
          {"301 via i4", fun moved_permanently_i4/0},
          {"301 via k5", fun moved_permanently_k5/0},
          {"307 via l5", fun moved_temporarily_l5/0},
@@ -341,7 +349,7 @@ head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -360,7 +368,7 @@ simple_get() ->
     put_setting(allowed_methods, ['GET']),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -590,7 +598,7 @@ options_b3() ->
     ok.
 
 %% 200 result with Vary
-variances_g7() ->
+variances_o18() ->
     put_setting(allowed_methods, ['GET']),
     Id = fun(X) -> X end,
     Charsets = [{"utf-8", Id},
@@ -599,9 +607,24 @@ variances_g7() ->
     put_setting(charsets_provided, Charsets),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_REGULAR_200,
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
+
+%% 300 result via O18
+multiple_choices_o18() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(multiple_choices, true),
+    Id = fun(X) -> X end,
+    Charsets = [{"utf-8", Id},
+                {"iso-8859-5", Id},
+                {"unicode-1-1", Id}],
+    put_setting(charsets_provided, Charsets),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 300, "Multiple Choices"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.    
 
 %% 301 result via I4
 moved_permanently_i4() ->
@@ -907,6 +930,7 @@ initialize_resource_settings() ->
     put_setting(process_post, false),
     put_setting(create_path, undefined),
     put_setting(is_conflict, false),
+    put_setting(multiple_choices, false),
     put_setting(base_uri, undefined),
     put_setting(expires, undefined),
     put_setting(delete_resource, false),
@@ -1051,6 +1075,10 @@ is_conflict(ReqData, Context) ->
         _ ->
             {Setting, ReqData, Context}
     end.
+
+multiple_choices(ReqData, Context) ->
+    Setting = lookup_setting(multiple_choices),
+    {Setting, ReqData, Context}.
 
 base_uri(ReqData, Context) ->
     Setting = lookup_setting(base_uri),
