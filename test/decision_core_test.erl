@@ -26,6 +26,9 @@
 -define(URL, "http://localhost:12001" ++ ?RESOURCE_PATH).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 
+-define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
+-define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
+                           'CONNECT', 'OPTIONS']).
 -define(DEFAULT_ALLOWED_METHODS, ['GET', 'HEAD', 'PUT']).
 
 -define(printThem,
@@ -46,23 +49,47 @@
 %% Testing, 2nd, p 49). (Exercising all possible paths is called
 %% multiple-condition coverage.)
 
-%% B13 - All state paths start at B13
+%% B13 - All decision-trace-paths start at B13
 -define(PATH_TO_B13, [v3b13]).
 
 %% B13b - The path to substate B13b
 -define(PATH_TO_B13B, ?PATH_TO_B13++[v3b13b]).
 
+%% B12 - The path to B12
+-define(PATH_TO_B12, ?PATH_TO_B13B++[v3b12]).
+
+%% B11 - The path to B11
+-define(PATH_TO_B11, ?PATH_TO_B12++[v3b11]).
+
+%% B10 - The path to B10
+-define(PATH_TO_B10, ?PATH_TO_B11++[v3b10]).
+
 %% B9 - There is one path to state B9
--define(PATH_TO_B9, ?PATH_TO_B13B++[v3b12,v3b11,v3b10,v3b9]).
+-define(PATH_TO_B9, ?PATH_TO_B10++[v3b9]).
 
 %% B9A - There is one path to the substate B9a
 -define(PATH_TO_B9A, ?PATH_TO_B9++[v3b9a]).
 
+%% B9B - There is one oath to the substate B9b
+-define(PATH_TO_B9B, ?PATH_TO_B9++[v3b9b]).
+
 %% B8 - There is one path to state B8 (skips substate B9a?)
--define(PATH_TO_B8, ?PATH_TO_B9++[v3b9b,v3b8]).
+-define(PATH_TO_B8, ?PATH_TO_B9B++[v3b8]).
+
+%% B7 - There is one path to state B7
+-define(PATH_TO_B7, ?PATH_TO_B8++[v3b7]).
+
+%% B6 - There is one path to state B6
+-define(PATH_TO_B6, ?PATH_TO_B7++[v3b6]).
+
+%% B5 - There is one path to state B5
+-define(PATH_TO_B5, ?PATH_TO_B6++[v3b5]).
+
+%% B4 - There is one path to state B4.
+-define(PATH_TO_B4, ?PATH_TO_B5++[v3b4]).
 
 %% B3 - There is one path to state B3
--define(PATH_TO_B3, ?PATH_TO_B8++[v3b7,v3b6,v3b5,v3b4,v3b3]).
+-define(PATH_TO_B3, ?PATH_TO_B4++[v3b3]).
 
 %% C3 - There is one path to state C3
 -define(PATH_TO_C3, ?PATH_TO_B3++[v3c3]).
@@ -239,8 +266,15 @@ decision_core_test_() ->
         [
          {"503 it's not you, it's me", fun service_unavailable/0},
          {"503 ping doesn't return pong", fun ping_invalid/0},
+         {"500 ping raises error", fun ping_error/0},
+         {"501 via b12", fun not_implemented_b12/0},
+         {"501 via b6", fun not_implemented_b6/0},
+         {"414 request uri too long", fun uri_too_long_b11/0},
+         {"415 via b5", fun unsupported_media_type_b5/0},
+         {"413 via b4", fun request_entity_too_large_b4/0},
          {"200 head method allowed", fun head_method_allowed/0},
          {"405 head method not allowed", fun head_method_not_allowed/0},
+         {"400 malformed", fun bad_request_b9/0},
          {"200 get method", fun simple_get/0},
          {"406 via c4", fun not_acceptable_c4/0},
          {"406 via d5<-c4", fun not_acceptable_d5_c4/0},
@@ -258,6 +292,7 @@ decision_core_test_() ->
          {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
          {"400 md5 header doesn't match 2", fun content_md5_custom_inval_b9a/0},
          {"401 result, unauthorized", fun authorized_b8/0},
+         {"403 via b7", fun forbidden_b7/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_o18/0},
          {"300 multiple choices", fun multiple_choices_o18/0},
@@ -325,22 +360,82 @@ get_decision_ids() ->
 %% Note: The expected decision traces in these tests is simply the output from
 %% the test itself. These have not yet been hand-verified!
 
-%% 503 at service_available
+%% 503 result via B13B (predicate: service_available)
 service_unavailable() ->
     put_setting(service_available, false),
     {ok, Result} = httpc:request(head, {?URL, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace = [v3b13, v3b13b],
+    ExpectedDecisionTrace = ?PATH_TO_B13B,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 503 at ping
+%% 503 result via B13 (at ping)
 ping_invalid() ->
     % "breakout" for "anything other than pong"
     put_setting(ping, breakout),
     {ok, Result} = httpc:request(head, {?URL, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace = [v3b13],
+    ExpectedDecisionTrace = ?PATH_TO_B13,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 500 error response result via B13 (ping raises error)
+ping_error() ->
+    put_setting(ping, ping_raise_error),
+    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B13,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.    
+
+%% 501 result via B12
+not_implemented_b12() ->
+    put_setting(allowed_methods, ?HTTP_1_0_METHODS),
+    put_setting(known_methods, ?HTTP_1_0_METHODS),
+    {ok, Result} = httpc:request(delete, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 501, "Not Implemented"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B12,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 501 result via B6
+not_implemented_b6() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(valid_content_headers, false),
+    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 501, "Not Implemented"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B6,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 414 result via B11
+uri_too_long_b11() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(uri_too_long, true),
+    TooLong = ?URL ++ "/notreallythatlongactually",
+    {ok, Result} = httpc:request(get, {TooLong, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 414, "Request-URI Too Large"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B11,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 415 result via B5
+unsupported_media_type_b5() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(known_content_type, false),
+    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 415, "Unsupported Media Type"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B5,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 413 result via B4
+request_entity_too_large_b4() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(valid_entity_length, false),
+    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 413, "Request Entity Too Large"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -358,8 +453,17 @@ head_method_not_allowed() ->
     put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
     {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
-    ExpectedDecisionTrace =
-        [v3b13, v3b13b, v3b12, v3b11, v3b10],
+    ExpectedDecisionTrace = ?PATH_TO_B10,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 400 result via B9
+bad_request_b9() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(malformed_request, true),
+    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B9B,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -576,8 +680,7 @@ content_md5_custom_inval_b9a() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-
-%% 401 result, unauthorized
+%% 401 result via B8
 authorized_b8() ->
     put_setting(is_authorized, "Basic"),
     put_setting(allowed_methods, ['GET']),
@@ -585,6 +688,16 @@ authorized_b8() ->
     ?assertMatch({{"HTTP/1.1", 401, "Unauthorized"},
                   [_, _, {"www-authenticate", "Basic"}, _], _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B8,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 403 result via B7
+forbidden_b7() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(forbidden, true),
+    {ok, Result} = httpc:request(get, {?URL ++ "/forbiddenfoo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 403, "Forbidden"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B7,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -913,6 +1026,13 @@ initialize_resource_settings() ->
     %% Defaults
     put_setting(service_available, true),
     put_setting(ping, pong),
+    put_setting(known_methods, ?HTTP_1_1_METHODS),
+    put_setting(uri_too_long, false),
+    put_setting(known_content_type, true),
+    put_setting(valid_entity_length, true),
+    put_setting(malformed_request, false),
+    put_setting(forbidden, false),
+    put_setting(valid_content_headers, true),
     put_setting(validate_content_checksum, not_validated),
     put_setting(is_authorized, true),
     put_setting(content_types_provided, [{"text/html", to_html}]),
@@ -971,6 +1091,34 @@ is_authorized(ReqData, Context) ->
 
 allowed_methods(ReqData, Context) ->
     Setting = lookup_setting(allowed_methods),
+    {Setting, ReqData, Context}.
+
+known_methods(ReqData, Context) ->
+    Setting = lookup_setting(known_methods),
+    {Setting, ReqData, Context}.
+
+uri_too_long(ReqData, Context) ->
+    Setting = lookup_setting(uri_too_long),
+    {Setting, ReqData, Context}.
+
+known_content_type(ReqData, Context) ->
+    Setting = lookup_setting(known_content_type),
+    {Setting, ReqData, Context}.
+
+valid_entity_length(ReqData, Context) ->
+    Setting = lookup_setting(valid_entity_length),
+    {Setting, ReqData, Context}.
+
+malformed_request(ReqData, Context) ->
+    Setting = lookup_setting(malformed_request),
+    {Setting, ReqData, Context}.
+
+forbidden(ReqData, Context) ->
+    Setting = lookup_setting(forbidden),
+    {Setting, ReqData, Context}.
+
+valid_content_headers(ReqData, Context) ->
+    Setting = lookup_setting(valid_content_headers),
     {Setting, ReqData, Context}.
 
 content_types_provided(ReqData, Context) ->
@@ -1057,8 +1205,8 @@ create_path(ReqData, Context) ->
     Setting = lookup_setting(create_path),
     case Setting of
         {set_resp_redirect, Location} ->
-            %% Note, we return the Location instead of setting the location in
-            %% the ReqData's header
+            %% Note, in this test we return the Location instead of setting the
+            %% location in the ReqData's header
             RDRedirect = wrq:do_redirect(true, ReqData),
             {Location, RDRedirect, Context};
         _ ->
