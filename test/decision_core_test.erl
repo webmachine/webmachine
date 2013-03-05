@@ -31,6 +31,12 @@
                            'CONNECT', 'OPTIONS']).
 -define(DEFAULT_ALLOWED_METHODS, ['GET', 'HEAD', 'PUT']).
 
+%% It doesn't matter if the date is current, it just needs to be valid
+-define(PRESENT_YEAR, 2013).
+-define(FIRST_DAY_OF_PRESENT_YEAR, {{?PRESENT_YEAR, 1, 1}, {12, 0, 0}}).
+-define(FIRST_DAY_OF_LAST_YEAR, {{?PRESENT_YEAR - 1, 1, 1}, {12, 0, 0}}).
+-define(FIRST_DAY_OF_NEXT_YEAR, {{?PRESENT_YEAR + 1, 1, 1}, {12, 0, 0}}).
+
 -define(printThem,
         begin
             io:format(user, "~nResult: ~p", [Result]),
@@ -262,6 +268,9 @@
 %% TEST SETUP AND CLEANUP
 %%
 decision_core_test_() ->
+    _Tests =
+        [
+        ],
     Tests =
         [
          {"503 it's not you, it's me", fun service_unavailable/0},
@@ -295,6 +304,7 @@ decision_core_test_() ->
          {"403 via b7", fun forbidden_b7/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_o18/0},
+         {"200 result with body generation", fun ok_o18b/0},
          {"300 multiple choices", fun multiple_choices_o18/0},
          {"301 via i4", fun moved_permanently_i4/0},
          {"301 via k5", fun moved_permanently_k5/0},
@@ -304,6 +314,7 @@ decision_core_test_() ->
          {"304 via j18<-i13<-i12<-h12", fun not_modified_j18_via_h12/0},
          {"304 via l17", fun not_modified_l17/0},
          {"303 via n11 reqdata", fun see_other_n11/0},
+         {"500 via n11 reqdata", fun internal_server_error_n11/0},
          {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
          {"303 via n11 custom base_uri", fun see_other_n11_custom_base_uri/0},
          {"303 via n11 passthrough base_uri", fun see_other_n11_wrq_base_uri/0},
@@ -316,10 +327,9 @@ decision_core_test_() ->
          {"409 via o14", fun conflict_o14/0},
          {"410 via m5", fun gone_m5/0},
          {"410 via n5", fun gone_n5/0},
-         {"202 via m20", fun accepted_m20/0}
+         {"202 via m20", fun accepted_m20/0},
+         {"415 via accept_helper", fun unsupported_media_type_accept_helper/0}
         ],
-    _Tests = [
-             ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
 setup() ->
@@ -724,6 +734,18 @@ variances_o18() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 200 result with body generation
+ok_o18b() ->
+    put_setting(allowed_methods, ['GET']),
+    put_setting(generate_etag, "v1"),
+    put_setting(last_modified, ?FIRST_DAY_OF_LAST_YEAR),
+    put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
 %% 300 result via O18
 multiple_choices_o18() ->
     put_setting(allowed_methods, ['GET']),
@@ -822,13 +844,10 @@ not_modified_j18_via_h12() ->
 %% 304 result via L17
 not_modified_l17() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
-    Now = calendar:universal_time(),
-    {{Year, Month, Day}, HourMinuteSecond} = Now,
-    LastYear = {{Year - 1, Month, Day}, HourMinuteSecond},
-    NextYear = {{Year + 1, Month, Day}, HourMinuteSecond},
-    put_setting(last_modified, LastYear),
-    put_setting(expires, NextYear),
-    Headers = [{"If-Modified-Since", httpd_util:rfc1123_date(LastYear)}],
+    put_setting(last_modified, ?FIRST_DAY_OF_LAST_YEAR),
+    put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
+    RFC1123LastYear = httpd_util:rfc1123_date(?FIRST_DAY_OF_LAST_YEAR),
+    Headers = [{"If-Modified-Since", RFC1123LastYear}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_L17_NO_ACPTHEAD,
@@ -846,6 +865,21 @@ see_other_n11() ->
     PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 500 result via N11 - Setting do_redirect without a Location
+internal_server_error_n11() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
+    ContentType = "text/html",
+    put_setting(content_types_accepted, [{ContentType, to_html}]),
+    put_setting(process_post, {set_resp_redirect_but_not_location}),
+    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
@@ -1012,6 +1046,23 @@ accepted_m20() ->
     {ok, Result} = httpc:request(delete, DeleteRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 202, "Accepted"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_M20B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 415 via accept_helper - This path is not explicit in the state diagram in
+%% http-headers-status-v3.png, but is a path in the
+%% webmachine_decision_core.erl logic. The accept_helper function itself can be
+%% reached from P3 (as a PUT), O14 (as a PUT), or N11 (as a POST).
+unsupported_media_type_accept_helper() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    HTMLContent = "text/html",
+    PlainTextContent = "text/plain",
+    put_setting(content_types_accepted, [{HTMLContent, to_html}]),
+    put_setting(is_conflict, false),
+    PutRequest = {?URL ++ "/put", [], PlainTextContent, "foo"},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 415, "Unsupported Media Type"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O14_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1192,6 +1243,11 @@ process_post(ReqData, Context) ->
             Headers = [{"Location", Location}],
             RDWithLocation = wrq:set_resp_headers(Headers, RDRedirect),
             {true, RDWithLocation, Context};
+        %% new resource with a redirect, but error case where the Location
+        %% isn't set
+        {set_resp_redirect_but_not_location} ->
+            RDRedirect = wrq:do_redirect(true, ReqData),
+            {true, RDRedirect, Context};
         %% new resource, no redirect (create instead)
         {new_resource, Location} ->
             Headers = [{"Location", Location}],
