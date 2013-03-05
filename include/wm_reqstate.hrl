@@ -1,10 +1,10 @@
--record(wm_reqstate, {socket=undefined,
-                   metadata=dict:new(),
-                   range=undefined,
-                   peer=undefined,
-                   reqdata=undefined,
-                   bodyfetch=undefined,
-                   reqbody=undefined,
-                   log_data=undefined
-                  }).
+-record(wm_reqstate, {socket=undefined :: undefined | inet:socket(),
+                      metadata=dict:new() :: dict(),
+                      range=undefined     :: undefined | string(),
+                      peer=undefined      :: undefined | inet:ip_address(),
+                      reqdata=undefined,  %% reqdata
+                      bodyfetch=undefined,
+                      reqbody=undefined   :: undefined | binary(),
+                      log_data=undefined
+                     }).
 
