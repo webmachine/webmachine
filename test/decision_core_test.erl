@@ -304,6 +304,7 @@ decision_core_test_() ->
          {"403 via b7", fun forbidden_b7/0},
          {"200 result, via options", fun options_b3/0},
          {"200 result with vary", fun variances_o18/0},
+         {"200 result with vary, 2", fun variances_o18_2/0},
          {"200 result with body generation", fun ok_o18b/0},
          {"300 multiple choices", fun multiple_choices_o18/0},
          {"301 via i4", fun moved_permanently_i4/0},
@@ -722,12 +723,25 @@ options_b3() ->
 
 %% 200 result with Vary
 variances_o18() ->
-    put_setting(allowed_methods, ['GET']),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     Id = fun(X) -> X end,
     Charsets = [{"utf-8", Id},
                 {"iso-8859-5", Id},
                 {"unicode-1-1", Id}],
     put_setting(charsets_provided, Charsets),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 200 result with other Vary
+variances_o18_2() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    ContentTypes = [{"text/html", to_html},
+                    {"text/plain", to_html}],
+    put_setting(content_types_provided, ContentTypes),
+    put_setting(encodings_provided, use_identity_or_gzip),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
@@ -1196,6 +1210,9 @@ encodings_provided(ReqData, Context) ->
         case Setting of
             use_identity ->
                 [{"identity", fun(X) -> X end}];
+            use_identity_or_gzip ->
+                [{"identity", fun(X) -> X end},
+                 {"gzip", fun(X) -> zlib:gzip(X) end}];
             none ->
                 [];
             Setting -> Setting
