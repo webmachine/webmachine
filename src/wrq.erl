@@ -35,7 +35,14 @@
 -include("wm_reqdata.hrl").
 -include("wm_reqstate.hrl").
 
+-type method() :: 'GET' | 'HEAD' | 'PUT' | 'POST' | 'DELETE'.
+-type scheme() :: http | https.
+-type version() :: {1, 0|1}.
+-type wm_reqdata() :: #wm_reqdata{}.
 
+-export_type([method/0, scheme/0, version/0, wm_reqdata/0]).
+
+-spec create(method(), version(), string(), gb_tree()) -> wm_reqdata().
 create(Method,Version,RawPath,Headers) ->
 	create(Method,http,Version,RawPath,Headers).
 create(Method,Scheme,Version,RawPath,Headers) ->
@@ -73,56 +80,75 @@ load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
                   port=Port,path_tokens=PathTokens,
                   app_root=AppRoot,disp_path=DispPath}.
 
+-spec method(wm_reqdata()) -> method().
 method(_RD = #wm_reqdata{method=Method}) -> Method.
 
+-spec scheme(wm_reqdata()) -> scheme().
 scheme(_RD = #wm_reqdata{scheme=Scheme}) -> Scheme.
 
+-spec version(wm_reqdata()) -> version().
 version(_RD = #wm_reqdata{version=Version})
   when is_tuple(Version), size(Version) == 2,
      is_integer(element(1,Version)), is_integer(element(2,Version)) -> Version.
 
+-spec peer(wm_reqdata()) -> inet:ip_address().
 peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
 
+-spec app_root(wm_reqdata()) -> string().
 app_root(_RD = #wm_reqdata{app_root=AR}) when is_list(AR) -> AR.
 
 % all three paths below are strings
+-spec disp_path(wm_reqdata()) -> string().
 disp_path(_RD = #wm_reqdata{disp_path=DP}) when is_list(DP) -> DP.
 
+-spec path(wm_reqdata()) -> string().
 path(_RD = #wm_reqdata{path=Path}) when is_list(Path) -> Path.
 
+-spec raw_path(wm_reqdata()) -> string().
 raw_path(_RD = #wm_reqdata{raw_path=RawPath}) when is_list(RawPath) -> RawPath.
 
+-spec path_info(wm_reqdata()) -> dict().
 path_info(_RD = #wm_reqdata{path_info=PathInfo}) -> PathInfo. % dict
 
+-spec path_tokens(wm_reqdata()) -> [string()].
 path_tokens(_RD = #wm_reqdata{path_tokens=PathT}) -> PathT. % list of strings
 
+-spec host_tokens(wm_reqdata()) -> [string()].
 host_tokens(_RD = #wm_reqdata{host_tokens=HostT}) -> HostT. % list of strings
 
+-spec port(wm_reqdata()) -> inet:port_number().
 port(_RD = #wm_reqdata{port=Port}) -> Port. % integer
 
+-spec response_code(wm_reqdata()) -> pos_integer().
 response_code(_RD = #wm_reqdata{response_code=C}) when is_integer(C) -> C.
 
+-spec req_cookie(wm_reqdata()) -> string().
 req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C. % string
 
-%% @spec req_qs(reqdata()) -> [{Key, Value}]
+-spec req_qs(wm_reqdata()) -> [{string(), string()}].
 req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 
+-spec req_headers(wm_reqdata()) -> gb_tree().
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
+-spec req_body(wm_reqdata()) -> binary().
 req_body(_RD = #wm_reqdata{wm_state=ReqState0,max_recv_body=MRB}) ->
     Req = webmachine_request:new(ReqState0),
     {ReqResp, ReqState} = Req:req_body(MRB),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
+-spec stream_req_body(wm_reqdata(), binary()) -> binary().
 stream_req_body(_RD = #wm_reqdata{wm_state=ReqState0}, MaxHunk) ->
     Req = webmachine_request:new(ReqState0),
     {ReqResp, ReqState} = Req:stream_req_body(MaxHunk),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
+-spec max_recv_body(wm_reqdata()) -> pos_integer().
 max_recv_body(_RD = #wm_reqdata{max_recv_body=X}) when is_integer(X) -> X.
 
+-spec set_max_recv_body(pos_integer(), wm_reqdata()) -> wm_reqdata().
 set_max_recv_body(X, RD) when is_integer(X) -> RD#wm_reqdata{max_recv_body=X}.
 
 maybe_conflict_body(BodyResponse) ->
@@ -135,11 +161,14 @@ maybe_conflict_body(BodyResponse) ->
             BodyResponse
     end.
 
+-spec resp_redirect(wm_reqdata()) -> boolean().
 resp_redirect(_RD = #wm_reqdata{resp_redirect=true}) -> true;
 resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
 
 resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
+%% TODO: make resp_body type
+-spec resp_body(wm_reqdata()) -> any().
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
 resp_body(_RD = #wm_reqdata{resp_body={stream,X}}) -> {stream,X};
 resp_body(_RD = #wm_reqdata{resp_body={known_length_stream,X,Y}}) -> {known_length_stream,X,Y};
@@ -149,7 +178,6 @@ resp_body(_RD = #wm_reqdata{resp_body=RespB}) when is_binary(RespB) -> RespB;
 resp_body(_RD = #wm_reqdata{resp_body=RespB}) -> iolist_to_binary(RespB).
 
 %% --
-
 path_info(Key, RD) when is_atom(Key) ->
     case dict:find(Key, path_info(RD)) of
         {ok, Value} when is_list(Value); is_integer(Value) ->

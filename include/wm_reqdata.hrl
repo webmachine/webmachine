@@ -1,8 +1,27 @@
--record(wm_reqdata, {method, scheme, version, peer, wm_state,
-                     disp_path, path, raw_path, path_info, path_tokens,
-                     app_root,response_code,max_recv_body, max_recv_hunk,
-                     req_cookie, req_qs, req_headers, req_body,
-                     resp_redirect, resp_headers, resp_body, resp_range,
-                     host_tokens, port, notes
+-record(wm_reqdata, {method,
+                     scheme  :: http | https,
+                     version :: wrq:version(),
+                     peer    :: inet:ip_address(),
+                     wm_state,
+                     disp_path,
+                     path     :: string(),
+                     raw_path :: string(),
+                     path_info :: dict(),
+                     path_tokens :: [string()],
+                     app_root  :: string(),
+                     response_code :: pos_integer(),
+                     max_recv_body :: pos_integer(),
+                     max_recv_hunk :: pos_integer(),
+                     req_cookie    :: string(),
+                     req_qs        :: string(),
+                     req_headers   :: gb_tree(), %% mochiheaders
+                     req_body,
+                     resp_redirect :: boolean(),
+                     resp_headers,
+                     resp_body  :: any(),
+                     resp_range :: atom(),
+                     host_tokens  :: [string()],
+                     port  :: inet:port_number(),
+                     notes :: list()
                     }).
 
