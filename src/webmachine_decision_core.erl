@@ -624,6 +624,8 @@ encode_body(Body) ->
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};
+        {known_length_stream, 0, _StreamBody} ->
+            {known_length_stream, 0, empty_stream()};
         {known_length_stream, Size, StreamBody} ->
             case method() of
                 'HEAD' ->
