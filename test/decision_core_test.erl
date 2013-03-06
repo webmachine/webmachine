@@ -329,7 +329,8 @@ decision_core_test_() ->
          {"410 via m5", fun gone_m5/0},
          {"410 via n5", fun gone_n5/0},
          {"202 via m20", fun accepted_m20/0},
-         {"415 via accept_helper", fun unsupported_media_type_accept_helper/0}
+         {"415 via accept_helper", fun unsupported_media_type_accept_helper/0},
+         {"201 via p11", fun created_p11_acccept_helper/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -1083,6 +1084,51 @@ unsupported_media_type_accept_helper() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
+%% 201 result via P11, executing extra webmachine_decision_core:accept_helper
+%% code.
+created_p11_acccept_helper() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'POST', 'PUT']),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
+    NewLocation = ?RESOURCE_PATH ++ "/posted",
+    put_setting(process_post,
+                {mfa, ?MODULE, process_post_created_p11, NewLocation}),
+    ContentType = "text/plain",
+    put_setting(content_types_accepted, [{ContentType, as_text}]),
+    FooPrime = string:copies("foo", 128),
+    PostRequest = {?URL ++ "/post", [], ContentType, FooPrime},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+process_post_created_p11(ReqData, Context, NewLocation) ->
+    StreamBody = wrq:stream_req_body(ReqData, 3),
+    Body = get_streamed_body(StreamBody, []),
+    StreamedReponse = send_streamed_body(Body, 4),
+    RDWithBody = wrq:set_resp_body({stream, StreamedReponse}, ReqData),
+    Headers = [{"Location", NewLocation}],
+    RDWithBodyAndLocation = wrq:set_resp_headers(Headers, RDWithBody),
+    {true, RDWithBodyAndLocation, Context}.
+
+%% The get_streamed_body and send_streamed_body functions here are derived from
+%% the example in the Webmachine docs
+get_streamed_body({Hunk, done}, Acc) ->
+    List = lists:reverse([Hunk | Acc]),
+    iolist_to_binary(List);
+get_streamed_body({Hunk, Next}, Acc) ->
+    get_streamed_body(Next(), [Hunk | Acc]).
+
+send_streamed_body(Body, Max) ->
+    HunkLen = 8 * Max,
+    case Body of
+        <<Hunk:HunkLen/bitstring, Rest/binary>> ->
+            {Hunk, fun() -> send_streamed_body(Rest, Max) end};
+        _ ->
+            {Body, done}
+    end.
+
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
 %%
@@ -1257,6 +1303,9 @@ post_is_create(ReqData, Context) ->
 process_post(ReqData, Context) ->
     Setting = lookup_setting(process_post),
     case Setting of
+        %% general callback
+        {mfa, Mod, Fun, Arg} ->
+            erlang:apply(Mod, Fun, [ReqData, Context, Arg]);
         %% new resource, with a redirect
         {set_resp_redirect, Location} ->
             RDRedirect = wrq:do_redirect(true, ReqData),
@@ -1330,5 +1379,8 @@ delete_completed(ReqData, Context) ->
 
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
+
+as_text(ReqData, Context) ->
+    {"Text?", ReqData, Context}.
 
 -endif.
