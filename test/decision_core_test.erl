@@ -1,3 +1,4 @@
+%% @author Macneil Shonle <mshonle@basho.com>
 %% @copyright 2007-2013 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +26,7 @@
 -define(RESOURCE_PATH, "/decisioncore").
 -define(URL, "http://localhost:12001" ++ ?RESOURCE_PATH).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
+-define(TEXT_CONTENT, ?HTML_CONTENT).
 
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
@@ -270,12 +272,14 @@
 decision_core_test_() ->
     _Tests =
         [
+         {"workin", fun stream_content_md5/0}
         ],
     Tests =
         [
          {"503 it's not you, it's me", fun service_unavailable/0},
          {"503 ping doesn't return pong", fun ping_invalid/0},
          {"500 ping raises error", fun ping_error/0},
+         {"500, error raised in callback", fun internal_server_error_o18/0},
          {"501 via b12", fun not_implemented_b12/0},
          {"501 via b6", fun not_implemented_b6/0},
          {"414 request uri too long", fun uri_too_long_b11/0},
@@ -330,7 +334,12 @@ decision_core_test_() ->
          {"410 via n5", fun gone_n5/0},
          {"202 via m20", fun accepted_m20/0},
          {"415 via accept_helper", fun unsupported_media_type_accept_helper/0},
-         {"201 via p11", fun created_p11_acccept_helper/0}
+         {"201 via p11, streamed", fun created_p11_streamed/0},
+         {"201 via p11, accept_helper", fun created_p11_accept_helper/0},
+         {"200 via get, writer callback", fun writer_callback/0},
+         {"200 via head, known length", fun head_length_access_for_cs/0},
+         {"200 via get, known length", fun get_known_length_for_cs/0},
+         {"200 via get, stream range", fun get_for_range_capable_stream/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -399,6 +408,28 @@ ping_error() ->
     ExpectedDecisionTrace = ?PATH_TO_B13,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.    
+
+%% 500 error response via O18 from a callback raising an error
+internal_server_error_o18() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(content_types_provided, [{"text/plain",
+                                          size_stream_raises_error}]),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% It seems that a callback that returns a callback is what's necessary to get
+%% the top-level `catch` in webmachine_decision_core:handle_request to be
+%% covered, hence the use of the range form of stream (other callbacks can also
+%% cover the catch clause, but not without cluttering the test output with
+%% badmatch errors from other modules)
+size_stream_raises_error(ReqData, Context) ->
+    Error = fun(_Start, _End) ->
+                    error(foobar)
+            end,
+    {{stream, 1, Error}, ReqData, Context}.
 
 %% 501 result via B12
 not_implemented_b12() ->
@@ -527,7 +558,7 @@ not_acceptable_d5_c3() ->
 not_acceptable_e6_d5_c3() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_provided, [{"text/plain", to_html}]),
-    put_setting(charsets_provided, [{"utf-8", make_utf8}]),
+    put_setting(charsets_provided, [{"utf-8", fun identity/1}]),
     Headers = [{"Accept-Language", "en-US"},
                {"Accept-Charset", "ISO-8859-1"}],
     {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
@@ -541,7 +572,7 @@ not_acceptable_f7_e6_d5_c4() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(content_types_provided, [{"text/plain", to_html}]),
     put_setting(language_available, true),
-    put_setting(charsets_provided, [{"utf-8", fun(X) -> X end}]),
+    put_setting(charsets_provided, [{"utf-8", fun identity/1}]),
     put_setting(encodings_provided, none),
     Headers = [{"Accept", "text/plain"},
                {"Accept-Language", "en-US"},
@@ -725,10 +756,9 @@ options_b3() ->
 %% 200 result with Vary
 variances_o18() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
-    Id = fun(X) -> X end,
-    Charsets = [{"utf-8", Id},
-                {"iso-8859-5", Id},
-                {"unicode-1-1", Id}],
+    Charsets = [{"utf-8", fun identity/1},
+                {"iso-8859-5", fun identity/1},
+                {"unicode-1-1", fun identity/1}],
     put_setting(charsets_provided, Charsets),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
@@ -742,8 +772,7 @@ variances_o18_2() ->
     ContentTypes = [{"text/html", to_html},
                     {"text/plain", to_html}],
     put_setting(content_types_provided, ContentTypes),
-    Id = fun(X) -> X end,
-    Charsets = [{"utf-8", Id}],
+    Charsets = [{"utf-8", fun identity/1}],
     put_setting(charsets_provided, Charsets),
     put_setting(encodings_provided, use_identity_or_gzip),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
@@ -768,10 +797,9 @@ ok_o18b() ->
 multiple_choices_o18() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(multiple_choices, true),
-    Id = fun(X) -> X end,
-    Charsets = [{"utf-8", Id},
-                {"iso-8859-5", Id},
-                {"unicode-1-1", Id}],
+    Charsets = [{"utf-8", fun identity/1},
+                {"iso-8859-5", fun identity/1},
+                {"unicode-1-1", fun identity/1}],
     put_setting(charsets_provided, Charsets),
     {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
     ?assertMatch({{"HTTP/1.1", 300, "Multiple Choices"}, _, _}, Result),
@@ -1084,17 +1112,15 @@ unsupported_media_type_accept_helper() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 201 result via P11, executing extra webmachine_decision_core:accept_helper
-%% code.
-created_p11_acccept_helper() ->
+%% 201 result via P11 with body streaming
+created_p11_streamed() ->
     put_setting(allowed_methods, ['GET', 'HEAD', 'POST', 'PUT']),
     put_setting(resource_exists, false),
     put_setting(allow_missing_post, true),
     NewLocation = ?RESOURCE_PATH ++ "/posted",
     put_setting(process_post,
-                {mfa, ?MODULE, process_post_created_p11, NewLocation}),
+                {mfa, ?MODULE, process_post_for_created_p11, NewLocation}),
     ContentType = "text/plain",
-    put_setting(content_types_accepted, [{ContentType, as_text}]),
     FooPrime = string:copies("foo", 128),
     PostRequest = {?URL ++ "/post", [], ContentType, FooPrime},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
@@ -1103,7 +1129,7 @@ created_p11_acccept_helper() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-process_post_created_p11(ReqData, Context, NewLocation) ->
+process_post_for_created_p11(ReqData, Context, NewLocation) ->
     StreamBody = wrq:stream_req_body(ReqData, 3),
     Body = get_streamed_body(StreamBody, []),
     StreamedReponse = send_streamed_body(Body, 4),
@@ -1128,6 +1154,115 @@ send_streamed_body(Body, Max) ->
         _ ->
             {Body, done}
     end.
+
+%% 201 result via P11, exercising webmachine_decision_core:accept_helper code
+created_p11_accept_helper() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    FourtyTwoMugs = string:copies("mug", 42),
+    ContentType = "text/plain",
+    put_setting(content_types_accepted, [{ContentType, accept_text}]),
+    put_setting(is_conflict, {new_location, ?URL ++ "/new"}),
+    PutRequest = {?URL ++ "/put", [], ContentType, FourtyTwoMugs},
+    {ok, Result} = httpc:request(put, PutRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+accept_text(ReqData, Context) ->
+    ReqBody = wrq:req_body(ReqData),
+    Text = binary:bin_to_list(ReqBody),
+    Reply = binary:list_to_bin("Recieved: " ++ Text ++ "."),
+    RDWithBody = wrq:set_resp_body(Reply, ReqData),
+    {true, RDWithBody, Context}.
+
+%% 200 result from a GET using the "Write callable response method," which is
+%% commented on this commit:
+%% github.com/basho/webmachine/commit/96f5c5a679595e3554fc3e6af565faf5c6e37bbd
+writer_callback() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(content_types_provided, [{"text/plain", writer_response}]),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+writer_response(ReqData, Context) ->
+    Body =
+        fun(Write) ->
+                Content = string:copies("mug", 42),
+                Write(Content)
+        end,
+    {{writer, Body}, ReqData, Context}.
+
+%% 200 result from a HEAD when the length is known, a special case for Riak CS
+head_length_access_for_cs() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(content_types_provided, [{"text/plain", known_length_body}]),
+    {ok, Result} = httpc:request(head, {?URL ++ "/knownlength", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 200 result from a GET when the length is known, a special case for Riak CS
+get_known_length_for_cs() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(content_types_provided, [{"text/plain", known_length_body}]),
+    {ok, Result} = httpc:request(get, {?URL ++ "/knownlength", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+known_length_body(ReqData, Context) ->
+    Content = "You have requested " ++ wrq:raw_path(ReqData) ++ ".",
+    Size = string:len(Content),
+    StreamBody = send_streamed_body(Content, 4),
+    {{known_length_stream, Size, StreamBody}, ReqData, Context}.
+
+%% 200 result from a GET exercising the range response form of returning bodies
+get_for_range_capable_stream() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(content_types_provided, [{"text/plain", range_response}]),
+    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% Return a function that, when given a range, returns a StreamBody for the
+%% content in that range
+range_response(ReqData, Context) ->
+    Content = string:copies("mug", 42),
+    Size = string:len(Content),
+    Fun = fun(Start, End) ->
+                  Length = (End - Start) + 1,
+                  Result = string:substr(Content, Start + 1, Length),
+                  {Result, done}
+          end,
+    {{stream, Size, Fun}, ReqData, Context}.
+
+%% TODO
+stream_content_md5() ->
+    put_setting(allowed_methods, ['GET', 'HEAD', 'POST', 'PUT']),
+    put_setting(process_post, {mfa, ?MODULE, process_post_for_md5_stream, []}),
+    ContentType = "text/plain",
+    FooPrime = string:copies("foo", 128),
+    InvalidMD5Sum = base64:encode_to_string("this is invalid for foo prime"),
+    Headers = [{"Content-MD5", InvalidMD5Sum}],
+    PostRequest = {?URL ++ "/post", Headers, ContentType, FooPrime},
+    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
+    ExpectedDecisionTrace = ?PATH_TO_B9A,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+process_post_for_md5_stream(ReqData, _Context, _) ->
+    _StreamBody = wrq:stream_req_body(ReqData, 3),
+    ok.
 
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
@@ -1258,9 +1393,9 @@ encodings_provided(ReqData, Context) ->
     Value =
         case Setting of
             use_identity ->
-                [{"identity", fun(X) -> X end}];
+                [{"identity", fun identity/1}];
             use_identity_or_gzip ->
-                [{"identity", fun(X) -> X end},
+                [{"identity", fun identity/1},
                  {"gzip", fun(X) -> zlib:gzip(X) end}];
             none ->
                 [];
@@ -1377,10 +1512,10 @@ delete_completed(ReqData, Context) ->
     Setting = lookup_setting(delete_completed),
     {Setting, ReqData, Context}.
 
+identity(X) ->
+    X.
+
 to_html(ReqData, Context) ->
     {?HTML_CONTENT, ReqData, Context}.
-
-as_text(ReqData, Context) ->
-    {"Text?", ReqData, Context}.
 
 -endif.
