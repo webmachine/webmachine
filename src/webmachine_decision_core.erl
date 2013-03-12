@@ -710,6 +710,7 @@ compute_body_md5() ->
         stream_conflict ->
             compute_body_md5_stream();
         Body ->
+            io:format(user, "~nBody = ~p", [Body]),
             crypto:md5(Body)
     end.
 

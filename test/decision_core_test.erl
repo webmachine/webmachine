@@ -258,9 +258,12 @@
 -define(PATH_TO_J18_NO_ACPTHEAD_3,
         ?PATH_TO_H12_NO_ACPTHEAD_2++[v3i12,v3i13,v3j18]).
 
-%% A path to a 204 with most defaults used, md5 checksum substate [Clever way
-%% to write this removed until a better solution for decision paths and
-%% substates is devised]
+%% Paths to a 201 and 204 with most defaults used, md5 checksum substate
+%% To prevent
+-define(PATH_TO_201_WITH_MD5_CHECKSUM,
+        [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9,v3b9a,v3b9b,v3b8,v3b7,v3b6,v3b5,
+         v3b4,v3b3,v3c3,v3d4,v3e5,v3f6,v3g7,v3h7,v3i7,v3k7,v3l7,v3m7,v3n11,
+         v3p11]).
 -define(PATH_TO_204_WITH_MD5_CHECKSUM,
         [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9,v3b9a,v3b9b,v3b8,v3b7,v3b6,v3b5,
          v3b4,v3b3,v3c3,v3d4,v3e5,v3f6,v3g7,v3g8,v3h10,v3i12,v3l13,v3m16,v3n16,
@@ -270,11 +273,11 @@
 %% TEST SETUP AND CLEANUP
 %%
 decision_core_test_() ->
-    _Tests =
+    Tests =
         [
          {"workin", fun stream_content_md5/0}
         ],
-    Tests =
+    _Tests =
         [
          {"503 it's not you, it's me", fun service_unavailable/0},
          {"503 ping doesn't return pong", fun ping_invalid/0},
@@ -1132,8 +1135,8 @@ created_p11_streamed() ->
 process_post_for_created_p11(ReqData, Context, NewLocation) ->
     StreamBody = wrq:stream_req_body(ReqData, 3),
     Body = get_streamed_body(StreamBody, []),
-    StreamedReponse = send_streamed_body(Body, 4),
-    RDWithBody = wrq:set_resp_body({stream, StreamedReponse}, ReqData),
+    StreamedResponse = send_streamed_body(Body, 4),
+    RDWithBody = wrq:set_resp_body({stream, StreamedResponse}, ReqData),
     Headers = [{"Location", NewLocation}],
     RDWithBodyAndLocation = wrq:set_resp_headers(Headers, RDWithBody),
     {true, RDWithBodyAndLocation, Context}.
@@ -1245,24 +1248,73 @@ range_response(ReqData, Context) ->
           end,
     {{stream, Size, Fun}, ReqData, Context}.
 
-%% TODO
+%% 201 result via P11 from a POST with a streaming/chunked body and an MD5-sum
 stream_content_md5() ->
     put_setting(allowed_methods, ['GET', 'HEAD', 'POST', 'PUT']),
-    put_setting(process_post, {mfa, ?MODULE, process_post_for_md5_stream, []}),
+    put_setting(validate_content_checksum,
+                {mfa, ?MODULE, validate_checksum_for_md5stream, not_validated}),
+    NewLocation = ?RESOURCE_PATH ++ "/posted",
+    put_setting(process_post,
+                {mfa, ?MODULE, process_post_for_md5_stream, NewLocation}),
+    put_setting(resource_exists, false),
+    put_setting(allow_missing_post, true),
     ContentType = "text/plain",
-    FooPrime = string:copies("foo", 128),
-    InvalidMD5Sum = base64:encode_to_string("this is invalid for foo prime"),
-    Headers = [{"Content-MD5", InvalidMD5Sum}],
-    PostRequest = {?URL ++ "/post", Headers, ContentType, FooPrime},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
-    ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B9A,
-    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    Content = "foo",
+    ValidMD5Sum = base64:encode_to_string(crypto:md5(Content)),
+    ibrowse:start(),
+    Url = ?URL ++ "/post",
+    Headers = [{"Content-Type", ContentType},
+%               {"Content-Length", string:len(Content)},
+               {"Content-MD5", ValidMD5Sum},
+               {"Expect", "100-continue"}],
+    BodyGenerator = fun(Step) ->
+                            case Step of
+                                0 -> {ok, Content, Step + 1};
+                                _ -> eof
+                            end
+                    end,
+    Body = {BodyGenerator, 0},
+    Options = [{transfer_encoding, {chunked, 3}}],
+    Result = ibrowse:send_req(Url, Headers, post, Body, Options),
+    io:format(user, "~nResult = ~p", [Result]),
+    {ok, Status, _RespHeaders, _RespBody} = Result,
+%    Headers = [{"Expect", "100-continue"}],
+%    Headers = [],
+%    Headers = [{"Content-MD5", ValidMD5Sum}],
+%    Headers = [{"Content-MD5", ValidMD5Sum},
+%               {"Expect", "100-continue"}],
+%    BodyGenerator = fun(Step) ->
+%                            case Step of
+%                                0 -> {ok, "foo", Step + 1};
+%                                _ -> eof
+%                            end
+%                    end,
+%    Body = {chunkify, BodyGenerator, 0},
+%    Body = Content,
+%    PostRequest = {?URL ++ "/post", Headers, ContentType, Body},
+%    io:format(user, "~n~p~n", [PostRequest]),
+%    {ok, Result} = httpc:request(post, PostRequest, [], []),
+%    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
+    ?assertEqual("201", Status),
+%    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
+%    ExpectedDecisionTrace = ?PATH_TO_201_WITH_MD5_CHECKSUM,
+%    ?printThem,
+%    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-process_post_for_md5_stream(ReqData, _Context, _) ->
-    _StreamBody = wrq:stream_req_body(ReqData, 3),
-    ok.
+validate_checksum_for_md5stream(ReqData, Context, Result) ->
+    _StreamBody = wrq:stream_req_body(ReqData, 5),
+    {Result, ReqData, Context}.
+
+process_post_for_md5_stream(ReqData, Context, NewLocation) ->
+    Headers = [{"Location", NewLocation}],
+    RDWithLocation = wrq:set_resp_headers(Headers, ReqData),
+%    ReqBody = wrq:stream_req_body(ReqData, 1024),
+%    Text = get_streamed_body(ReqBody, []),
+%    Text = wrq:req_body(ReqData),
+%    io:format(user, "~nReceived: ~p", [Text]),
+%    io:format(user, "~nReqData: ~p", [ReqData]),
+    {true, RDWithLocation, Context}.
 
 %%
 %% WEBMACHINE RESOURCE FUNCTIONS AND CONFIGURATION
@@ -1332,7 +1384,13 @@ service_available(ReqData, Context) ->
 
 validate_content_checksum(ReqData, Context) ->
     Setting = lookup_setting(validate_content_checksum),
-    {Setting, ReqData, Context}.
+    case Setting of 
+        %% general callback
+        {mfa, Mod, Fun, Arg} ->
+            erlang:apply(Mod, Fun, [ReqData, Context, Arg]);
+        _ ->
+            {Setting, ReqData, Context}
+    end.
 
 is_authorized(ReqData, Context) ->
     Setting = lookup_setting(is_authorized),
