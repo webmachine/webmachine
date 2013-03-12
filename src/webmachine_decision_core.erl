@@ -167,7 +167,12 @@ decision(v3b10) ->
         false ->
             wrcall({set_resp_headers, [{"Allow",
                    string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
-            respond(405)
+            case application:get_env(webmachine, error_response_on_405) of
+                {ok, true} ->
+                    error_response(405, "Method Not Allowed");
+                _ ->
+                    respond(405)
+            end
     end;
 
 %% "Content-MD5 present?"
