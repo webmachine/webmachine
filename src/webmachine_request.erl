@@ -100,8 +100,8 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.9.2").
--define(QUIP, "someone had painted it blue").
+-define(WMVSN, "1.10.0").
+-define(QUIP, "never breaks eye contact").
 -define(IDLE_TIMEOUT, infinity).
 
 new(#wm_reqstate{}=ReqState) ->
