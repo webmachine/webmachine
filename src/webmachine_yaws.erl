@@ -111,21 +111,22 @@ add_header(Header, Value, Headers) ->
     yaws_api:set_header(Headers, Header, Value).
 
 merge_header(Header, Value, Headers) ->
-    NewVal = case yaws_api:get_header(Headers, Header) of
-                 undefined ->
-                     Value;
-                 OldVal ->
-                     OldVal ++ ", " ++ Value
-             end,
-    yaws_api:set_header(Headers, Header, NewVal).
+    yaws_api:merge_header(Headers, Header, Value).
+
+header_formatter(H, V) when is_atom(H) ->
+    header_formatter(atom_to_list(H), V);
+header_formatter(H, {multi, Vals}) ->
+    [{H, V} || V <- Vals];
+header_formatter(H, V) ->
+    {H, V}.
 
 headers_to_list(Headers) ->
-    Formatter = fun(H,V) when is_atom(H) ->
-                        {atom_to_list(H), V};
-                   (H,V) ->
-                        {H,V}
-                end,
-    yaws_api:reformat_header(Headers, Formatter).
+    Formatted = yaws_api:reformat_header(Headers, fun header_formatter/2),
+    lists:foldr(fun({_,_}=HV, Acc) ->
+                        [HV|Acc];
+                   (HVList, Acc) when is_list(HVList) ->
+                        lists:foldl(fun(HV, Acc2) -> [HV|Acc2] end, Acc, HVList)
+                end, [], Formatted).
 
 headers_from_list(Headers) ->
     lists:foldl(fun({Hdr,Val}, Hdrs) ->
