@@ -275,10 +275,6 @@
 decision_core_test_() ->
     Tests =
         [
-         {"workin", fun stream_content_md5/0}
-        ],
-    _Tests =
-        [
          {"503 it's not you, it's me", fun service_unavailable/0},
          {"503 ping doesn't return pong", fun ping_invalid/0},
          {"500 ping raises error", fun ping_error/0},
@@ -343,6 +339,7 @@ decision_core_test_() ->
          {"200 via head, known length", fun head_length_access_for_cs/0},
          {"200 via get, known length", fun get_known_length_for_cs/0},
          {"200 via get, stream range", fun get_for_range_capable_stream/0}
+         %%,{"known failure", fun stream_content_md5/0}
         ],
     {foreach, fun setup/0, fun cleanup/1, Tests}.
 
@@ -1249,6 +1246,9 @@ range_response(ReqData, Context) ->
     {{stream, Size, Fun}, ReqData, Context}.
 
 %% 201 result via P11 from a POST with a streaming/chunked body and an MD5-sum
+%%
+%% This test exposes a bug with the code that checks a stream's MD5 sum
+%% Known Failure
 stream_content_md5() ->
     put_setting(allowed_methods, ['GET', 'HEAD', 'POST', 'PUT']),
     put_setting(validate_content_checksum,
@@ -1264,7 +1264,6 @@ stream_content_md5() ->
     ibrowse:start(),
     Url = ?URL ++ "/post",
     Headers = [{"Content-Type", ContentType},
-%               {"Content-Length", string:len(Content)},
                {"Content-MD5", ValidMD5Sum},
                {"Expect", "100-continue"}],
     BodyGenerator = fun(Step) ->
@@ -1276,30 +1275,10 @@ stream_content_md5() ->
     Body = {BodyGenerator, 0},
     Options = [{transfer_encoding, {chunked, 3}}],
     Result = ibrowse:send_req(Url, Headers, post, Body, Options),
-    io:format(user, "~nResult = ~p", [Result]),
     {ok, Status, _RespHeaders, _RespBody} = Result,
-%    Headers = [{"Expect", "100-continue"}],
-%    Headers = [],
-%    Headers = [{"Content-MD5", ValidMD5Sum}],
-%    Headers = [{"Content-MD5", ValidMD5Sum},
-%               {"Expect", "100-continue"}],
-%    BodyGenerator = fun(Step) ->
-%                            case Step of
-%                                0 -> {ok, "foo", Step + 1};
-%                                _ -> eof
-%                            end
-%                    end,
-%    Body = {chunkify, BodyGenerator, 0},
-%    Body = Content,
-%    PostRequest = {?URL ++ "/post", Headers, ContentType, Body},
-%    io:format(user, "~n~p~n", [PostRequest]),
-%    {ok, Result} = httpc:request(post, PostRequest, [], []),
-%    ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ?assertEqual("201", Status),
-%    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
-%    ExpectedDecisionTrace = ?PATH_TO_201_WITH_MD5_CHECKSUM,
-%    ?printThem,
-%    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ExpectedDecisionTrace = ?PATH_TO_201_WITH_MD5_CHECKSUM,
+    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
 validate_checksum_for_md5stream(ReqData, Context, Result) ->
@@ -1312,8 +1291,6 @@ process_post_for_md5_stream(ReqData, Context, NewLocation) ->
 %    ReqBody = wrq:stream_req_body(ReqData, 1024),
 %    Text = get_streamed_body(ReqBody, []),
 %    Text = wrq:req_body(ReqData),
-%    io:format(user, "~nReceived: ~p", [Text]),
-%    io:format(user, "~nReqData: ~p", [ReqData]),
     {true, RDWithLocation, Context}.
 
 %%
