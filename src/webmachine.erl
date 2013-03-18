@@ -81,17 +81,17 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 %%
 %% TEST
 %%
-%-ifdef(TEST).
-%
-%-include_lib("eunit/include/eunit.hrl").
-%
-%start_stop_test() ->
-%    application:start(inets),
-%    application:start(mochiweb),
-%    ?assertEqual(ok, webmachine:start()),
-%    ?assertEqual(ok, webmachine:stop()),
-%    application:stop(mochiweb),
-%    application:stop(inets),
-%    ok.
-%
-%-endif.
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+start_stop_test() ->
+    application:start(inets),
+    application:start(mochiweb),
+    ?assertEqual(ok, webmachine:start()),
+    ?assertEqual(ok, webmachine:stop()),
+    application:stop(mochiweb),
+    application:stop(inets),
+    ok.
+
+-endif.
