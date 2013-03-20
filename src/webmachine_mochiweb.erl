@@ -22,8 +22,7 @@
 
 %% The `log_dir' option is deprecated, but remove it from the
 %% options list if it is present
--define(WM_OPTIONS, [default_router,
-                     error_handler,
+-define(WM_OPTIONS, [error_handler,
                      log_dir,
                      rewrite_module,
                      resource_module_option]).
@@ -31,29 +30,12 @@
 -define (WM_OPTION_DEFAULTS, [{error_handler, webmachine_error_handler}]).
 
 start(Options) ->
-    {DispatchList, PName, WMOptions, OtherOptions} = get_wm_options(Options),
-    webmachine_router:init_routes(PName, DispatchList),
+    {DispatchList, PName, DGroup, WMOptions, OtherOptions} = get_wm_options(Options),
+    webmachine_router:init_routes(DGroup, DispatchList),
     [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
-    maybe_stop_default_router(),
-    MochiName = list_to_atom(atom_to_list(PName) ++ "_mochiweb"),
-    LoopFun = fun(X) -> loop(PName, X) end,
+    MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
+    LoopFun = fun(X) -> loop(DGroup, X) end,
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
-
-maybe_stop_default_router() ->
-    case application:get_env(webmachine, default_router) of
-        {ok, false} ->
-            delete_default_router(stop_default_router());
-        _ ->
-            ok
-    end.
-
-stop_default_router() ->
-    supervisor:terminate_child(webmachine_sup, webmachine_router).
-
-delete_default_router(ok) ->
-    supervisor:delete_child(webmachine_sup, webmachine_router);
-delete_default_router({error, _Reason}) ->
-    ok.
 
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),
@@ -125,12 +107,17 @@ get_wm_options(Options) ->
     {Name, Options2} =
         case get_option(name, Options1) of
             {undefined, Opts2} ->
-                {webmachine_router, Opts2};
-            Res ->
-                Res
+                {webmachine, Opts2};
+            NRes -> NRes
         end,
-    {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options2}, ?WM_OPTIONS),
-    {DispatchList, Name, WMOptions, RestOptions}.
+    {DGroup, Options3} =
+        case get_option(dispatch_group, Options2) of
+            {undefined, Opts3} ->
+                {default, Opts3};
+            RRes -> RRes
+        end,
+    {WMOptions, RestOptions} = lists:foldl(fun get_wm_option/2, {[], Options3}, ?WM_OPTIONS),
+    {DispatchList, Name, DGroup, WMOptions, RestOptions}.
 
 get_option(Option, Options) ->
     case lists:keytake(Option, 1, Options) of
@@ -178,3 +165,8 @@ resource_module(Mod, _, undefined) ->
     Mod;
 resource_module(Mod, ModOpts, {ok, OptionVal}) ->
     proplists:get_value(OptionVal, ModOpts, Mod).
+
+to_list(L) when is_list(L) ->
+    L;
+to_list(A) when is_atom(A) ->
+    atom_to_list(A).
