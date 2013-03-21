@@ -219,7 +219,6 @@ add_remove_route_test() ->
     [PathSpec] = get_routes(),
     webmachine_router:remove_route(PathSpec),
     [] = get_routes(),
-    webmachine_router:remove_resource(foo),
     ets:delete(?MODULE),
     exit(Pid, kill).
 
