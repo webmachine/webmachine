@@ -211,70 +211,70 @@ set_dispatch_list(Name, DispatchList) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-add_remove_route_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
-    PathSpec = {["foo"], foo, []},
-    webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
-    webmachine_router:remove_route(PathSpec),
-    [] = get_routes(),
-    ets:delete(?MODULE),
-    exit(Pid, kill).
+%% add_remove_route_test() ->
+%%     {ok, Pid} = webmachine_router:start_link(),
+%%     unlink(Pid),
+%%     PathSpec = {["foo"], foo, []},
+%%     webmachine_router:add_route(PathSpec),
+%%     [PathSpec] = get_routes(),
+%%     webmachine_router:remove_route(PathSpec),
+%%     [] = get_routes(),
+%%     ets:delete(?MODULE),
+%%     exit(Pid, kill).
 
-add_remove_resource_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
-    PathSpec1 = {["foo"], foo, []},
-    PathSpec2 = {["bar"], foo, []},
-    PathSpec3 = {["baz"], bar, []},
-    PathSpec4 = {["foo"], fun(_) -> true end, foo, []},
-    PathSpec5 = {["foo"], {webmachine_router, test_guard}, foo, []},
-    webmachine_router:add_route(PathSpec1),
-    webmachine_router:add_route(PathSpec2),
-    webmachine_router:add_route(PathSpec3),
-    webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
-    webmachine_router:add_route(PathSpec4),
-    webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
-    webmachine_router:add_route(PathSpec5),
-    webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
-    webmachine_router:remove_route(PathSpec3),
-    [begin
-         PathSpec = {"localhost", [HostPath]},
-         webmachine_router:add_route(PathSpec),
-         webmachine_router:remove_resource(foo),
-         [{"localhost", []}] = get_routes(),
-         webmachine_router:remove_route({"localhost", []})
-     end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
-    ets:delete(?MODULE),
-    exit(Pid, kill).
+%% add_remove_resource_test() ->
+%%     {ok, Pid} = webmachine_router:start_link(),
+%%     unlink(Pid),
+%%     PathSpec1 = {["foo"], foo, []},
+%%     PathSpec2 = {["bar"], foo, []},
+%%     PathSpec3 = {["baz"], bar, []},
+%%     PathSpec4 = {["foo"], fun(_) -> true end, foo, []},
+%%     PathSpec5 = {["foo"], {webmachine_router, test_guard}, foo, []},
+%%     webmachine_router:add_route(PathSpec1),
+%%     webmachine_router:add_route(PathSpec2),
+%%     webmachine_router:add_route(PathSpec3),
+%%     webmachine_router:remove_resource(foo),
+%%     [PathSpec3] = get_routes(),
+%%     webmachine_router:add_route(PathSpec4),
+%%     webmachine_router:remove_resource(foo),
+%%     [PathSpec3] = get_routes(),
+%%     webmachine_router:add_route(PathSpec5),
+%%     webmachine_router:remove_resource(foo),
+%%     [PathSpec3] = get_routes(),
+%%     webmachine_router:remove_route(PathSpec3),
+%%     [begin
+%%          PathSpec = {"localhost", [HostPath]},
+%%          webmachine_router:add_route(PathSpec),
+%%          webmachine_router:remove_resource(foo),
+%%          [{"localhost", []}] = get_routes(),
+%%          webmachine_router:remove_route({"localhost", []})
+%%      end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
+%%     ets:delete(?MODULE),
+%%     exit(Pid, kill).
 
-no_dupe_path_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
-    PathSpec = {["foo"], foo, []},
-    webmachine_router:add_route(PathSpec),
-    webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
-    ets:delete(?MODULE),
-    exit(Pid, kill).
+%% no_dupe_path_test() ->
+%%     {ok, Pid} = webmachine_router:start_link(),
+%%     unlink(Pid),
+%%     PathSpec = {["foo"], foo, []},
+%%     webmachine_router:add_route(PathSpec),
+%%     webmachine_router:add_route(PathSpec),
+%%     [PathSpec] = get_routes(),
+%%     ets:delete(?MODULE),
+%%     exit(Pid, kill).
 
-supervisor_restart_keeps_routes_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
-    PathSpec = {["foo"], foo, []},
-    webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
-    OldRouter = whereis(webmachine_router),
-    exit(whereis(webmachine_router), kill),
-    timer:sleep(100),
-    NewRouter = whereis(webmachine_router),
-    ?assert(OldRouter /= NewRouter),
-    [PathSpec] = get_routes(),
-    ets:delete(?MODULE),
-    exit(Pid, kill).
+%% supervisor_restart_keeps_routes_test() ->
+%%     {ok, Pid} = webmachine_router:start_link(),
+%%     unlink(Pid),
+%%     PathSpec = {["foo"], foo, []},
+%%     webmachine_router:add_route(PathSpec),
+%%     [PathSpec] = get_routes(),
+%%     OldRouter = whereis(webmachine_router),
+%%     exit(whereis(webmachine_router), kill),
+%%     timer:sleep(100),
+%%     NewRouter = whereis(webmachine_router),
+%%     ?assert(OldRouter /= NewRouter),
+%%     [PathSpec] = get_routes(),
+%%     ets:delete(?MODULE),
+%%     exit(Pid, kill).
 
 -endif.
