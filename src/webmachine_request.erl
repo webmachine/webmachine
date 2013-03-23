@@ -344,10 +344,7 @@ send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
 
 send_chunk(Socket, Data) ->
     Size = iolist_size(Data),
-    send(Socket, mochihex:to_hex(Size)),
-    send(Socket, <<"\r\n">>),
-    send(Socket, Data),
-    send(Socket, <<"\r\n">>),
+    send(Socket, [mochihex:to_hex(Size), <<"\r\n">>, Data, <<"\r\n">>]),
     Size.
 
 send_ok_response({?MODULE, ReqState}=Req) ->
