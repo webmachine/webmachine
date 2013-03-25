@@ -211,70 +211,103 @@ set_dispatch_list(Name, DispatchList) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-%% add_remove_route_test() ->
-%%     {ok, Pid} = webmachine_router:start_link(),
-%%     unlink(Pid),
-%%     PathSpec = {["foo"], foo, []},
-%%     webmachine_router:add_route(PathSpec),
-%%     [PathSpec] = get_routes(),
-%%     webmachine_router:remove_route(PathSpec),
-%%     [] = get_routes(),
-%%     ets:delete(?MODULE),
-%%     exit(Pid, kill).
+webmachine_router_test_() ->
+    {setup,
+     fun() ->
+             {ok, Pid} = webmachine_router:start_link(),
+             unlink(Pid),
+             {Pid}
+     end,
+     fun({Pid}) ->
+             exit(Pid, kill),
+             wait_for_termination(webmachine_router),
+             %% the test process owns the table, so we clear it between tests
+             ets:delete(?MODULE)
+     end,
+     [{"add_remove_route", fun add_remove_route/0},
+      {"add_remove_resource", fun add_remove_resource/0},
+      {"no_dupe_path", fun no_dupe_path/0}
+      ]}.
 
-%% add_remove_resource_test() ->
-%%     {ok, Pid} = webmachine_router:start_link(),
-%%     unlink(Pid),
-%%     PathSpec1 = {["foo"], foo, []},
-%%     PathSpec2 = {["bar"], foo, []},
-%%     PathSpec3 = {["baz"], bar, []},
-%%     PathSpec4 = {["foo"], fun(_) -> true end, foo, []},
-%%     PathSpec5 = {["foo"], {webmachine_router, test_guard}, foo, []},
-%%     webmachine_router:add_route(PathSpec1),
-%%     webmachine_router:add_route(PathSpec2),
-%%     webmachine_router:add_route(PathSpec3),
-%%     webmachine_router:remove_resource(foo),
-%%     [PathSpec3] = get_routes(),
-%%     webmachine_router:add_route(PathSpec4),
-%%     webmachine_router:remove_resource(foo),
-%%     [PathSpec3] = get_routes(),
-%%     webmachine_router:add_route(PathSpec5),
-%%     webmachine_router:remove_resource(foo),
-%%     [PathSpec3] = get_routes(),
-%%     webmachine_router:remove_route(PathSpec3),
-%%     [begin
-%%          PathSpec = {"localhost", [HostPath]},
-%%          webmachine_router:add_route(PathSpec),
-%%          webmachine_router:remove_resource(foo),
-%%          [{"localhost", []}] = get_routes(),
-%%          webmachine_router:remove_route({"localhost", []})
-%%      end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
-%%     ets:delete(?MODULE),
-%%     exit(Pid, kill).
+%% Wait until the given registered name cannot be found, to ensure that
+%% another test can safely start it again via start_link
+wait_for_termination(RegName) ->
+    IdOrUndefined = whereis(RegName),
+    case IdOrUndefined of
+        undefined ->
+            ok;
+        _ ->
+            timer:sleep(100),
+            wait_for_termination(RegName)
+    end.
 
-%% no_dupe_path_test() ->
-%%     {ok, Pid} = webmachine_router:start_link(),
-%%     unlink(Pid),
-%%     PathSpec = {["foo"], foo, []},
-%%     webmachine_router:add_route(PathSpec),
-%%     webmachine_router:add_route(PathSpec),
-%%     [PathSpec] = get_routes(),
-%%     ets:delete(?MODULE),
-%%     exit(Pid, kill).
+add_remove_route() ->
+    PathSpec = {["foo"], foo, []},
+    webmachine_router:add_route(PathSpec),
+    ?assertEqual([PathSpec], get_routes()),
+    webmachine_router:remove_route(PathSpec),
+    ?assertEqual([], get_routes()),
+    ok.
 
-%% supervisor_restart_keeps_routes_test() ->
-%%     {ok, Pid} = webmachine_router:start_link(),
-%%     unlink(Pid),
-%%     PathSpec = {["foo"], foo, []},
-%%     webmachine_router:add_route(PathSpec),
-%%     [PathSpec] = get_routes(),
-%%     OldRouter = whereis(webmachine_router),
-%%     exit(whereis(webmachine_router), kill),
-%%     timer:sleep(100),
-%%     NewRouter = whereis(webmachine_router),
-%%     ?assert(OldRouter /= NewRouter),
-%%     [PathSpec] = get_routes(),
-%%     ets:delete(?MODULE),
-%%     exit(Pid, kill).
+add_remove_resource() ->
+    PathSpec1 = {["foo"], foo, []},
+    PathSpec2 = {["bar"], foo, []},
+    PathSpec3 = {["baz"], bar, []},
+    PathSpec4 = {["foo"], fun(_) -> true end, foo, []},
+    PathSpec5 = {["foo"], {webmachine_router, test_guard}, foo, []},
+    webmachine_router:add_route(PathSpec1),
+    webmachine_router:add_route(PathSpec2),
+    webmachine_router:add_route(PathSpec3),
+    webmachine_router:remove_resource(foo),
+    ?assertEqual([PathSpec3], get_routes()),
+    webmachine_router:add_route(PathSpec4),
+    webmachine_router:remove_resource(foo),
+    ?assertEqual([PathSpec3], get_routes()),
+    webmachine_router:add_route(PathSpec5),
+    webmachine_router:remove_resource(foo),
+    ?assertEqual([PathSpec3], get_routes()),
+    webmachine_router:remove_route(PathSpec3),
+    [begin
+         PathSpec = {"localhost", [HostPath]},
+         webmachine_router:add_route(PathSpec),
+         webmachine_router:remove_resource(foo),
+         ?assertEqual([{"localhost", []}], get_routes()),
+         webmachine_router:remove_route({"localhost", []})
+     end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
+    ok.
+
+no_dupe_path() ->
+    PathSpec = {["foo"], foo, []},
+    webmachine_router:add_route(PathSpec),
+    webmachine_router:add_route(PathSpec),
+    ?assertEqual([PathSpec], get_routes()),
+    ok.
+
+supervisor_restart_keeps_routes_test() ->
+    {ok, Pid} = webmachine_router:start_link(),
+    unlink(Pid),
+    PathSpec = {["foo"], foo, []},
+    webmachine_router:add_route(PathSpec),
+    ?assertEqual([PathSpec], get_routes()),
+    OldRouter = whereis(webmachine_router),
+    ?assertEqual(Pid, OldRouter),
+    exit(whereis(webmachine_router), kill),
+    timer:sleep(100),
+    NewRouter = undefined,
+%    NewRouter = wait_for_restart(webmachine_router),
+    ?assert(OldRouter /= NewRouter),
+    ?assertEqual([PathSpec], get_routes()),
+    exit(Pid, kill),
+    ets:delete(?MODULE),
+    ok.
+
+%% wait_for_restart(RegName) ->
+%%     IdOrUndefined = whereis(RegName),
+%%     case IdOrUndefined of
+%%         undefined ->
+%%             timer:sleep(100),
+%%             wait_for_restart(RegName);
+%%         Id -> Id
+%%     end.
 
 -endif.
