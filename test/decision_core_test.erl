@@ -22,9 +22,9 @@
 
 -compile(export_all).
 
--define(PORT, 12001).
+-define(PORT, 12322).
 -define(RESOURCE_PATH, "/decisioncore").
--define(URL, "http://localhost:12001" ++ ?RESOURCE_PATH).
+-define(URL, "http://localhost:12322" ++ ?RESOURCE_PATH).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
 
