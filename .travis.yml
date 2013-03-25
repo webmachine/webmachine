@@ -6,7 +6,7 @@ env:
     - secure: "s4POHb3TKagwSWSj18cfjMSiBNb6p/5slK4xlzElpox/V9sSVWVOfTy/FfgC\nimM+UivORZW+5wCbryZnWhFs6KrynSzzDUO2XKbzMzvy5yPkjDgAdkSXA3Xs\nE1ELFA14Lb6kg8/JCzbAYZFUPNRky8T/rr6OohSu0F0daMp5IN0="
 before_script:
   - "gem install travis-artifacts"
-script: "set -o pipefail; make test 2>&1 | tee test.log"
+script: "set -o pipefail; ./rebar -v skip_deps=true eunit 2>&1 | tee test.log"
 after_failure:
   - "tar cvzf test.tgz --exclude '*.beam' --exclude '*.erl' test.log .eunit"
   - "travis-artifacts upload --path test.tgz"
