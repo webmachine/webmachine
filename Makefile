@@ -21,3 +21,5 @@ edoc:
 test: all
 	@(./rebar skip_deps=true eunit)
 
+verbosetest: all
+	@(./rebar -v skip_deps=true eunit)
