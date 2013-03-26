@@ -349,14 +349,21 @@ setup() ->
     application:start(inets),
     WebConfig = [{ip, "0.0.0.0"},
                  {port, ?PORT},
-                 {dispatch, [{["decisioncore", '*'],
-                              ?MODULE, []}]}
-                ],
-    {ok, Pid0} = webmachine_sup:start_link(),
-    {ok, Pid} = webmachine_mochiweb:start(WebConfig),
-    link(Pid),
+                 {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
+    Pid0 = start_webmachine(),
+    {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
+    link(Pid1),
     meck:new(webmachine_resource, [passthrough]),
-    {Pid0, Pid}.
+    {Pid0, Pid1}.
+
+start_webmachine() ->
+    case webmachine_sup:start_link() of
+        {ok, Pid} ->
+            Pid;
+        {error, {already_started, Pid}} ->
+            exit(Pid, brutal_kill),
+            start_webmachine()
+    end.
 
 cleanup({Pid0, Pid1}) ->
     meck:unload(webmachine_resource),
