@@ -347,7 +347,7 @@ setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-    application:start(sasl),
+%%    application:start(sasl),
     Pid0 = start_webmachine(),
     WebConfig = [{ip, "0.0.0.0"},
                  {port, ?PORT},
