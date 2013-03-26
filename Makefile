@@ -2,7 +2,7 @@ ERL          ?= erl
 APP          := webmachine
 
 REPO = ${shell echo `basename "$${PWD}"`}
-ARTIFACTSFILE = ${shell echo ${REPO}-`date +%F-%a-%T`.tgz}
+ARTIFACTSFILE = ${shell echo ${REPO}-`date +%F_%H-%M-%S`.tgz}
 
 .PHONY: deps
 
