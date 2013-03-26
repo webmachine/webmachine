@@ -7,9 +7,7 @@ env:
 before_script:
   - "gem install travis-artifacts"
 script: "set -o pipefail; make verbosetest 2>&1 | tee test.log"
-after_failure:
-  - "tar cvzf test.tgz --exclude '*.beam' --exclude '*.erl' test.log .eunit"
-  - "travis-artifacts upload --path test.tgz"
+after_failure: "make travisupload"
 language: erlang
 notifications:
   webhooks: http://basho-engbot.herokuapp.com/travis?key=66724b424957d598311ba00bb2d137fcae4eae21
