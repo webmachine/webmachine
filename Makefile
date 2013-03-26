@@ -28,5 +28,5 @@ verbosetest: all
 	@(./rebar -v skip_deps=true eunit)
 
 travisupload:
-	tar cvfz ${ARTIFACTSFILE} --execlude '*.beam' --exclude '*.erl' test.log .eunit
+	tar cvfz ${ARTIFACTSFILE} --exclude '*.beam' --exclude '*.erl' test.log .eunit
 	travis-artifacts upload --path ${ARTIFACTSFILE}
