@@ -363,6 +363,7 @@ start_webmachine() ->
             Pid;
         {error, {already_started, Pid}} ->
             exit(Pid, kill),
+            erlang:yield(),
             start_webmachine()
     end.
 
