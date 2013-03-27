@@ -341,7 +341,27 @@ decision_core_test_() ->
          {"200 via get, stream range", fun get_for_range_capable_stream/0}
          %%,{"known failure", fun stream_content_md5/0}
         ],
-    {spawn, [{foreach, fun setup/0, fun cleanup/1, Tests}]}.
+    {spawn,
+     [{foreach,
+       fun() ->
+               try
+                   setup()
+               catch
+                   T:E ->
+                       io:format(user, "~nEXCEPTION~nT=~p~nE=~p~nTRACE: ~p~n",
+                                 [T, E, erlang:get_stacktrace()])
+               end
+       end,
+       fun(V) ->
+               try
+                   cleanup(V)
+               catch
+                   T:E ->
+                       io:format(user, "~nEXCEPTION~nT=~p~nE=~p~nTRACE: ~p~n",
+                                 [T, E, erlang:get_stacktrace()])
+               end
+       end,
+       Tests}]}.
 
 setup() ->
 %%    error_logger:tty(false),
