@@ -358,14 +358,15 @@ setup() ->
     {Pid0, Pid1}.
 
 start_webmachine() ->
-    case webmachine_sup:start_link() of
-        {ok, Pid} ->
-            Pid;
-        {error, {already_started, Pid}} ->
-            exit(Pid, kill),
-            erlang:yield(),
-            start_webmachine()
-    end.
+    webmachine_sup:start_link().
+    %% case webmachine_sup:start_link() of
+    %%     {ok, Pid} ->
+    %%         Pid;
+    %%     {error, {already_started, Pid}} ->
+    %%         exit(Pid, kill),
+    %%         erlang:yield(),
+    %%         start_webmachine()
+    %% end.
 
 cleanup({Pid0, Pid1}) ->
     meck:unload(webmachine_resource),
