@@ -55,46 +55,21 @@
 %% Testing, 2nd, p 49). (Exercising all possible paths is called
 %% multiple-condition coverage.)
 
-%% B13 - All decision-trace-paths start at B13
+-define(DECISION_ID_PATTERN, "v3[[:alpha:]]+\\d+[[:alpha:]]*").
+-define(DECISION_ID_SUBSTATE_PATTERN, "v3[[:alpha:]]+\\d+[[:alpha:]]+").
+
+%% B13-B3 -- All decision-trace-paths start at B13. There is a linear path
+%% crossing the B nodes if you ignore substates.
 -define(PATH_TO_B13, [v3b13]).
-
-%% B13b - The path to substate B13b
--define(PATH_TO_B13B, ?PATH_TO_B13++[v3b13b]).
-
-%% B12 - The path to B12
--define(PATH_TO_B12, ?PATH_TO_B13B++[v3b12]).
-
-%% B11 - The path to B11
+-define(PATH_TO_B12, ?PATH_TO_B13++[v3b12]).
 -define(PATH_TO_B11, ?PATH_TO_B12++[v3b11]).
-
-%% B10 - The path to B10
 -define(PATH_TO_B10, ?PATH_TO_B11++[v3b10]).
-
-%% B9 - There is one path to state B9
 -define(PATH_TO_B9, ?PATH_TO_B10++[v3b9]).
-
-%% B9A - There is one path to the substate B9a
--define(PATH_TO_B9A, ?PATH_TO_B9++[v3b9a]).
-
-%% B9B - There is one oath to the substate B9b
--define(PATH_TO_B9B, ?PATH_TO_B9++[v3b9b]).
-
-%% B8 - There is one path to state B8 (skips substate B9a?)
--define(PATH_TO_B8, ?PATH_TO_B9B++[v3b8]).
-
-%% B7 - There is one path to state B7
+-define(PATH_TO_B8, ?PATH_TO_B9++[v3b8]).
 -define(PATH_TO_B7, ?PATH_TO_B8++[v3b7]).
-
-%% B6 - There is one path to state B6
 -define(PATH_TO_B6, ?PATH_TO_B7++[v3b6]).
-
-%% B5 - There is one path to state B5
 -define(PATH_TO_B5, ?PATH_TO_B6++[v3b5]).
-
-%% B4 - There is one path to state B4.
 -define(PATH_TO_B4, ?PATH_TO_B5++[v3b4]).
-
-%% B3 - There is one path to state B3
 -define(PATH_TO_B3, ?PATH_TO_B4++[v3b3]).
 
 %% C3 - There is one path to state C3
@@ -167,11 +142,6 @@
 %% P3 - The path to P3 without accept headers
 -define(PATH_TO_P3_NO_ACPTHEAD, ?PATH_TO_I4_NO_ACPTHEAD++[v3p3]).
 
-%% P11 - Two paths to P11 without accept headers, via N11 and P3
--define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
-        ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD++[v3p11]).
--define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD++[v3p11]).
-
 %% K5 - The path to K5 without accept headers
 -define(PATH_TO_K5_NO_ACPTHEAD, ?PATH_TO_K7_NO_ACPTHEAD++[v3k5]).
 
@@ -212,9 +182,8 @@
 %% M16 - A path to M16 without accept headers
 -define(PATH_TO_M16_NO_ACPTHEAD, ?PATH_TO_L13_NO_ACPTHEAD++[v3m16]).
 
-%% M20 - A path to M20 without accept headers, and substate M20b
+%% M20 - A path to M20 without accept headers
 -define(PATH_TO_M20_NO_ACPTHEAD, ?PATH_TO_M16_NO_ACPTHEAD++[v3m20]).
--define(PATH_TO_M20B_NO_ACPTHEAD, ?PATH_TO_M20_NO_ACPTHEAD++[v3m20b]).
 
 %% N16 - A path to N16 without accept headers
 -define(PATH_TO_N16_NO_ACPTHEAD, ?PATH_TO_M16_NO_ACPTHEAD++[v3n16]).
@@ -228,8 +197,8 @@
 %% O18 - A path to O18 without accept headers
 -define(PATH_TO_O18_NO_ACPTHEAD, ?PATH_TO_O16_NO_ACPTHEAD++[v3o18]).
 
-%% O18b - A path to substate O18b
--define(PATH_TO_O18B_NO_ACPTHEAD, ?PATH_TO_O18_NO_ACPTHEAD++[v3o18b]).
+%% O20 - A path to O20 without accept headers
+-define(PATH_TO_O20_NO_ACPTHEAD, PATH_TO_P11).
 
 %% L17 - A path to L17 without accept headers
 -define(PATH_TO_L17_NO_ACPTHEAD,
@@ -256,90 +225,92 @@
 -define(PATH_TO_J18_NO_ACPTHEAD_3,
         ?PATH_TO_H12_NO_ACPTHEAD_2++[v3i12,v3i13,v3j18]).
 
-%% Paths to a 201 and 204 with most defaults used, md5 checksum substate
-%% To prevent
--define(PATH_TO_201_WITH_MD5_CHECKSUM,
-        [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9,v3b9a,v3b9b,v3b8,v3b7,v3b6,v3b5,
-         v3b4,v3b3,v3c3,v3d4,v3e5,v3f6,v3g7,v3h7,v3i7,v3k7,v3l7,v3m7,v3n11,
-         v3p11]).
--define(PATH_TO_204_WITH_MD5_CHECKSUM,
-        [v3b13,v3b13b,v3b12,v3b11,v3b10,v3b9,v3b9a,v3b9b,v3b8,v3b7,v3b6,v3b5,
-         v3b4,v3b3,v3c3,v3d4,v3e5,v3f6,v3g7,v3g8,v3h10,v3i12,v3l13,v3m16,v3n16,
-         v3o16,v3o14,v3p11,v3o20]).
+%% P11 - Three paths to P11 without accept headers, via N11, P3, or O14
+-define(PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
+        ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD++[v3p11]).
+-define(PATH_TO_P11_VIA_P3_NO_ACPTHEAD, ?PATH_TO_P3_NO_ACPTHEAD++[v3p11]).
+-define(PATH_TO_P11_VIA_O14_NO_ACPTHEAD, ?PATH_TO_O14_NO_ACPTHEAD++[v3p11]).
+
+%% O20 - The path to O20 via P11 via O14
+-define(PATH_TO_O20_VIA_P11_VIA_O14_NO_ACPTHEAD,
+        ?PATH_TO_P11_VIA_O14_NO_ACPTHEAD++[v3o20]).
 
 %%
 %% TEST SETUP AND CLEANUP
 %%
+test_list() ->
+    [{"503 it's not you, it's me", fun service_unavailable/0},
+     {"503 ping doesn't return pong", fun ping_invalid/0},
+     {"500 ping raises error", fun ping_error/0},
+     {"500, error raised in callback", fun internal_server_error_o18/0},
+     {"501 via b12", fun not_implemented_b12/0},
+     {"501 via b6", fun not_implemented_b6/0},
+     {"414 request uri too long", fun uri_too_long_b11/0},
+     {"415 via b5", fun unsupported_media_type_b5/0},
+     {"413 via b4", fun request_entity_too_large_b4/0},
+     {"200 head method allowed", fun head_method_allowed/0},
+     {"405 head method not allowed", fun head_method_not_allowed/0},
+     {"400 malformed", fun bad_request_b9/0},
+     {"200 get method", fun simple_get/0},
+     {"406 via c4", fun not_acceptable_c4/0},
+     {"406 via d5<-c4", fun not_acceptable_d5_c4/0},
+     {"406 via d5<-c3", fun not_acceptable_d5_c3/0},
+     {"406 via e6<-d5<-c3", fun not_acceptable_e6_d5_c3/0},
+     {"406 via f7<-e6<-d5<-c4", fun not_acceptable_f7_e6_d5_c4/0},
+     {"412 no headers, no resource", fun precond_fail_no_resource/0},
+     {"412 via g11 if-match, no etag", fun precond_fail_g11/0},
+     {"412 via h12, greater last modified", fun precond_fail_h12/0},
+     {"412 via j18<-i13<-i12<-h10", fun precond_fail_j18/0},
+     {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
+     {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
+     {"204 md5 header matches", fun content_md5_valid_b9a/0},
+     {"204 md5 header matches, 2", fun content_md5_valid_b9a_validated/0},
+     {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
+     {"400 md5 header doesn't match 2", fun content_md5_custom_inval_b9a/0},
+     {"401 result, unauthorized", fun authorized_b8/0},
+     {"403 via b7", fun forbidden_b7/0},
+     {"200 result, via options", fun options_b3/0},
+     {"200 result with vary", fun variances_o18/0},
+     {"200 result with vary, 2", fun variances_o18_2/0},
+     {"200 result with body generation", fun ok_o18b/0},
+     {"300 multiple choices", fun multiple_choices_o18/0},
+     {"301 via i4", fun moved_permanently_i4/0},
+     {"301 via k5", fun moved_permanently_k5/0},
+     {"307 via l5", fun moved_temporarily_l5/0},
+     {"304 via j18<-i13<-i12<-h10", fun not_modified_j18/0},
+     {"304 via j18<-k13<-h11<-g11", fun not_modified_j18_via_k13/0},
+     {"304 via j18<-i13<-i12<-h12", fun not_modified_j18_via_h12/0},
+     {"304 via l17", fun not_modified_l17/0},
+     {"303 via n11 reqdata", fun see_other_n11/0},
+     {"500 via n11 reqdata", fun internal_server_error_n11/0},
+     {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
+     {"303 via n11 custom base_uri", fun see_other_n11_custom_base_uri/0},
+     {"303 via n11 passthrough base_uri", fun see_other_n11_wrq_base_uri/0},
+     {"303 via n5", fun see_other_n5/0},
+     {"404 via l7", fun not_found_l7/0},
+     {"404 via m7", fun not_found_m7/0},
+     {"201 via p11 post", fun created_p11_post/0},
+     {"201 via p11 put", fun created_p11_put/0},
+     {"409 via p3", fun conflict_p3/0},
+     {"409 via o14", fun conflict_o14/0},
+     {"410 via m5", fun gone_m5/0},
+     {"410 via n5", fun gone_n5/0},
+     {"202 via m20", fun accepted_m20/0},
+     {"415 via accept_helper", fun unsupported_media_type_accept_helper/0},
+     {"201 via p11, streamed", fun created_p11_streamed/0},
+     {"201 via p11, accept_helper", fun created_p11_accept_helper/0},
+     {"200 via get, writer callback", fun writer_callback/0},
+     {"200 via head, known length", fun head_length_access_for_cs/0},
+     {"200 via get, known length", fun get_known_length_for_cs/0},
+     {"200 via get, stream range", fun get_for_range_capable_stream/0}
+     %%,{"known failure", fun stream_content_md5/0}
+    ].
+
+test_list1() ->
+    [{"414 request uri too long", fun uri_too_long_b11/0}].
+
 decision_core_test_() ->
-    Tests =
-        [
-         {"503 it's not you, it's me", fun service_unavailable/0},
-         {"503 ping doesn't return pong", fun ping_invalid/0},
-         {"500 ping raises error", fun ping_error/0},
-         {"500, error raised in callback", fun internal_server_error_o18/0},
-         {"501 via b12", fun not_implemented_b12/0},
-         {"501 via b6", fun not_implemented_b6/0},
-         {"414 request uri too long", fun uri_too_long_b11/0},
-         {"415 via b5", fun unsupported_media_type_b5/0},
-         {"413 via b4", fun request_entity_too_large_b4/0},
-         {"200 head method allowed", fun head_method_allowed/0},
-         {"405 head method not allowed", fun head_method_not_allowed/0},
-         {"400 malformed", fun bad_request_b9/0},
-         {"200 get method", fun simple_get/0},
-         {"406 via c4", fun not_acceptable_c4/0},
-         {"406 via d5<-c4", fun not_acceptable_d5_c4/0},
-         {"406 via d5<-c3", fun not_acceptable_d5_c3/0},
-         {"406 via e6<-d5<-c3", fun not_acceptable_e6_d5_c3/0},
-         {"406 via f7<-e6<-d5<-c4", fun not_acceptable_f7_e6_d5_c4/0},
-         {"412 no headers, no resource", fun precond_fail_no_resource/0},
-         {"412 via g11 if-match, no etag", fun precond_fail_g11/0},
-         {"412 via h12, greater last modified", fun precond_fail_h12/0},
-         {"412 via j18<-i13<-i12<-h10", fun precond_fail_j18/0},
-         {"412 via j18<-k13<-h11<-g11", fun precond_fail_j18_via_k13/0},
-         {"412 via j18<-i13<-i12<-h12", fun precond_fail_j18_via_h12/0},
-         {"204 md5 header matches", fun content_md5_valid_b9a/0},
-         {"204 md5 header matches, 2", fun content_md5_valid_b9a_validated/0},
-         {"400 md5 header doesn't match", fun content_md5_invalid_b9a/0},
-         {"400 md5 header doesn't match 2", fun content_md5_custom_inval_b9a/0},
-         {"401 result, unauthorized", fun authorized_b8/0},
-         {"403 via b7", fun forbidden_b7/0},
-         {"200 result, via options", fun options_b3/0},
-         {"200 result with vary", fun variances_o18/0},
-         {"200 result with vary, 2", fun variances_o18_2/0},
-         {"200 result with body generation", fun ok_o18b/0},
-         {"300 multiple choices", fun multiple_choices_o18/0},
-         {"301 via i4", fun moved_permanently_i4/0},
-         {"301 via k5", fun moved_permanently_k5/0},
-         {"307 via l5", fun moved_temporarily_l5/0},
-         {"304 via j18<-i13<-i12<-h10", fun not_modified_j18/0},
-         {"304 via j18<-k13<-h11<-g11", fun not_modified_j18_via_k13/0},
-         {"304 via j18<-i13<-i12<-h12", fun not_modified_j18_via_h12/0},
-         {"304 via l17", fun not_modified_l17/0},
-         {"303 via n11 reqdata", fun see_other_n11/0},
-         {"500 via n11 reqdata", fun internal_server_error_n11/0},
-         {"303 via n11 resource calls", fun see_other_n11_resource_calls/0},
-         {"303 via n11 custom base_uri", fun see_other_n11_custom_base_uri/0},
-         {"303 via n11 passthrough base_uri", fun see_other_n11_wrq_base_uri/0},
-         {"303 via n5", fun see_other_n5/0},
-         {"404 via l7", fun not_found_l7/0},
-         {"404 via m7", fun not_found_m7/0},
-         {"201 via p11 post", fun created_p11_post/0},
-         {"201 via p11 put", fun created_p11_put/0},
-         {"409 via p3", fun conflict_p3/0},
-         {"409 via o14", fun conflict_o14/0},
-         {"410 via m5", fun gone_m5/0},
-         {"410 via n5", fun gone_n5/0},
-         {"202 via m20", fun accepted_m20/0},
-         {"415 via accept_helper", fun unsupported_media_type_accept_helper/0},
-         {"201 via p11, streamed", fun created_p11_streamed/0},
-         {"201 via p11, accept_helper", fun created_p11_accept_helper/0},
-         {"200 via get, writer callback", fun writer_callback/0},
-         {"200 via head, known length", fun head_length_access_for_cs/0},
-         {"200 via get, known length", fun get_known_length_for_cs/0},
-         {"200 via get, stream range", fun get_for_range_capable_stream/0}
-         %%,{"known failure", fun stream_content_md5/0}
-        ],
-    {foreach, fun setup/0, fun cleanup/1, Tests}.
+    {foreach, fun setup/0, fun cleanup/1, test_list()}.
 
 setup() ->
     error_logger:tty(false),
@@ -379,8 +350,37 @@ cleanup({Pid0, Pid1}) ->
     clear_resource_settings().
 
 get_decision_ids() ->
-    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
-                       <- meck:history(webmachine_resource)].
+%    ExtractID =
+%        fun(T) ->
+%                {_, {webmachine_resource, log_d, [DecisionID|_]}, _} = T,
+%                DecisionID
+%        end,
+    History = meck:history(webmachine_resource),
+%    io:format(user, "~nHistory = ~p", [History]),
+%    _DecisionIds = lists:map(ExtractID, History),
+    R = [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
+                           <- History, not is_substate(DecisionID)],
+%    ?assertEqual(DecisionIds, R),
+    R.
+
+%% Is the decision ID a sub-state? Sub-states are not on the HTTP/1.1 activity
+%% diagram and exist as an implementation detail for control flow. The decision
+%% traces can be simplified by ignoring these sub-states.
+is_substate(DecisionID) ->
+    ?assert(is_decision_id(DecisionID)),
+    atom_matches(DecisionID, ?DECISION_ID_SUBSTATE_PATTERN).
+
+is_decision_id(Atom) ->
+    atom_matches(Atom, ?DECISION_ID_PATTERN).
+
+%% Does the given atom match the regular expression?
+atom_matches(Atom, RE) when is_atom(Atom) ->
+    case re:run(atom_to_list(Atom), RE, [{capture, none}]) of
+        match ->
+            true;
+        nomatch ->
+            false
+    end.
 
 %%
 %% TEST CASES
@@ -388,15 +388,14 @@ get_decision_ids() ->
 %% The decision trace is the path through the HTTP/1.1 activity diagram, which
 %% has nodes labeled from A-P on the x-axis and 1-26 on the y-axis.
 %%
-%% Note: The expected decision traces in these tests is simply the output from
-%% the test itself. These have not yet been hand-verified!
+%% The expected decision traces in these tests are hand verified.
 
 %% 503 result via B13B (predicate: service_available)
 service_unavailable() ->
     put_setting(service_available, false),
     {ok, Result} = httpc:request(head, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B13B,
+    ExpectedDecisionTrace = ?PATH_TO_B13,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -426,7 +425,7 @@ internal_server_error_o18() ->
                                           size_stream_raises_error}]),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -497,7 +496,7 @@ head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
     {ok, Result} = httpc:request(head, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -516,7 +515,7 @@ bad_request_b9() ->
     put_setting(malformed_request, true),
     {ok, Result} = httpc:request(get, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B9B,
+    ExpectedDecisionTrace = ?PATH_TO_B9,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -525,7 +524,7 @@ simple_get() ->
     put_setting(allowed_methods, ['GET']),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -683,7 +682,7 @@ content_md5_valid_b9a() ->
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
+    ExpectedDecisionTrace = ?PATH_TO_O20_VIA_P11_VIA_O14_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -700,7 +699,7 @@ content_md5_valid_b9a_validated() ->
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
+    ExpectedDecisionTrace = ?PATH_TO_O20_VIA_P11_VIA_O14_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -714,7 +713,7 @@ content_md5_invalid_b9a() ->
     PutRequest = {url(), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B9A,
+    ExpectedDecisionTrace = ?PATH_TO_B9,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -729,7 +728,7 @@ content_md5_custom_inval_b9a() ->
     PutRequest = {url(), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B9A,
+    ExpectedDecisionTrace = ?PATH_TO_B9,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -772,7 +771,7 @@ variances_o18() ->
     put_setting(charsets_provided, Charsets),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -787,7 +786,7 @@ variances_o18_2() ->
     put_setting(encodings_provided, use_identity_or_gzip),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -799,7 +798,7 @@ ok_o18b() ->
     put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -813,7 +812,7 @@ multiple_choices_o18() ->
     put_setting(charsets_provided, Charsets),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 300, "Multiple Choices"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.    
 
@@ -1101,7 +1100,7 @@ accepted_m20() ->
     DeleteRequest = {url("doomed"), []},
     {ok, Result} = httpc:request(delete, DeleteRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 202, "Accepted"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_M20B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_M20_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1195,7 +1194,7 @@ writer_callback() ->
     put_setting(content_types_provided, [{"text/plain", writer_response}]),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1213,7 +1212,7 @@ head_length_access_for_cs() ->
     put_setting(content_types_provided, [{"text/plain", known_length_body}]),
     {ok, Result} = httpc:request(head, {url("knownlength"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1223,7 +1222,7 @@ get_known_length_for_cs() ->
     put_setting(content_types_provided, [{"text/plain", known_length_body}]),
     {ok, Result} = httpc:request(get, {url("knownlength"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1239,7 +1238,7 @@ get_for_range_capable_stream() ->
     put_setting(content_types_provided, [{"text/plain", range_response}]),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
+    ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
@@ -1287,7 +1286,7 @@ stream_content_md5() ->
     Result = ibrowse:send_req(Url, Headers, post, Body, Options),
     {ok, Status, _RespHeaders, _RespBody} = Result,
     ?assertEqual("201", Status),
-    ExpectedDecisionTrace = ?PATH_TO_201_WITH_MD5_CHECKSUM,
+    ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
