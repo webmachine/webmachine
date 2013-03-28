@@ -310,7 +310,7 @@ test_list1() ->
     [{"414 request uri too long", fun uri_too_long_b11/0}].
 
 decision_core_test_() ->
-    {foreach, fun setup/0, fun cleanup/1, test_list()}.
+    {foreach, local, fun setup/0, fun cleanup/1, test_list()}.
 
 setup() ->
     error_logger:tty(false),
