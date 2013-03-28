@@ -22,9 +22,7 @@
 
 -compile(export_all).
 
--define(PORT, 12322).
 -define(RESOURCE_PATH, "/decisioncore").
--define(URL, "http://localhost:12322" ++ ?RESOURCE_PATH).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
 
@@ -342,38 +340,22 @@ decision_core_test_() ->
          %%,{"known failure", fun stream_content_md5/0}
         ],
     {spawn,
-     [{foreach,
-       fun() ->
-               try
-                   setup()
-               catch
-                   T:E ->
-                       io:format(user, "~nEXCEPTION~nT=~p~nE=~p~nTRACE: ~p~n",
-                                 [T, E, erlang:get_stacktrace()])
-               end
-       end,
-       fun(V) ->
-               try
-                   cleanup(V)
-               catch
-                   T:E ->
-                       io:format(user, "~nEXCEPTION~nT=~p~nE=~p~nTRACE: ~p~n",
-                                 [T, E, erlang:get_stacktrace()])
-               end
-       end,
-       Tests}]}.
+     [{foreach, fun setup/0, fun cleanup/1, Tests}]
+    }.
 
 setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-%%    application:start(sasl),
     Pid0 = start_webmachine(),
-    WebConfig = [{ip, "0.0.0.0"},
-                 {port, ?PORT},
+    WebConfig = [{name, ?MODULE},
+                 {ip, "0.0.0.0"},
+                 {port, 0},
                  {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
     {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
     link(Pid1),
+    Port = mochiweb_socket_server:get(Pid1, port),
+    set_port(Port),
     meck:new(webmachine_resource, [passthrough]),
     {Pid0, Pid1}.
 
@@ -414,7 +396,7 @@ get_decision_ids() ->
 %% 503 result via B13B (predicate: service_available)
 service_unavailable() ->
     put_setting(service_available, false),
-    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(head, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B13B,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -424,7 +406,7 @@ service_unavailable() ->
 ping_invalid() ->
     % "breakout" for "anything other than pong"
     put_setting(ping, breakout),
-    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(head, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B13,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -433,7 +415,7 @@ ping_invalid() ->
 %% 500 error response result via B13 (ping raises error)
 ping_error() ->
     put_setting(ping, ping_raise_error),
-    {ok, Result} = httpc:request(head, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(head, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B13,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -444,7 +426,7 @@ internal_server_error_o18() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(content_types_provided, [{"text/plain",
                                           size_stream_raises_error}]),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -465,7 +447,7 @@ size_stream_raises_error(ReqData, Context) ->
 not_implemented_b12() ->
     put_setting(allowed_methods, ?HTTP_1_0_METHODS),
     put_setting(known_methods, ?HTTP_1_0_METHODS),
-    {ok, Result} = httpc:request(delete, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(delete, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 501, "Not Implemented"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B12,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -475,7 +457,7 @@ not_implemented_b12() ->
 not_implemented_b6() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(valid_content_headers, false),
-    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(get, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 501, "Not Implemented"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B6,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -485,7 +467,7 @@ not_implemented_b6() ->
 uri_too_long_b11() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(uri_too_long, true),
-    TooLong = ?URL ++ "/notreallythatlongactually",
+    TooLong = url("notreallythatlongactually"),
     {ok, Result} = httpc:request(get, {TooLong, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 414, "Request-URI Too Large"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B11,
@@ -496,7 +478,7 @@ uri_too_long_b11() ->
 unsupported_media_type_b5() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(known_content_type, false),
-    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(get, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 415, "Unsupported Media Type"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B5,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -506,7 +488,7 @@ unsupported_media_type_b5() ->
 request_entity_too_large_b4() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(valid_entity_length, false),
-    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(get, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 413, "Request Entity Too Large"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -515,7 +497,7 @@ request_entity_too_large_b4() ->
 %% 200 from head method allowed
 head_method_allowed() ->
     put_setting(allowed_methods, ['GET', 'HEAD']),
-    {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(head, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -524,7 +506,7 @@ head_method_allowed() ->
 %% 405 from head method not allowed
 head_method_not_allowed() ->
     put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
-    {ok, Result} = httpc:request(head, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(head, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B10,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -534,7 +516,7 @@ head_method_not_allowed() ->
 bad_request_b9() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(malformed_request, true),
-    {ok, Result} = httpc:request(get, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(get, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B9B,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -543,7 +525,7 @@ bad_request_b9() ->
 %% 200 from a get
 simple_get() ->
     put_setting(allowed_methods, ['GET']),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, ?HTML_CONTENT}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -553,7 +535,7 @@ simple_get() ->
 not_acceptable_c4() ->
     put_setting(allowed_methods, ['GET']),
     Headers = [{"Accept", "video/mp4"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_C4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -566,7 +548,7 @@ not_acceptable_d5_c4() ->
     put_setting(language_available, false),
     Headers = [{"Accept", "text/plain"},
                {"Accept-Language", "x-pig-latin"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_D5_VIA_C4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -578,7 +560,7 @@ not_acceptable_d5_c3() ->
     put_setting(content_types_provided, [{"text/plain", to_html}]),
     put_setting(language_available, false),
     Headers = [{"Accept-Language", "x-pig-latin"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_D5_VIA_C3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -591,7 +573,7 @@ not_acceptable_e6_d5_c3() ->
     put_setting(charsets_provided, [{"utf-8", fun identity/1}]),
     Headers = [{"Accept-Language", "en-US"},
                {"Accept-Charset", "ISO-8859-1"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_E6_VIA_D5_C3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -608,7 +590,7 @@ not_acceptable_f7_e6_d5_c4() ->
                {"Accept-Language", "en-US"},
                {"Accept-Charset", "utf-8"},
                {"Accept-Encoding", "gzip"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 406, "Not Acceptable"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_F7_VIA_E6_D5_C4,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -619,7 +601,7 @@ precond_fail_no_resource() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(resource_exists, false),
     Headers = [{"If-Match", "*"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_H7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -630,7 +612,7 @@ precond_fail_g11() ->
     put_setting(allowed_methods, ['GET']),
     put_setting(generate_etag, "v2"),
     Headers = [{"If-Match", "\"v0\", \"v1\""}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_G11_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -644,7 +626,7 @@ precond_fail_h12() ->
     ResErlDate = httpd_util:convert_request_date(FivePM),
     put_setting(last_modified, ResErlDate),
     Headers = [{"If-Unmodified-Since", TenAM}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_H12_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -654,7 +636,7 @@ precond_fail_h12() ->
 precond_fail_j18() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     Headers = [{"If-None-Match", "*"}],
-    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    PutRequest = {url(), Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD,
@@ -668,7 +650,7 @@ precond_fail_j18_via_k13() ->
     Headers = [{"If-Match", "\"v1\""},
                {"If-None-Match", "\"v1\""},
                {"If-Unmodified-Since", "{{INVALID DATE}}"}],
-    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    PutRequest = {url(), Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_2,
@@ -685,7 +667,7 @@ precond_fail_j18_via_h12() ->
     Headers = [{"If-Match", "*"},
                {"If-None-Match", "*"},
                {"If-Unmodified-Since", FivePM}],
-    PutRequest = {?URL, Headers, "text/plain", "foo"},
+    PutRequest = {url(), Headers, "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 412, "Precondition Failed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_3,
@@ -700,7 +682,7 @@ content_md5_valid_b9a() ->
     Body = "foo",
     MD5Sum = base64:encode_to_string(crypto:md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
-    PutRequest = {?URL ++ "/new", Headers, ContentType, Body},
+    PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
@@ -717,7 +699,7 @@ content_md5_valid_b9a_validated() ->
     Body = "foo",
     MD5Sum = base64:encode_to_string(crypto:md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
-    PutRequest = {?URL ++ "/new", Headers, ContentType, Body},
+    PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 204, "No Content"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_204_WITH_MD5_CHECKSUM,
@@ -731,7 +713,7 @@ content_md5_invalid_b9a() ->
     Body = "foo",
     InvalidMD5Sum = base64:encode_to_string("this is invalid for foo"),
     Headers = [{"Content-MD5", InvalidMD5Sum}],
-    PutRequest = {?URL, Headers, ContentType, Body},
+    PutRequest = {url(), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B9A,
@@ -746,7 +728,7 @@ content_md5_custom_inval_b9a() ->
     Body = "foo",
     InvalidMD5Sum = base64:encode_to_string("this is invalid for foo"),
     Headers = [{"Content-MD5", InvalidMD5Sum}],
-    PutRequest = {?URL, Headers, ContentType, Body},
+    PutRequest = {url(), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 400, "Bad Request"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B9A,
@@ -757,7 +739,7 @@ content_md5_custom_inval_b9a() ->
 authorized_b8() ->
     put_setting(is_authorized, "Basic"),
     put_setting(allowed_methods, ['GET']),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 401, "Unauthorized"},
                   [_, _, {"www-authenticate", "Basic"}, _], _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B8,
@@ -768,7 +750,7 @@ authorized_b8() ->
 forbidden_b7() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(forbidden, true),
-    {ok, Result} = httpc:request(get, {?URL ++ "/forbiddenfoo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("forbiddenfoo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 403, "Forbidden"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B7,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -777,7 +759,7 @@ forbidden_b7() ->
 %% 200 result, via OPTIONS
 options_b3() ->
     put_setting(allowed_methods, ['GET', 'HEAD', 'PUT', 'OPTIONS']),
-    {ok, Result} = httpc:request(options, {?URL, []}, [], []),
+    {ok, Result} = httpc:request(options, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -790,7 +772,7 @@ variances_o18() ->
                 {"iso-8859-5", fun identity/1},
                 {"unicode-1-1", fun identity/1}],
     put_setting(charsets_provided, Charsets),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -805,7 +787,7 @@ variances_o18_2() ->
     Charsets = [{"utf-8", fun identity/1}],
     put_setting(charsets_provided, Charsets),
     put_setting(encodings_provided, use_identity_or_gzip),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -817,7 +799,7 @@ ok_o18b() ->
     put_setting(generate_etag, "v1"),
     put_setting(last_modified, ?FIRST_DAY_OF_LAST_YEAR),
     put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -831,7 +813,7 @@ multiple_choices_o18() ->
                 {"iso-8859-5", fun identity/1},
                 {"unicode-1-1", fun identity/1}],
     put_setting(charsets_provided, Charsets),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 300, "Multiple Choices"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -841,8 +823,8 @@ multiple_choices_o18() ->
 moved_permanently_i4() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(resource_exists, false),
-    put_setting(moved_permanently, {true, ?URL ++ "/new"}),
-    PutRequest = {?URL ++ "/old", [], "text/plain", "foo"},
+    put_setting(moved_permanently, {true, url("new")}),
+    PutRequest = {url("old"), [], "text/plain", "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_I4_NO_ACPTHEAD,
@@ -854,11 +836,11 @@ moved_permanently_k5() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(resource_exists, false),
     put_setting(previously_existed, true),
-    put_setting(moved_permanently, {true, ?URL ++ "/new"}),
+    put_setting(moved_permanently, {true, url("new")}),
     %% We just want to get the 301 from httpc, we don't want it to actually
     %% try redirecting, so we turn off autoredirect
     HTTPOptions = [{autoredirect, false}],
-    {ok, Result} = httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
+    {ok, Result} = httpc:request(get, {url("old"), []}, HTTPOptions, []),
     ?assertMatch({{"HTTP/1.1", 301, "Moved Permanently"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_K5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -869,10 +851,10 @@ moved_temporarily_l5() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(resource_exists, false),
     put_setting(previously_existed, true),
-    put_setting(moved_temporarily, {true, ?URL ++ "/new"}),
+    put_setting(moved_temporarily, {true, url("new")}),
     %% We just want to get the 307 from httpc - similar to note about 301 above
     HTTPOptions = [{autoredirect, false}],
-    {ok, Result}= httpc:request(get, {?URL ++ "/old", []}, HTTPOptions, []),
+    {ok, Result}= httpc:request(get, {url("old"), []}, HTTPOptions, []),
     ?assertMatch({{"HTTP/1.1", 307, "Temporary Redirect"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_L5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -882,7 +864,7 @@ moved_temporarily_l5() ->
 not_modified_j18() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     Headers = [{"If-None-Match", "*"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -895,7 +877,7 @@ not_modified_j18_via_k13() ->
     Headers = [{"If-Match", "\"v1\""},
                {"If-None-Match", "\"v1\""},
                {"If-Unmodified-Since", "{{INVALID DATE}}"}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_2,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -911,7 +893,7 @@ not_modified_j18_via_h12() ->
     Headers = [{"If-Match", "*"},
                {"If-None-Match", "*"},
                {"If-Unmodified-Since", FivePM}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_J18_NO_ACPTHEAD_3,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -924,7 +906,7 @@ not_modified_l17() ->
     put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
     RFC1123LastYear = httpd_util:rfc1123_date(?FIRST_DAY_OF_LAST_YEAR),
     Headers = [{"If-Modified-Since", RFC1123LastYear}],
-    {ok, Result} = httpc:request(get, {?URL, Headers}, [], []),
+    {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_L17_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -938,7 +920,7 @@ see_other_n11() ->
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
@@ -953,7 +935,7 @@ internal_server_error_n11() ->
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(process_post, {set_resp_redirect_but_not_location}),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
@@ -985,7 +967,7 @@ see_other_n11_resource_calls_base_uri(Value) ->
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(create_path, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     put_setting(base_uri, Value),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
@@ -1001,7 +983,7 @@ see_other_n5() ->
     put_setting(previously_existed, true),
     put_setting(allow_missing_post, true),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_N5_NO_ACPTHEAD,
@@ -1012,7 +994,7 @@ see_other_n5() ->
 not_found_l7() ->
     put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
     put_setting(resource_exists, false),
-    {ok, Result} = httpc:request(get, {?URL ++ "/nothere", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("nothere"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 404, "Object Not Found"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_L7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1024,7 +1006,7 @@ not_found_m7() ->
     put_setting(resource_exists, false),
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 404, "Object Not Found"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_M7_NO_ACPTHEAD,
@@ -1039,7 +1021,7 @@ created_p11_post() ->
     put_setting(process_post, {new_resource, ?RESOURCE_PATH ++ "/new1"}),
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
@@ -1052,8 +1034,8 @@ created_p11_put() ->
     put_setting(resource_exists, false),
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
-    put_setting(is_conflict, {new_location, ?URL ++ "/new"}),
-    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    put_setting(is_conflict, {new_location, url("new")}),
+    PutRequest = {url("put"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
@@ -1067,7 +1049,7 @@ conflict_p3() ->
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(is_conflict, true),
-    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    PutRequest = {url("put"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 409, "Conflict"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P3_NO_ACPTHEAD,
@@ -1080,7 +1062,7 @@ conflict_o14() ->
     ContentType = "text/html",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(is_conflict, true),
-    PutRequest = {?URL ++ "/put", [], ContentType, "foo"},
+    PutRequest = {url("put"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 409, "Conflict"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O14_NO_ACPTHEAD,
@@ -1092,7 +1074,7 @@ gone_m5() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(resource_exists, false),
     put_setting(previously_existed, true),
-    {ok, Result} = httpc:request(get, {?URL ++ "/gone", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("gone"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 410, "Gone"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_M5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1105,7 +1087,7 @@ gone_n5() ->
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(resource_exists, false),
     put_setting(previously_existed, true),
-    PostRequest = {?URL ++ "/post", [], ContentType, "foo"},
+    PostRequest = {url("post"), [], ContentType, "foo"},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 410, "Gone"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N5_NO_ACPTHEAD,
@@ -1118,7 +1100,7 @@ accepted_m20() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS ++ ['DELETE']),
     put_setting(delete_resource, true),
     put_setting(delete_completed, false),
-    DeleteRequest = {?URL ++ "/doomed", []},
+    DeleteRequest = {url("doomed"), []},
     {ok, Result} = httpc:request(delete, DeleteRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 202, "Accepted"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_M20B_NO_ACPTHEAD,
@@ -1135,7 +1117,7 @@ unsupported_media_type_accept_helper() ->
     PlainTextContent = "text/plain",
     put_setting(content_types_accepted, [{HTMLContent, to_html}]),
     put_setting(is_conflict, false),
-    PutRequest = {?URL ++ "/put", [], PlainTextContent, "foo"},
+    PutRequest = {url("put"), [], PlainTextContent, "foo"},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 415, "Unsupported Media Type"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O14_NO_ACPTHEAD,
@@ -1152,7 +1134,7 @@ created_p11_streamed() ->
                 {mfa, ?MODULE, process_post_for_created_p11, NewLocation}),
     ContentType = "text/plain",
     FooPrime = string:copies("foo", 128),
-    PostRequest = {?URL ++ "/post", [], ContentType, FooPrime},
+    PostRequest = {url("post"), [], ContentType, FooPrime},
     {ok, Result} = httpc:request(post, PostRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_N11_NO_ACPTHEAD,
@@ -1192,8 +1174,8 @@ created_p11_accept_helper() ->
     FourtyTwoMugs = string:copies("mug", 42),
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, accept_text}]),
-    put_setting(is_conflict, {new_location, ?URL ++ "/new"}),
-    PutRequest = {?URL ++ "/put", [], ContentType, FourtyTwoMugs},
+    put_setting(is_conflict, {new_location, url("new")}),
+    PutRequest = {url("put"), [], ContentType, FourtyTwoMugs},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
@@ -1213,7 +1195,7 @@ accept_text(ReqData, Context) ->
 writer_callback() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(content_types_provided, [{"text/plain", writer_response}]),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1231,7 +1213,7 @@ writer_response(ReqData, Context) ->
 head_length_access_for_cs() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(content_types_provided, [{"text/plain", known_length_body}]),
-    {ok, Result} = httpc:request(head, {?URL ++ "/knownlength", []}, [], []),
+    {ok, Result} = httpc:request(head, {url("knownlength"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1241,7 +1223,7 @@ head_length_access_for_cs() ->
 get_known_length_for_cs() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(content_types_provided, [{"text/plain", known_length_body}]),
-    {ok, Result} = httpc:request(get, {?URL ++ "/knownlength", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("knownlength"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1257,7 +1239,7 @@ known_length_body(ReqData, Context) ->
 get_for_range_capable_stream() ->
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
     put_setting(content_types_provided, [{"text/plain", range_response}]),
-    {ok, Result} = httpc:request(get, {?URL ++ "/foo", []}, [], []),
+    {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 200, "OK"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18B_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1292,7 +1274,7 @@ stream_content_md5() ->
     Content = "foo",
     ValidMD5Sum = base64:encode_to_string(crypto:md5(Content)),
     ibrowse:start(),
-    Url = ?URL ++ "/post",
+    Url = url("post"),
     Headers = [{"Content-Type", ContentType},
                {"Content-MD5", ValidMD5Sum},
                {"Expect", "100-continue"}],
@@ -1374,6 +1356,20 @@ put_setting(SettingName, SettingValue) ->
 lookup_setting(Setting) ->
     [{Setting, Value}] = ets:lookup(?MODULE, Setting),
     Value.
+
+set_port(Port) ->
+    put_setting(port, Port).
+
+get_port() ->
+    lookup_setting(port).
+
+url() ->
+    Port = get_port(),
+    Chars = io_lib:format("http://localhost:~b~s", [Port, ?RESOURCE_PATH]),
+    lists:flatten(Chars).
+
+url(Path) ->
+    url() ++ "/" ++ Path.
 
 init([]) ->
     {ok, undefined}.
