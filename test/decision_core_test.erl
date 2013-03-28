@@ -364,10 +364,10 @@ decision_core_test_() ->
        Tests}]}.
 
 setup() ->
-%%    error_logger:tty(false),
+    error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-    application:start(sasl),
+%%    application:start(sasl),
     Pid0 = start_webmachine(),
     WebConfig = [{ip, "0.0.0.0"},
                  {port, ?PORT},
@@ -391,7 +391,6 @@ cleanup({Pid0, Pid1}) ->
     meck:unload(webmachine_resource),
     %% clean up
 %%    webmachine_mochiweb:stop(),
-    timer:sleep(1000),
     unlink(Pid0),
     exit(Pid0, kill),
     unlink(Pid1),
