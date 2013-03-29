@@ -308,26 +308,31 @@ setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-    WebmachineSup = start_webmachine(),
+    %% WebmachineSup = start_webmachine(),
+    io:format(user, "Thing that should be dead: ~p",
+             [whereis(webmachine_sup)]),
+    {ok, WebmachineSup} = webmachine_sup:start_link(),
     WebConfig = [{name, ?MODULE},
                  {ip, "0.0.0.0"},
                  {port, 0},
                  {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
+    io:format(user, "Another thing that should be dead: ~p~n",
+             [whereis(decision_core_test_mochiweb)]),    
     {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
     link(MochiServ),
     set_port(mochiweb_socket_server:get(MochiServ, port)),
     meck:new(webmachine_resource, [passthrough]),
     {WebmachineSup, MochiServ}.
 
-start_webmachine() ->
-    case webmachine_sup:start_link() of
-        {ok, Pid} ->
-            Pid;
-        {error, {already_started, Pid}} ->
-            stop_webmachine(Pid),
-            erlang:yield(),
-            start_webmachine()
-    end.
+%% start_webmachine() ->
+%%     case webmachine_sup:start_link() of
+%%         {ok, Pid} ->
+%%             Pid;
+%%         {error, {already_started, Pid}} ->
+%%             stop_webmachine(Pid),
+%%             erlang:yield(),
+%%             start_webmachine()
+%%     end.
 
 stop_webmachine(WebmachineSup) ->
     %% Children = supervisor:which_children(WebmachineSup),
