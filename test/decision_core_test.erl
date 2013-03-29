@@ -37,15 +37,6 @@
 -define(FIRST_DAY_OF_LAST_YEAR, {{?PRESENT_YEAR - 1, 1, 1}, {12, 0, 0}}).
 -define(FIRST_DAY_OF_NEXT_YEAR, {{?PRESENT_YEAR + 1, 1, 1}, {12, 0, 0}}).
 
--define(printThem,
-        begin
-            io:format(user, "~nResult: ~p", [Result]),
-            io:format(user, "~nExpected:~n~p", [ExpectedDecisionTrace]),
-            IDs = get_decision_ids(),
-            io:format(user, "~nGot:~n~p", [IDs]),
-            io:format(user, "~nMatch? ~p~n", [ExpectedDecisionTrace =:= IDs])
-        end).
-
 %% DECISION TRACE PATHS
 %%
 %% Not all possible paths will be tested at this point. The current testing
@@ -321,11 +312,11 @@ setup() ->
                  {ip, "0.0.0.0"},
                  {port, 0},
                  {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
-    {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
-    link(Pid1),
-    set_port(mochiweb_socket_server:get(Pid1, port)),
+    {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
+    link(MochiServ),
+    set_port(mochiweb_socket_server:get(MochiServ, port)),
     meck:new(webmachine_resource, [passthrough]),
-    {WebmachineSup, Pid1}.
+    {WebmachineSup, MochiServ}.
 
 start_webmachine() ->
     case webmachine_sup:start_link() of
@@ -347,12 +338,14 @@ stop_webmachine(WebmachineSup) ->
     unlink(WebmachineSup),
     exit(WebmachineSup, kill).
 
-cleanup({WebmachineSup, Pid1}) ->
+cleanup({WebmachineSup, MochiServ}) ->
     meck:unload(webmachine_resource),
     %% clean up
     stop_webmachine(WebmachineSup),
-    unlink(Pid1),
-    exit(Pid1, kill),
+    {registered_name, MochiName} = process_info(MochiServ, registered_name),
+    webmachine_mochiweb:stop(MochiName),
+    unlink(MochiServ),
+    exit(MochiServ, kill),
     application:stop(inets),
     clear_resource_settings().
 
