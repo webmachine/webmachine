@@ -301,7 +301,8 @@ test_list1() ->
     [{"414 request uri too long", fun uri_too_long_b11/0}].
 
 decision_core_test_() ->
-    {foreach, spawn, fun setup/0, fun cleanup/1, test_list()}.
+    {foreach, spawn, fun setup/0, fun cleanup/1,
+     [{spawn, Test} || Test <- test_list()]}.
 
 setup() ->
     error_logger:tty(false),
@@ -329,14 +330,26 @@ start_webmachine() ->
     end.
 
 stop_webmachine(WebmachineSup) ->
-    Children = supervisor:which_children(WebmachineSup),
-    Ids = [Id || {Id, _, _, _} <- Children],
-    [begin
-         supervisor:terminate_child(WebmachineSup, Id),
-         supervisor:delete_child(WebmachineSup, Id)
-     end || Id <- Ids],
+    %% Children = supervisor:which_children(WebmachineSup),
+    %% Ids = [Id || {Id, _, _, _} <- Children],
+    %% [begin
+    %%      supervisor:terminate_child(WebmachineSup, Id),
+    %%      supervisor:delete_child(WebmachineSup, Id)
+    %%  end || Id <- Ids],
     unlink(WebmachineSup),
-    exit(WebmachineSup, kill).
+    exit(WebmachineSup, kill),
+    wait_for_pid(WebmachineSup).
+
+%% @doc Wait for a pid to exit -- Copied from riak_kv_test_util.erl
+wait_for_pid(Pid) ->
+    Mref = erlang:monitor(process, Pid),
+    receive
+        {'DOWN',Mref,process,_,_} ->
+            ok
+    after
+        5000 ->
+            {error, didnotexit, Pid, erlang:process_info(Pid)}
+    end.
 
 cleanup({WebmachineSup, MochiServ}) ->
     meck:unload(webmachine_resource),
@@ -346,6 +359,7 @@ cleanup({WebmachineSup, MochiServ}) ->
     webmachine_mochiweb:stop(MochiName),
     unlink(MochiServ),
     exit(MochiServ, kill),
+    wait_for_pid(MochiServ),
     application:stop(inets),
     clear_resource_settings().
 
