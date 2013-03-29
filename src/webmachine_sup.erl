@@ -31,14 +31,16 @@
 %% @spec start_link() -> ServerRet
 %% @doc API for starting the supervisor.
 start_link() ->
-    io:format(user, "~nAttempting to start {local, ~p}~n", [?MODULE]),
-    try
+    io:format(user, "~nAttempting to start {local, ~p}...", [?MODULE]),
+    Result = try
         supervisor:start_link({local, ?MODULE}, ?MODULE, [])
     catch
         T:E ->
             io:format(user, "~n~p : ~p", [T, E]),
             io:format(user, "~n~p", [erlang:get_stacktrace()])
-    end.
+    end,
+    io:format(user, "... succeeded~n", []),
+    Result.
 
 %% @spec upgrade() -> ok
 %% @doc Add processes if necessary.
