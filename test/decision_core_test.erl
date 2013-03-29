@@ -308,16 +308,18 @@ setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-    %% WebmachineSup = start_webmachine(),
-%    io:format(user, "~nThing that should be dead: ~p.",
-%             [whereis(webmachine_sup)]),
-    {ok, WebmachineSup} = webmachine_sup:start_link(),
+    {ok, WebmachineSup} =
+        try
+            webmachine_sup:start_link()
+        catch
+            T:E ->
+                io:format(user, "~n~p : ~p", [T, E]),
+                io:format(user, "~n~p", [erlang:get_stacktrace()])
+        end,
     WebConfig = [{name, ?MODULE},
                  {ip, "0.0.0.0"},
                  {port, 0},
                  {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
-%    io:format(user, "~nAnother thing that should be dead: ~p.~n",
-%             [whereis(decision_core_test_mochiweb)]),    
     {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
     link(MochiServ),
     set_port(mochiweb_socket_server:get(MochiServ, port)),
