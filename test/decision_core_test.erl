@@ -316,52 +316,50 @@ setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
-    Pid0 = start_webmachine(),
+    WebmachineSup = start_webmachine(),
     WebConfig = [{name, ?MODULE},
                  {ip, "0.0.0.0"},
                  {port, 0},
                  {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
     {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
     link(Pid1),
-    Port = mochiweb_socket_server:get(Pid1, port),
-    set_port(Port),
+    set_port(mochiweb_socket_server:get(Pid1, port)),
     meck:new(webmachine_resource, [passthrough]),
-    {Pid0, Pid1}.
+    {WebmachineSup, Pid1}.
 
 start_webmachine() ->
     case webmachine_sup:start_link() of
         {ok, Pid} ->
             Pid;
         {error, {already_started, Pid}} ->
-            supervisor:shutdown(Pid, brutal_kill),
-%            exit(Pid, kill),
+            stop_webmachine(Pid),
             erlang:yield(),
             start_webmachine()
     end.
 
-cleanup({Pid0, Pid1}) ->
+stop_webmachine(WebmachineSup) ->
+    Children = supervisor:which_children(WebmachineSup),
+    Ids = [Id || {Id, _, _, _} <- Children],
+    [begin
+         supervisor:terminate_child(WebmachineSup, Id),
+         supervisor:delete_child(WebmachineSup, Id)
+     end || Id <- Ids],
+    unlink(WebmachineSup),
+    exit(WebmachineSup, kill).
+
+cleanup({WebmachineSup, Pid1}) ->
     meck:unload(webmachine_resource),
     %% clean up
-    unlink(Pid0),
-    exit(Pid0, kill),
+    stop_webmachine(WebmachineSup),
     unlink(Pid1),
     exit(Pid1, kill),
     application:stop(inets),
     clear_resource_settings().
 
 get_decision_ids() ->
-%    ExtractID =
-%        fun(T) ->
-%                {_, {webmachine_resource, log_d, [DecisionID|_]}, _} = T,
-%                DecisionID
-%        end,
     History = meck:history(webmachine_resource),
-%    io:format(user, "~nHistory = ~p", [History]),
-%    _DecisionIds = lists:map(ExtractID, History),
-    R = [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
-                           <- History, not is_substate(DecisionID)],
-%    ?assertEqual(DecisionIds, R),
-    R.
+    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
+                       <- History, not is_substate(DecisionID)].
 
 %% Is the decision ID a sub-state? Sub-states are not on the HTTP/1.1 activity
 %% diagram and exist as an implementation detail for control flow. The decision
