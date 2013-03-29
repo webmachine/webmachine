@@ -305,26 +305,25 @@ decision_core_test_() ->
      [{spawn, Test} || Test <- test_list()]}.
 
 setup() ->
-    error_logger:tty(false),
-    initialize_resource_settings(),
-    application:start(inets),
-    {ok, WebmachineSup} =
-        try
-            webmachine_sup:start_link()
-        catch
-            T:E ->
-                io:format(user, "~n~p : ~p", [T, E]),
-                io:format(user, "~n~p", [erlang:get_stacktrace()])
-        end,
-    WebConfig = [{name, ?MODULE},
-                 {ip, "0.0.0.0"},
-                 {port, 0},
-                 {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
-    {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
-    link(MochiServ),
-    set_port(mochiweb_socket_server:get(MochiServ, port)),
-    meck:new(webmachine_resource, [passthrough]),
-    {WebmachineSup, MochiServ}.
+    try
+        error_logger:tty(false),
+        initialize_resource_settings(),
+        application:start(inets),
+        {ok, WebmachineSup} = webmachine_sup:start_link(),
+        WebConfig = [{name, ?MODULE},
+                     {ip, "0.0.0.0"},
+                     {port, 0},
+                     {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
+        {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
+        link(MochiServ),
+        set_port(mochiweb_socket_server:get(MochiServ, port)),
+        meck:new(webmachine_resource, [passthrough]),
+        {WebmachineSup, MochiServ}
+    catch
+        T:E ->
+            io:format(user, "~n~p : ~p", [T, E]),
+            io:format(user, "~n~p", [erlang:get_stacktrace()])
+    end.
 
 %% start_webmachine() ->
 %%     case webmachine_sup:start_link() of
