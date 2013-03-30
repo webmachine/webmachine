@@ -306,9 +306,9 @@ decision_core_test_() ->
 
 setup() ->
     try
-        io:format(user, "~nlength(processes()) = ~p (limit = ~p).",
+        io:format(user, "~n(processes: ~p, limit: ~p).",
                   [length(processes()), erlang:system_info(process_limit)]),
-        io:format(user, "~nlength(processes()) = ~p.", [length(processes())]),
+        io:format(user, "~nmemory: ~p", [erlang:memory()]),
         error_logger:tty(false),
         initialize_resource_settings(),
         application:start(inets),
@@ -320,7 +320,8 @@ setup() ->
         {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
         link(MochiServ),
         set_port(mochiweb_socket_server:get(MochiServ, port)),
-%%        meck:new(webmachine_resource, [passthrough, no_link]),
+        meck:new(webmachine_resource,
+                 [passthrough, no_link, no_passthrough_cover]),
         {WebmachineSup, MochiServ}
     catch
         T:E ->
@@ -361,7 +362,7 @@ wait_for_pid(Pid) ->
     end.
 
 cleanup({WebmachineSup, MochiServ}) ->
-%%    meck:unload(webmachine_resource),
+    meck:unload(webmachine_resource),
     %% clean up
     stop_webmachine(WebmachineSup),
     {registered_name, MochiName} = process_info(MochiServ, registered_name),
@@ -373,10 +374,10 @@ cleanup({WebmachineSup, MochiServ}) ->
     clear_resource_settings().
 
 get_decision_ids() ->
-    [a].
-%%    History = meck:history(webmachine_resource),
-%%    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
-%%                       <- History, not is_substate(DecisionID)].
+    %% [a].
+    History = meck:history(webmachine_resource),
+    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
+                       <- History, not is_substate(DecisionID)].
 
 %% Is the decision ID a sub-state? Sub-states are not on the HTTP/1.1 activity
 %% diagram and exist as an implementation detail for control flow. The decision
