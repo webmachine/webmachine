@@ -317,7 +317,7 @@ setup() ->
         {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
         link(MochiServ),
         set_port(mochiweb_socket_server:get(MochiServ, port)),
-        meck:new(webmachine_resource, [passthrough]),
+        meck:new(webmachine_resource, [passthrough, no_link]),
         {WebmachineSup, MochiServ}
     catch
         T:E ->
