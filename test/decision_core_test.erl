@@ -308,6 +308,7 @@ setup() ->
     error_logger:tty(false),
     initialize_resource_settings(),
     application:start(inets),
+    erlang:yield(),
     {ok, WebmachineSup} = webmachine_sup:start_link(),
     WebConfig = [{name, ?MODULE},
                  {ip, "0.0.0.0"},
