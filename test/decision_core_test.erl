@@ -306,6 +306,7 @@ decision_core_test_() ->
 
 setup() ->
     try
+        io:format(user, "~nlength(processes()) = ~p.", [length(processes())]),
         error_logger:tty(false),
         initialize_resource_settings(),
         application:start(inets),
