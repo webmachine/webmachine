@@ -229,7 +229,7 @@
 %%
 %% TEST SETUP AND CLEANUP
 %%
-test_list() ->
+core_tests() ->
     [{"503 it's not you, it's me", fun service_unavailable/0},
      {"503 ping doesn't return pong", fun ping_invalid/0},
      {"500 ping raises error", fun ping_error/0},
@@ -297,12 +297,12 @@ test_list() ->
      %%,{"known failure", fun stream_content_md5/0}
     ].
 
-test_list1() ->
+core_tests1() ->
     [{"414 request uri too long", fun uri_too_long_b11/0}].
 
 decision_core_test_() ->
     {foreach, spawn, fun setup/0, fun cleanup/1,
-     [{spawn, Test} || Test <- test_list()]}.
+     [{spawn, Test} || Test <- core_tests()]}.
 
 setup() ->
     error_logger:tty(false),
@@ -316,8 +316,8 @@ setup() ->
     {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
     link(MochiServ),
     set_port(mochiweb_socket_server:get(MochiServ, port)),
-    meck:new(webmachine_resource,
-             [passthrough, no_link, no_passthrough_cover]),
+%    meck:new(webmachine_resource,
+%             [passthrough, no_link, no_passthrough_cover]),
     {WebmachineSup, MochiServ}.
 
 %% start_webmachine() ->
@@ -353,7 +353,7 @@ wait_for_pid(Pid) ->
     end.
 
 cleanup({WebmachineSup, MochiServ}) ->
-    meck:unload(webmachine_resource),
+%    meck:unload(webmachine_resource),
     %% clean up
     stop_webmachine(WebmachineSup),
     {registered_name, MochiName} = process_info(MochiServ, registered_name),
@@ -365,10 +365,15 @@ cleanup({WebmachineSup, MochiServ}) ->
     clear_resource_settings().
 
 get_decision_ids() ->
-    %% [a].
-    History = meck:history(webmachine_resource),
-    [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
-                       <- History, not is_substate(DecisionID)].
+%%    History = meck:history(webmachine_resource),
+%%    Result = [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
+%%                                <- History, not is_substate(DecisionID)],
+    ETSList = lists:reverse(lookup_setting(decision_trace)),
+    Filtered = lists:filter(fun(E) -> not is_substate(E) end, ETSList),
+    Filtered.
+%    io:format(user, "Does~n~p~nEqual~n~p~n? ~p",
+%              [Result, Filtered, Result == Filtered]),
+%%    Result.
 
 %% Is the decision ID a sub-state? Sub-states are not on the HTTP/1.1 activity
 %% diagram and exist as an implementation detail for control flow. The decision
@@ -1316,6 +1321,9 @@ process_post_for_md5_stream(ReqData, Context, NewLocation) ->
 initialize_resource_settings() ->
     %% Configure ETS table to hold resource settings for each test
     ets:new(?MODULE, [named_table, public]),
+
+    %% FILO Trace
+    put_setting(decision_trace, []),
     
     %% Defaults
     put_setting(service_available, true),
@@ -1374,6 +1382,9 @@ url() ->
 
 url(Path) ->
     url() ++ "/" ++ Path.
+
+log_d(_, DecisionID) ->
+    io:format(user, "~nam I even called? ~p", [DecisionID]).
 
 init([]) ->
     {ok, undefined}.

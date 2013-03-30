@@ -144,6 +144,14 @@ do_log(LogData) ->
 
 log_decision(DecisionID) ->
     Resource = get(resource),
+    case ets:info(decision_core_test) of
+        undefined ->
+            ok;
+        _ ->
+            [{_, TraceList}] = ets:lookup(decision_core_test, decision_trace),
+            NewTraceList = [DecisionID | TraceList],
+            ets:insert(decision_core_test, {decision_trace, NewTraceList})
+    end,
     Resource:log_d(DecisionID).
 
 %% "Service Available"
