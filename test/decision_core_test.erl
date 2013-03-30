@@ -305,29 +305,20 @@ decision_core_test_() ->
      [{spawn, Test} || Test <- test_list()]}.
 
 setup() ->
-    try
-        io:format(user, "~n(processes: ~p, limit: ~p).",
-                  [length(processes()), erlang:system_info(process_limit)]),
-        io:format(user, "~nmemory: ~p", [erlang:memory()]),
-        error_logger:tty(false),
-        initialize_resource_settings(),
-        application:start(inets),
-        {ok, WebmachineSup} = webmachine_sup:start_link(),
-        WebConfig = [{name, ?MODULE},
-                     {ip, "0.0.0.0"},
-                     {port, 0},
-                     {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
-        {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
-        link(MochiServ),
-        set_port(mochiweb_socket_server:get(MochiServ, port)),
-        meck:new(webmachine_resource,
-                 [passthrough, no_link, no_passthrough_cover]),
-        {WebmachineSup, MochiServ}
-    catch
-        T:E ->
-            io:format(user, "~n~p : ~p", [T, E]),
-            io:format(user, "~n~p", [erlang:get_stacktrace()])
-    end.
+    error_logger:tty(false),
+    initialize_resource_settings(),
+    application:start(inets),
+    {ok, WebmachineSup} = webmachine_sup:start_link(),
+    WebConfig = [{name, ?MODULE},
+                 {ip, "0.0.0.0"},
+                 {port, 0},
+                 {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
+    {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
+    link(MochiServ),
+    set_port(mochiweb_socket_server:get(MochiServ, port)),
+    meck:new(webmachine_resource,
+             [passthrough, no_link, no_passthrough_cover]),
+    {WebmachineSup, MochiServ}.
 
 %% start_webmachine() ->
 %%     case webmachine_sup:start_link() of
@@ -354,7 +345,7 @@ stop_webmachine(WebmachineSup) ->
 wait_for_pid(Pid) ->
     Mref = erlang:monitor(process, Pid),
     receive
-        {'DOWN',Mref,process,_,_} ->
+        {'DOWN', Mref, process, _, _} ->
             ok
     after
         5000 ->
