@@ -300,16 +300,24 @@ core_tests() ->
 core_tests1() ->
     [{"414 request uri too long", fun uri_too_long_b11/0}].
 
+start_inets_test() ->
+    ok = application:start(inets),
+    ok.
+
 decision_core_test_() ->
     {foreach, spawn, fun setup/0, fun cleanup/1,
      [{spawn, Test} || Test <- core_tests()]}.
+
+stop_inets_test() ->
+    application:stop(inets),
+    ok.
 
 setup() ->
     try
         error_logger:tty(false),
         initialize_resource_settings(),
-        application:start(inets),
-        timer:sleep(500),
+%        application:start(inets),
+%        timer:sleep(500),
         {ok, WebmachineSup} = webmachine_sup:start_link(),
         WebConfig = [{name, ?MODULE},
                      {ip, "0.0.0.0"},
@@ -367,7 +375,7 @@ cleanup({WebmachineSup, MochiServ}) ->
     unlink(MochiServ),
     exit(MochiServ, kill),
     wait_for_pid(MochiServ),
-    application:stop(inets),
+%    application:stop(inets),
     clear_resource_settings().
 
 get_decision_ids() ->
