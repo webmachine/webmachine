@@ -25,6 +25,7 @@
 -define(RESOURCE_PATH, "/decisioncore").
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
+-define(EPHEMERAL_PORT, 0).
 
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
@@ -300,28 +301,20 @@ core_tests() ->
 core_tests1() ->
     [{"414 request uri too long", fun uri_too_long_b11/0}].
 
-start_inets_test() ->
-    ok = application:start(inets),
-    ok.
-
 decision_core_test_() ->
-    {foreach, spawn, fun setup/0, fun cleanup/1,
+    {foreach, local, fun setup/0, fun cleanup/1,
      [{spawn, Test} || Test <- core_tests()]}.
-
-stop_inets_test() ->
-    application:stop(inets),
-    ok.
 
 setup() ->
     try
+        cleanup_previous_runs(),
         error_logger:tty(false),
         initialize_resource_settings(),
-%        application:start(inets),
-%        timer:sleep(500),
+        application:start(inets),
         {ok, WebmachineSup} = webmachine_sup:start_link(),
         WebConfig = [{name, ?MODULE},
                      {ip, "0.0.0.0"},
-                     {port, 0},
+                     {port, ?EPHEMERAL_PORT},
                      {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
         {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
         link(MochiServ),
@@ -331,29 +324,24 @@ setup() ->
         {WebmachineSup, MochiServ}
     catch
         T:E ->
-            io:format(user, "~n~p : ~p : ~p", [T, E, erlang:get_stacktrace()])
+            io:format(user, "~n~p : ~p : ~p", [T, E, erlang:get_stacktrace()]),
+            error(setup_failed)
     end.
 
-%% start_webmachine() ->
-%%     case webmachine_sup:start_link() of
-%%         {ok, Pid} ->
-%%             Pid;
-%%         {error, {already_started, Pid}} ->
-%%             stop_webmachine(Pid),
-%%             erlang:yield(),
-%%             start_webmachine()
-%%     end.
+cleanup_previous_runs() ->
+    RegNames = [webmachine_sup, webmachine_router, webmachine_logger,
+                webmachine_log_event, webmachine_logger_watcher_sup],
+    ShouldBeDead = [whereis(RegName) || RegName <- RegNames],
+    ZombiePids = [Pid || Pid <- ShouldBeDead, Pid /= undefined],
+    lists:foreach(fun(Pid) ->
+                          Result = wait_for_pid(Pid),
+                          io:format(user, "wait_for_pid: ~p", [Result])
+                  end, ZombiePids).
 
-stop_webmachine(WebmachineSup) ->
-    %% Children = supervisor:which_children(WebmachineSup),
-    %% Ids = [Id || {Id, _, _, _} <- Children],
-    %% [begin
-    %%      supervisor:terminate_child(WebmachineSup, Id),
-    %%      supervisor:delete_child(WebmachineSup, Id)
-    %%  end || Id <- Ids],
-    unlink(WebmachineSup),
-    exit(WebmachineSup, kill),
-    wait_for_pid(WebmachineSup).
+stop_supervisor(Sup) ->
+    unlink(Sup),
+    exit(Sup, kill),
+    wait_for_pid(Sup).
 
 %% @doc Wait for a pid to exit -- Copied from riak_kv_test_util.erl
 wait_for_pid(Pid) ->
@@ -369,24 +357,17 @@ wait_for_pid(Pid) ->
 cleanup({WebmachineSup, MochiServ}) ->
     meck:unload(webmachine_resource),
     %% clean up
-    stop_webmachine(WebmachineSup),
+    stop_supervisor(WebmachineSup),
     {registered_name, MochiName} = process_info(MochiServ, registered_name),
     webmachine_mochiweb:stop(MochiName),
-    unlink(MochiServ),
-    exit(MochiServ, kill),
-    wait_for_pid(MochiServ),
-%    application:stop(inets),
+    stop_supervisor(MochiServ),
+    application:stop(inets),
     clear_resource_settings().
 
 get_decision_ids() ->
     History = meck:history(webmachine_resource),
     Result = [DecisionID || {_, {webmachine_resource, log_d, [DecisionID|_]}, _}
                                 <- History, not is_substate(DecisionID)],
-%%    ETSList = lists:reverse(lookup_setting(decision_trace)),
-%%    Filtered = lists:filter(fun(E) -> not is_substate(E) end, ETSList),
-%%    Filtered.
-%%    io:format(user, "Does~n~p~nEqual~n~p~n? ~p",
-%%              [Result, Filtered, Result == Filtered]),
     Result.
 
 %% Is the decision ID a sub-state? Sub-states are not on the HTTP/1.1 activity
