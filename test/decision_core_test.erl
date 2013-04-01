@@ -333,10 +333,7 @@ cleanup_previous_runs() ->
                 webmachine_log_event, webmachine_logger_watcher_sup],
     ShouldBeDead = [whereis(RegName) || RegName <- RegNames],
     ZombiePids = [Pid || Pid <- ShouldBeDead, Pid /= undefined],
-    lists:foreach(fun(Pid) ->
-                          Result = wait_for_pid(Pid),
-                          io:format(user, "wait_for_pid: ~p", [Result])
-                  end, ZombiePids).
+    lists:foreach(fun wait_for_pid/1, ZombiePids).
 
 stop_supervisor(Sup) ->
     unlink(Sup),
@@ -1377,9 +1374,6 @@ url() ->
 
 url(Path) ->
     url() ++ "/" ++ Path.
-
-log_d(_, DecisionID) ->
-    io:format(user, "~nam I even called? ~p", [DecisionID]).
 
 init([]) ->
     {ok, undefined}.
