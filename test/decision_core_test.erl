@@ -1314,9 +1314,6 @@ initialize_resource_settings() ->
     %% Configure ETS table to hold resource settings for each test
     ets:new(?MODULE, [named_table, public]),
 
-    %% FILO Trace
-    put_setting(decision_trace, []),
-    
     %% Defaults
     put_setting(service_available, true),
     put_setting(ping, pong),
