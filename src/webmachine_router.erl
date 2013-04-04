@@ -293,21 +293,13 @@ supervisor_restart_keeps_routes_test() ->
     ?assertEqual(Pid, OldRouter),
     exit(whereis(webmachine_router), kill),
     timer:sleep(100),
+    %% Note: This test is currently broken and wasn't actually testing what it
+    %% was supposed to
     NewRouter = undefined,
-%    NewRouter = wait_for_restart(webmachine_router),
     ?assert(OldRouter /= NewRouter),
     ?assertEqual([PathSpec], get_routes()),
     exit(Pid, kill),
     ets:delete(?MODULE),
     ok.
-
-%% wait_for_restart(RegName) ->
-%%     IdOrUndefined = whereis(RegName),
-%%     case IdOrUndefined of
-%%         undefined ->
-%%             timer:sleep(100),
-%%             wait_for_restart(RegName);
-%%         Id -> Id
-%%     end.
 
 -endif.
