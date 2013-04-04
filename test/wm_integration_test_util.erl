@@ -119,14 +119,15 @@ service_available(ReqData, Context) ->
     {false, ReqData, Context}.
 
 integration_tests() ->
-    [fun integration_test/1].
+    [fun service_unavailable_test/1].
 
 integration_test_() ->
     {foreach,
      %% Setup
      fun() ->
-             DL = [{[?MODULE, '*'], ?MODULE, []}],
-             wm_integration_test_util:start(?MODULE, "0.0.0.0", DL)
+             DL = [{[atom_to_list(?MODULE), '*'], ?MODULE, []}],
+             Ctx = wm_integration_test_util:start(?MODULE, "0.0.0.0", DL),
+             Ctx
      end,
      %% Cleanup
      fun(Ctx) ->
@@ -134,10 +135,10 @@ integration_test_() ->
      end,
      %% Test functions provided with context from setup
      [fun(Ctx) ->
-              {with, Ctx, integration_tests()}
-     end]}.
+              {spawn, {with, Ctx, integration_tests()}}
+      end]}.
 
-integration_test(Ctx) ->
+service_unavailable_test(Ctx) ->
     URL = wm_integration_test_util:url(Ctx, "foo"),
     {ok, Result} = httpc:request(head, {URL, []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),

@@ -22,10 +22,10 @@
 
 -compile(export_all).
 
--define(RESOURCE_PATH, "/decisioncore").
+-define(RESOURCE, atom_to_list(?MODULE)).
+-define(RESOURCE_PATH, "/" ++ ?RESOURCE).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
--define(EPHEMERAL_PORT, 0).
 
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
@@ -298,67 +298,28 @@ core_tests() ->
      %% known_failure -- fun stream_content_md5/0
     ].
 
-core_tests1() ->
-    [{"414 request uri too long", fun uri_too_long_b11/0}].
-
 decision_core_test_() ->
     {foreach, local, fun setup/0, fun cleanup/1,
      [{spawn, Test} || Test <- core_tests()]}.
 
 setup() ->
     try
-        cleanup_previous_runs(),
-        error_logger:tty(false),
         initialize_resource_settings(),
-        application:start(inets),
-        {ok, WebmachineSup} = webmachine_sup:start_link(),
-        WebConfig = [{name, ?MODULE},
-                     {ip, "0.0.0.0"},
-                     {port, ?EPHEMERAL_PORT},
-                     {dispatch, [{["decisioncore", '*'], ?MODULE, []}]}],
-        {ok, MochiServ} = webmachine_mochiweb:start(WebConfig),
-        link(MochiServ),
-        set_port(mochiweb_socket_server:get(MochiServ, port)),
-        meck:new(webmachine_resource,
-                 [passthrough, no_link, no_passthrough_cover]),
-        {WebmachineSup, MochiServ}
+        DispatchList = [{[?RESOURCE, '*'], ?MODULE, []}],
+        Ctx = wm_integration_test_util:start(?MODULE, "0.0.0.0", DispatchList),
+        set_context(Ctx),
+        MeckOpts = [passthrough, no_link, no_passthrough_cover],
+        meck:new(webmachine_resource, MeckOpts),
+        Ctx
     catch
         T:E ->
             io:format(user, "~n~p : ~p : ~p", [T, E, erlang:get_stacktrace()]),
             error(setup_failed)
     end.
 
-cleanup_previous_runs() ->
-    RegNames = [webmachine_sup, webmachine_router, webmachine_logger,
-                webmachine_log_event, webmachine_logger_watcher_sup],
-    ShouldBeDead = [whereis(RegName) || RegName <- RegNames],
-    ZombiePids = [Pid || Pid <- ShouldBeDead, Pid /= undefined],
-    lists:foreach(fun wait_for_pid/1, ZombiePids).
-
-stop_supervisor(Sup) ->
-    unlink(Sup),
-    exit(Sup, kill),
-    wait_for_pid(Sup).
-
-%% @doc Wait for a pid to exit -- Copied from riak_kv_test_util.erl
-wait_for_pid(Pid) ->
-    Mref = erlang:monitor(process, Pid),
-    receive
-        {'DOWN', Mref, process, _, _} ->
-            ok
-    after
-        5000 ->
-            {error, didnotexit, Pid, erlang:process_info(Pid)}
-    end.
-
-cleanup({WebmachineSup, MochiServ}) ->
+cleanup(Ctx) ->
     meck:unload(webmachine_resource),
-    %% clean up
-    stop_supervisor(WebmachineSup),
-    {registered_name, MochiName} = process_info(MochiServ, registered_name),
-    webmachine_mochiweb:stop(MochiName),
-    stop_supervisor(MochiServ),
-    application:stop(inets),
+    wm_integration_test_util:stop(Ctx),
     clear_resource_settings().
 
 get_decision_ids() ->
@@ -1358,19 +1319,19 @@ lookup_setting(Setting) ->
     [{Setting, Value}] = ets:lookup(?MODULE, Setting),
     Value.
 
-set_port(Port) ->
-    put_setting(port, Port).
+set_context(Context) ->
+    put_setting(context, Context).
 
-get_port() ->
-    lookup_setting(port).
+get_context() ->
+    lookup_setting(context).
 
 url() ->
-    Port = get_port(),
-    Chars = io_lib:format("http://localhost:~b~s", [Port, ?RESOURCE_PATH]),
-    lists:flatten(Chars).
+    Ctx = get_context(),
+    wm_integration_test_util:url(Ctx).
 
 url(Path) ->
-    url() ++ "/" ++ Path.
+    Ctx = get_context(),
+    wm_integration_test_util:url(Ctx, Path).
 
 init([]) ->
     {ok, undefined}.
