@@ -2,7 +2,7 @@
 {application, webmachine,
  [
   {description, "webmachine"},
-  {vsn, "1.10.0"},
+  {vsn, "1.10.1"},
   {modules, []},
   {registered, []},
   {applications, [kernel,
