@@ -483,7 +483,7 @@ decision(v3n11) ->
                 true ->
                     case wrcall({get_resp_header, "Location"}) of
                         undefined ->
-                            respond(500,
+                            error_response(500,
                                     "Response had do_redirect but no Location");
                         _ ->
                             respond(303)

@@ -16,12 +16,12 @@
 
 -module(etag_test).
 
-
 -ifdef(EQC).
 
--include("wm_reqdata.hrl").
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
+
+-include_lib("webmachine/include/webmachine.hrl").
 
 -compile(export_all).
 
@@ -100,11 +100,35 @@ etag_test_() ->
          ?_assert(eqc:quickcheck(eqc:testing_time(10, ?QC_OUT(etag_prop()))))}
        ]}]}.
 
+%% The EQC tests can periodically fail, however the counter examples it
+%% produces are just coincidental. One reduction in particlar (the tuple of the
+%% empty list and two empty binaries) is enough of a red herring that it's
+%% included here as a sanity check.
+etag_regressions_test_() ->
+    CounterExample1 = [{[], <<>>, <<>>}],
+    CounterExample2 = [{[<<25,113,71,254>>, <<25,113,71,254>>, <<"?">>],
+                        <<"?">>, <<"r?}">>}],
+    CounterExample3 = [{[<<19>>, <<70,6,56,181,38,128>>,
+                         <<70,6,56,181,38,128>>, <<19>>, <<19>>, <<19>>,
+                         <<70,6,56,181,38,128>>, <<19>>, <<19>>, <<19>>,
+                         <<19>>, <<70,6,56,181,38,128>>], <<19>>,
+                         <<70,6,56,181,38,128>>}],
+    {spawn,
+     [{setup, fun setup/0, fun cleanup/1,
+       [{"counter example 1",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample1))},
+        {"counter example 2",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample2))},
+        {"counter example 3",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample3))}]}]}.
+
 setup() ->
+    error_logger:tty(false),
     %% Setup ETS table to hold current etag value
     ets:new(?MODULE, [named_table, public]),
 
     %% Spin up webmachine
+    application:start(inets),
     WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
                  {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
     {ok, Pid0} = webmachine_sup:start_link(),
@@ -117,7 +141,8 @@ cleanup({Pid0, Pid1}) ->
     unlink(Pid0),
     exit(Pid0, kill),
     unlink(Pid1),
-    exit(Pid1, kill).
+    exit(Pid1, kill),
+    application:stop(inets).
 
 init([]) ->
     {ok, undefined}.
@@ -138,8 +163,5 @@ generate_etag(ReqData, Context) ->
         [{etag, ETag}] ->
             {ETag, ReqData, Context}
     end.
-
-ping(ReqData, State) ->
-    {pong, ReqData, State}.
 
 -endif.

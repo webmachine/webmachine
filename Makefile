@@ -1,6 +1,9 @@
 ERL          ?= erl
 APP          := webmachine
 
+REPO = ${shell echo `basename "$${PWD}"`}
+ARTIFACTSFILE = ${shell echo ${REPO}-`date +%F_%H-%M-%S`.tgz}
+
 .PHONY: deps
 
 all: deps
@@ -21,3 +24,9 @@ edoc:
 test: all
 	@(./rebar skip_deps=true eunit)
 
+verbosetest: all
+	@(./rebar -v skip_deps=true eunit)
+
+travisupload:
+	tar cvfz ${ARTIFACTSFILE} --exclude '*.beam' --exclude '*.erl' test.log .eunit
+	travis-artifacts upload --path ${ARTIFACTSFILE}
