@@ -518,6 +518,7 @@ decision(v3o18) ->
     BuildBody = case method() of
         'GET' -> true;
         'HEAD' -> true;
+        'POST' -> true;
         _ -> false
     end,
     FinalBody = case BuildBody of
