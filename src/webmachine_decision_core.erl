@@ -59,7 +59,9 @@ d(DecisionID) ->
     log_decision(DecisionID),
     decision(DecisionID).
 
-respond(Code) ->
+respond(Code) when is_integer(Code) ->
+    respond({Code, undefined});
+respond({Code, _ReasonPhrase}=CodeAndReason) ->
     Resource = get(resource),
     EndTime = now(),
     case Code of
@@ -86,9 +88,9 @@ respond(Code) ->
         _ -> ignore
     end,
     put(code, Code),
-    wrcall({set_response_code, Code}),
+    wrcall({set_response_code, CodeAndReason}),
     resource_call(finish_request),
-    wrcall({send_response, Code}),
+    wrcall({send_response, CodeAndReason}),
     RMod = wrcall({get_metadata, 'resource_module'}),
     Notes = wrcall(notes),
     LogData0 = wrcall(log_data),
