@@ -54,6 +54,8 @@ loop(Name, MochiReq) ->
 
     %% Run the dispatch code, catch any errors...
     try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
+        {error, invalid_host} ->
+            handle_error(400, "Invalid Host", Req);
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             handle_error(404, {none, none, []}, Req);
         {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
@@ -86,11 +88,7 @@ handle_error(Code, Error, Req) ->
     {ok,ReqState3} = Req2:send_response(Code),
     Req3 = {webmachine_request,ReqState3},
     {LogData,_ReqState4} = Req3:log_data(),
-    case application:get_env(webmachine,webmachine_logger_module) of
-        {ok, LogModule} ->
-            spawn(LogModule, log_access, [LogData]);
-        _ -> nop
-    end.
+    spawn(webmachine_log, log_access, [LogData]).
 
 get_wm_option(OptName, {WMOptions, OtherOptions}) ->
     {Value, UpdOtherOptions} =
