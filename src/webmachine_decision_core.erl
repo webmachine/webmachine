@@ -429,7 +429,11 @@ decision(v3m16) ->
 %% DELETE enacted immediately?
 %% Also where DELETE is forced.
 decision(v3m20) ->
-    decision_test(resource_call(delete_resource), true, v3m20b, 500);
+    Result = resource_call(delete_resource),
+    %% DELETE may have body and TCP connection will be closed unless body is read.
+    %% See mochiweb_request:should_close.
+    maybe_flush_body_stream(),
+    decision_test(Result, true, v3m20b, 500);
 decision(v3m20b) ->
     decision_test(resource_call(delete_completed), true, v3o20, 202);
 %% "Server allows POST to missing resource?"
@@ -727,3 +731,13 @@ compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     crypto:md5_final(crypto:md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
     compute_body_md5_stream(crypto:md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+
+maybe_flush_body_stream() ->
+    maybe_flush_body_stream(wrcall({stream_req_body, 8192})).
+
+maybe_flush_body_stream(stream_conflict) ->
+    ok;
+maybe_flush_body_stream({_Hunk, done}) ->
+    ok;
+maybe_flush_body_stream({_Hunk, Next}) ->
+    maybe_flush_body_stream(Next()).
