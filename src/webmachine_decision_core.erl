@@ -61,36 +61,36 @@ d(DecisionID) ->
 
 respond(Code) when is_integer(Code) ->
     respond({Code, undefined});
-respond({Code, _ReasonPhrase}=CodeAndReason) ->
+respond({_, _}=CodeAndPhrase) ->
     Resource = get(resource),
     EndTime = now(),
-    case Code of
-        404 ->
-            {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-            Reason = {none, none, []},
-            {ErrorHTML,ReqState} = ErrorHandler:render_error(
-                          Code, {webmachine_request,get(reqstate)}, Reason),
-            put(reqstate, ReqState),
-            wrcall({set_resp_body, ErrorHTML});
-        304 ->
-            wrcall({remove_resp_header, "Content-Type"}),
-            case resource_call(generate_etag) of
-                undefined -> nop;
-                ETag -> wrcall({set_resp_header, "ETag", webmachine_util:quoted_string(ETag)})
-            end,
-            case resource_call(expires) of
-                undefined -> nop;
-                Exp ->
-                    wrcall({set_resp_header, "Expires",
-                           httpd_util:rfc1123_date(
-                              calendar:universal_time_to_local_time(Exp))})
-            end;
-        _ -> ignore
+    respond(CodeAndPhrase, Resource, EndTime).
+
+respond({Code, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime)
+  when Code >= 400, Code < 600 ->
+    error_response(CodeAndPhrase, Resource, EndTime);
+respond({304, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime) ->
+    wrcall({remove_resp_header, "Content-Type"}),
+    case resource_call(generate_etag) of
+        undefined -> nop;
+        ETag -> wrcall({set_resp_header, "ETag", webmachine_util:quoted_string(ETag)})
     end,
+    case resource_call(expires) of
+        undefined -> nop;
+        Exp ->
+            wrcall({set_resp_header, "Expires",
+                    httpd_util:rfc1123_date(
+                      calendar:universal_time_to_local_time(Exp))})
+    end,
+    finish_response(CodeAndPhrase, Resource, EndTime);
+respond(CodeAndPhrase, Resource, EndTime) ->
+    finish_response(CodeAndPhrase, Resource, EndTime).
+
+finish_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
     put(code, Code),
-    wrcall({set_response_code, CodeAndReason}),
+    wrcall({set_response_code, CodeAndPhrase}),
     resource_call(finish_request),
-    wrcall({send_response, CodeAndReason}),
+    wrcall({send_response, CodeAndPhrase}),
     RMod = wrcall({get_metadata, 'resource_module'}),
     Notes = wrcall(notes),
     LogData0 = wrcall(log_data),
@@ -100,19 +100,27 @@ respond({Code, _ReasonPhrase}=CodeAndReason) ->
     spawn(fun() -> do_log(LogData) end),
     Resource:stop().
 
-respond(Code, Headers) ->
-    wrcall({set_resp_headers, Headers}),
-    respond(Code).
+error_response(Reason) ->
+    error_response(500, Reason).
 
 error_response(Code, Reason) ->
+    Resource = get(resource),
+    EndTime = now(),
+    error_response({Code, undefined}, Reason, Resource, EndTime).
+
+error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
+    error_response({Code, _}=CodeAndPhrase,
+                   webmachine_error:reason(Code),
+                   Resource,
+                   EndTime).
+
+error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
                               Code, {webmachine_request,get(reqstate)}, Reason),
     put(reqstate, ReqState),
     wrcall({set_resp_body, ErrorHTML}),
-    respond(Code).
-error_response(Reason) ->
-    error_response(500, Reason).
+    finish_response(CodeAndPhrase, Resource, EndTime).
 
 decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
     case Test of
@@ -188,10 +196,10 @@ decision(v3b9a) ->
             case BodyHash =:= Checksum of
                 true -> d(v3b9b);
                 _ ->
-                    error_response(400, <<"Content-MD5 header does not match request body.">>)
+                    respond(400)
             end;
         false ->
-            error_response(400, <<"Content-MD5 header does not match request body.">>);
+            respond(400);
         _ -> d(v3b9b)
     end;
 %% "Malformed?"
@@ -226,7 +234,8 @@ decision(v3b3) ->
     case method() of
         'OPTIONS' ->
             Hdrs = resource_call(options),
-            respond(200, Hdrs);
+            wrcall({set_resp_headers, Hdrs}),
+            respond(200);
         _ ->
             d(v3c3)
     end;
@@ -443,7 +452,7 @@ decision(v3n11) ->
                 undefined -> error_response("post_is_create w/o create_path");
                 NewPath ->
                     case is_list(NewPath) of
-                        false -> error_response({"create_path not a string",NewPath});
+                        false -> error_response({"create_path not a string", NewPath});
                         true ->
                             BaseUri = case resource_call(base_uri) of
                                 undefined -> wrcall(base_uri);
@@ -485,8 +494,8 @@ decision(v3n11) ->
                 true ->
                     case wrcall({get_resp_header, "Location"}) of
                         undefined ->
-                            respond(500,
-                                    "Response had do_redirect but no Location");
+                            Reason = "Response had do_redirect but no Location",
+                            error_response(500, Reason);
                         _ ->
                             respond(303)
                     end;
