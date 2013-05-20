@@ -100,6 +100,7 @@ host_tokens(_RD = #wm_reqdata{host_tokens=HostT}) -> HostT. % list of strings
 
 port(_RD = #wm_reqdata{port=Port}) -> Port. % integer
 
+response_code(_RD = #wm_reqdata{response_code={C,_ReasonPhrase}}) when is_integer(C) -> C;
 response_code(_RD = #wm_reqdata{response_code=C}) when is_integer(C) -> C.
 
 req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C. % string
