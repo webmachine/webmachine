@@ -589,10 +589,13 @@ decision(v3p11) ->
     end.
 
 accept_helper() ->
-    CT = case get_header_val("Content-Type") of
-             undefined -> "application/octet-stream";
-             Other -> Other
-         end,
+    accept_helper(get_header_val("Content-Type")).
+
+accept_helper(undefined) ->
+    accept_helper("application/octet-stream");
+accept_helper([]) ->
+    accept_helper("application/octet-stream");
+accept_helper(CT) ->
     {MT, MParams} = webmachine_util:media_type_to_detail(CT),
     wrcall({set_metadata, 'mediaparams', MParams}),
     case [Fun || {Type,Fun} <-
