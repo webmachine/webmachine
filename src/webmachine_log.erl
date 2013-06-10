@@ -131,7 +131,7 @@ log_access(#wm_log_data{}=LogData) ->
 %% @doc Close a log file.
 -spec log_close(atom(), string(), file:io_device()) -> ok | {error, term()}.
 log_close(Mod, Name, FD) ->
-    io:format("~p: closing log file: ~p~n", [Mod, Name]),
+    error_logger:info_msg("~p: closing log file: ~p~n", [Mod, Name]),
     file:close(FD).
 
 %% @doc Open a new log file for writing
@@ -144,7 +144,7 @@ log_open(FileName) ->
 -spec log_open(string(), non_neg_integer()) -> file:io_device().
 log_open(FileName, DateHour) ->
     LogName = FileName ++ suffix(DateHour),
-    io:format("opening log file: ~p~n", [LogName]),
+    error_logger:info_msg("opening log file: ~p~n", [LogName]),
     filelib:ensure_dir(LogName),
     {ok, FD} = file:open(LogName, [read, write, raw]),
     {ok, Location} = file:position(FD, eof),
