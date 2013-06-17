@@ -926,7 +926,7 @@ header_test() ->
 metadata_test() ->
     Key = "webmachine",
     Value = "eunit",
-    {ok, ReqState} = set_metadata(Key, Value, #wm_reqstate{metadata=dict:new()}),
+    {ok, ReqState} = set_metadata(Key, Value, #wm_reqstate{metadata=orddict:new()}),
     ?assertEqual({Value, ReqState}, get_metadata(Key, ReqState)).
 
 peer_test() ->
