@@ -368,6 +368,10 @@ unescape_quoted_string([Char | Rest], Acc) ->
 
 %% @doc  Compute the difference between two now() tuples, in milliseconds.
 %% @spec now_diff_milliseconds(now(), now()) -> integer()
+now_diff_milliseconds(undefined, undefined) ->
+    0;
+now_diff_milliseconds(undefined, T2) ->
+    now_diff_milliseconds(os:timestamp(), T2);
 now_diff_milliseconds({M,S,U}, {M,S1,U1}) ->
     ((S-S1) * 1000) + ((U-U1) div 1000);
 now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
