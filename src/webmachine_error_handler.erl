@@ -27,7 +27,9 @@
 
 render_error(Code, Req, Reason) ->
     case Req:has_response_body() of
-        {true,_} -> Req:response_body();
+        {true,_} ->
+            maybe_log(Req, Reason),
+            Req:response_body();
         {false,_} -> render_error_body(Code, Req:trim_state(), Reason)
     end.
 
@@ -37,16 +39,7 @@ render_error_body(404, Req, _Reason) ->
 
 render_error_body(500, Req, Reason) ->
     {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
-    {Path,_} = Req:path(),
-    case Reason of
-        {error, {exit, normal, _Stack}} ->
-            %% webmachine_request did an exit(normal), so suppress this
-            %% message. This usually happens when a chunked upload is
-            %% interrupted by network failure.
-            ok;
-        _ ->
-            error_logger:error_msg("webmachine error: path=~p~n~p~n", [Path, Reason])
-    end,
+    maybe_log(Req, Reason),
     STString = io_lib:format("~p", [Reason]),
     ErrorStart = "<html><head><title>500 Internal Server Error</title></head><body><h1>Internal Server Error</h1>The server encountered an error while processing this request:<br><pre>",
     ErrorEnd = "</pre><P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></body></html>",
@@ -93,3 +86,11 @@ render_error_body(Code, Req, Reason) ->
             "<p><hr><address>mochiweb+webmachine web server</address></body></html>"],
     {iolist_to_binary(Body), ReqState}.
 
+maybe_log(_Req, {error, {exit, normal, _Stack}}) ->
+    %% webmachine_request did an exit(normal), so suppress this
+    %% message. This usually happens when a chunked upload is
+    %% interrupted by network failure.
+    ok;
+maybe_log(Req, Reason) ->
+    {Path,_} = Req:path(),
+    error_logger:error_msg("webmachine error: path=~p~n~p~n", [Path, Reason]).
