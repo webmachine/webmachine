@@ -725,24 +725,51 @@ variances() ->
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
 
+-ifdef(new_hash).
+md5(Bin) ->
+    crypto:hash(md5, Bin).
+
+md5_init() ->
+    crypto:hash_init(md5).
+
+md5_update(Ctx, Bin) ->
+    crypto:hash_update(Ctx, Bin).
+
+md5_final(Ctx) ->
+    crypto:hash_final(Ctx).
+-else.
+md5(Bin) ->
+    crypto:md5(Bin).
+
+md5_init() ->
+    crypto:md5_init().
+
+md5_update(Ctx, Bin) ->
+    crypto:md5_update(Ctx, Bin).
+
+md5_final(Ctx) ->
+    crypto:md5_final(Ctx).
+-endif.
+
+
 compute_body_md5() ->
     case wrcall({req_body, 52428800}) of
         stream_conflict ->
             compute_body_md5_stream();
         Body ->
-            crypto:hash(md5, Body)
+            md5(Body)
     end.
 
 compute_body_md5_stream() ->
-    MD5Ctx = crypto:hash_init(md5),
+    MD5Ctx = md5_init(),
     compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192}), <<>>).
 
 compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     %% Save the body so it can be retrieved later
     put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
-    crypto:hash_final(crypto:hash_update(MD5, Hunk));
+    md5_final(md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
-    compute_body_md5_stream(crypto:hash_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+    compute_body_md5_stream(md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
 
 maybe_flush_body_stream() ->
     maybe_flush_body_stream(wrcall({stream_req_body, 8192})).
