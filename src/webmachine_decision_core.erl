@@ -730,19 +730,19 @@ compute_body_md5() ->
         stream_conflict ->
             compute_body_md5_stream();
         Body ->
-            crypto:md5(Body)
+            crypto:hash(md5, Body)
     end.
 
 compute_body_md5_stream() ->
-    MD5Ctx = crypto:md5_init(),
+    MD5Ctx = crypto:hash_init(md5),
     compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192}), <<>>).
 
 compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     %% Save the body so it can be retrieved later
     put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
-    crypto:md5_final(crypto:md5_update(MD5, Hunk));
+    crypto:hash_final(crypto:hash_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
-    compute_body_md5_stream(crypto:md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+    compute_body_md5_stream(crypto:hash_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
 
 maybe_flush_body_stream() ->
     maybe_flush_body_stream(wrcall({stream_req_body, 8192})).
