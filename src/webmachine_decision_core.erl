@@ -79,8 +79,7 @@ respond({304, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime) ->
         undefined -> nop;
         Exp ->
             wrcall({set_resp_header, "Expires",
-                    httpd_util:rfc1123_date(
-                      calendar:universal_time_to_local_time(Exp))})
+                    webmachine_util:rfc1123_date(Exp)})
     end,
     finish_response(CodeAndPhrase, Resource, EndTime);
 respond(CodeAndPhrase, Resource, EndTime) ->
@@ -546,15 +545,13 @@ decision(v3o18) ->
                 undefined -> nop;
                 LM ->
                     wrcall({set_resp_header, "Last-Modified",
-                           httpd_util:rfc1123_date(
-                             calendar:universal_time_to_local_time(LM))})
+                            webmachine_util:rfc1123_date(LM)})
             end,
             case resource_call(expires) of
                 undefined -> nop;
                 Exp ->
                     wrcall({set_resp_header, "Expires",
-                           httpd_util:rfc1123_date(
-                              calendar:universal_time_to_local_time(Exp))})
+                            webmachine_util:rfc1123_date(Exp)})
             end,
             F = hd([Fun || {Type,Fun} <- resource_call(content_types_provided),
                            CT =:= webmachine_util:format_content_type(Type)]),

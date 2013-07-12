@@ -20,6 +20,7 @@
 -module(webmachine_util).
 -export([guess_mime/1]).
 -export([convert_request_date/1, compare_ims_dates/2]).
+-export([rfc1123_date/1]).
 -export([choose_media_type/2, format_content_type/1]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
@@ -51,6 +52,13 @@ compare_ims_dates(D1, D2) ->
     GD1 = calendar:datetime_to_gregorian_seconds(D1),
     GD2 = calendar:datetime_to_gregorian_seconds(D2),
     GD1 > GD2.
+
+%% @doc Convert tuple style GMT datetime to RFC1123 style one
+rfc1123_date({{YYYY, MM, DD}, {Hour, Min, Sec}}) ->
+    DayNumber = calendar:day_of_the_week({YYYY, MM, DD}),
+    lists:flatten(io_lib:format("~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+                                [httpd_util:day(DayNumber), DD, httpd_util:month(MM),
+                                 YYYY, Hour, Min, Sec])).
 
 %% @spec guess_mime(string()) -> string()
 %% @doc  Guess the mime type of a file by the extension of its filename.
@@ -466,6 +474,10 @@ compare_ims_dates_test() ->
     Early = {{2009,12,30},{13,39,02}},
     ?assertEqual(true, compare_ims_dates(Late, Early)),
     ?assertEqual(false, compare_ims_dates(Early, Late)).
+
+rfc1123_date_test() ->
+    ?assertEqual("Thu, 11 Jul 2013 04:33:19 GMT",
+                 rfc1123_date({{2013, 7, 11}, {4, 33, 19}})).
 
 guess_mime_test() ->
     TextTypes = [".html",".css",".htc",".manifest",".txt"],
