@@ -725,7 +725,7 @@ variances() ->
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
 
--ifdef(new_hash).
+-ifndef(old_hash).
 md5(Bin) ->
     crypto:hash(md5, Bin).
 
