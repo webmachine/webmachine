@@ -1,0 +1,11 @@
+case erlang:system_info(otp_release) =< "R15B01" of
+    true  ->
+        HashDefine = [{d,old_hash}],
+        case lists:keysearch(erl_opts, 1, CONFIG) of
+            {value, {erl_opts, Opts}} ->
+                lists:keyreplace(erl_opts,1,CONFIG,{erl_opts,Opts++HashDefine});
+            false ->
+                CONFIG ++ [{erl_opts, HashDefine}]
+        end;
+    false -> CONFIG
+end.
