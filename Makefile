@@ -4,7 +4,7 @@ APP          := webmachine
 .PHONY: deps
 
 all: deps
-	@(./rebar compile
+	@(./rebar compile)
 
 deps:
 	@(./rebar get-deps)
