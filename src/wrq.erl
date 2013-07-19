@@ -21,7 +21,7 @@
          path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
          resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1,
-         base_uri/1]).
+         base_uri/1,sock/1]).
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
@@ -29,7 +29,7 @@
          append_to_resp_body/2,append_to_response_body/2, set_resp_range/2,
          max_recv_body/1,set_max_recv_body/2,
          get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,
-         add_note/3, get_notes/1]).
+         set_sock/2,add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include("wm_reqdata.hrl").
@@ -46,6 +46,7 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
+      sock="defined_in_wm_req_srv_init",
       req_body=not_fetched_yet,
       max_recv_body=(1024*(1024*1024)),
       % Stolen from R13B03 inet_drv.c's TCP_MAX_PACKET_SIZE definition
@@ -82,6 +83,8 @@ version(_RD = #wm_reqdata{version=Version})
      is_integer(element(1,Version)), is_integer(element(2,Version)) -> Version.
 
 peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
+
+sock(_RD = #wm_reqdata{sock=Sock}) when is_list(Sock) -> Sock.
 
 app_root(_RD = #wm_reqdata{app_root=AR}) when is_list(AR) -> AR.
 
@@ -166,6 +169,8 @@ do_redirect(true, RD) ->  RD#wm_reqdata{resp_redirect=true};
 do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.
 
 set_peer(P, RD) when is_list(P) -> RD#wm_reqdata{peer=P}. % string
+
+set_sock(S, RD) when is_list(S) -> RD#wm_reqdata{sock=S}. % string
 
 set_disp_path(P, RD) when is_list(P) -> RD#wm_reqdata{disp_path=P}. % string
 

@@ -41,7 +41,7 @@
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
 
--export([get_peer/1]). % used in initialization
+-export([get_peer/1, get_sock/1]). % used in initialization
 -export([call/2]). % internal switching interface, used by wrcall
 
 % actual interface for resource functions
@@ -130,6 +130,23 @@ get_peer({?MODULE, ReqState}=Req) ->
 get_peer(ReqState) ->
     get_peer({?MODULE, ReqState}).
 
+get_sock({?MODULE, ReqState} = Req) ->
+    case ReqState#wm_reqstate.sock of
+    undefined ->
+    Sockname = case ReqState#wm_reqstate.socket of
+            testing -> {ok, {{127,0,0,1}, 80}};
+            {ssl,SslSocket} -> ssl:sockname(SslSocket);
+            _ -> inet:sockname(ReqState#wm_reqstate.socket)
+        end,
+        Sock = peer_from_peername(Sockname, Req),
+        NewReqState = ReqState#wm_reqstate{sock=Sock},
+        {Sock, NewReqState};
+    _ ->
+        {ReqState#wm_reqstate.peer, ReqState}
+    end;
+get_sock(ReqState) ->
+    get_sock({?MODULE, ReqState}).
+
 peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}, Req) ->
     x_peername(inet_parse:ntoa(Addr), Req);
 peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}, Req)
@@ -207,6 +224,7 @@ call(get_path_info, {?MODULE, ReqState}) ->
 call({get_path_info, Key}, {?MODULE, ReqState}) ->
     {wrq:path_info(Key, ReqState#wm_reqstate.reqdata), ReqState};
 call(peer, Req) -> get_peer(Req);
+call(sock, Req) -> get_sock(Req);
 call(range, Req) -> get_range(Req);
 call(response_code, {?MODULE, ReqState}) ->
     {wrq:response_code(ReqState#wm_reqstate.reqdata), ReqState};
@@ -958,5 +976,36 @@ peer_test() ->
     after 2000 ->
             exit({error, listener_fail})
     end.
+
+sock_test() ->
+    Self = self(),
+    Pid = spawn_link(fun() ->
+                             {ok, LS} = gen_tcp:listen(0, [binary, {active, false}]),
+                             {ok, {_, Port}} = inet:sockname(LS),
+                             Self ! {port, Port},
+                             {ok, S} = gen_tcp:accept(LS),
+                             receive
+                                 stop ->
+                                     ok
+                             after 2000 ->
+                                     ok
+                             end,
+                             gen_tcp:close(S),
+                             gen_tcp:close(LS)
+                     end),
+    receive
+        {port, Port} ->
+            {ok, S} = gen_tcp:connect({127,0,0,1}, Port, [binary, {active, false}]),
+            ReqData = #wm_reqdata{req_headers = mochiweb_headers:make([])},
+            ReqState = #wm_reqstate{socket=S, reqdata=ReqData},
+            ?assertEqual({S, ReqState}, socket(ReqState)),
+            {"127.0.0.1", NReqState} = get_sock(ReqState),
+            ?assertEqual("127.0.0.1", NReqState#wm_reqstate.sock),
+            Pid ! stop,
+            gen_tcp:close(S)
+    after 2000 ->
+            exit({error, listener_fail})
+    end.
+
 
 -endif.
