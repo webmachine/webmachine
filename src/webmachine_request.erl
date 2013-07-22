@@ -132,17 +132,17 @@ get_peer(ReqState) ->
 
 get_sock({?MODULE, ReqState} = Req) ->
     case ReqState#wm_reqstate.sock of
-    undefined ->
-    Sockname = case ReqState#wm_reqstate.socket of
-            testing -> {ok, {{127,0,0,1}, 80}};
-            {ssl,SslSocket} -> ssl:sockname(SslSocket);
-            _ -> inet:sockname(ReqState#wm_reqstate.socket)
-        end,
-        Sock = peer_from_peername(Sockname, Req),
-        NewReqState = ReqState#wm_reqstate{sock=Sock},
-        {Sock, NewReqState};
-    _ ->
-        {ReqState#wm_reqstate.peer, ReqState}
+        undefined ->
+            Sockname = case ReqState#wm_reqstate.socket of
+                testing -> {ok, {{127,0,0,1}, 80}};
+                {ssl,SslSocket} -> ssl:sockname(SslSocket);
+                _ -> inet:sockname(ReqState#wm_reqstate.socket)
+            end,
+            Sock = peer_from_peername(Sockname, Req),
+            NewReqState = ReqState#wm_reqstate{sock=Sock},
+            {Sock, NewReqState};
+        _ ->
+            {ReqState#wm_reqstate.peer, ReqState}
     end;
 get_sock(ReqState) ->
     get_sock({?MODULE, ReqState}).
