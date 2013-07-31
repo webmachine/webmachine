@@ -91,13 +91,14 @@ expected_response_code("If-None-Match", _, false) ->
     204.
 
 etag_test_() ->
+    Time = 10,
     {spawn,
      [{setup,
        fun setup/0,
        fun cleanup/1,
        [
-        {timeout, 12,
-         ?_assert(eqc:quickcheck(eqc:testing_time(10, ?QC_OUT(etag_prop()))))}
+        {timeout, Time*3,
+         ?_assert(eqc:quickcheck(eqc:testing_time(Time, ?QC_OUT(etag_prop()))))}
        ]}]}.
 
 setup() ->
