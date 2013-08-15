@@ -19,6 +19,7 @@
 -module(webmachine_log).
 
 -include("webmachine_logger.hrl").
+-include("wm_reqdata.hrl").
 
 -export([add_handler/2,
          call/2,
@@ -32,6 +33,9 @@
          fmtnow/0,
          log_access/1,
          log_close/3,
+         log_error/1,
+         log_error/3,
+         log_info/1,
          log_open/1,
          log_open/2,
          log_write/2,
@@ -131,8 +135,23 @@ log_access(#wm_log_data{}=LogData) ->
 %% @doc Close a log file.
 -spec log_close(atom(), string(), file:io_device()) -> ok | {error, term()}.
 log_close(Mod, Name, FD) ->
-    error_logger:info_msg("~p: closing log file: ~p~n", [Mod, Name]),
+    log_info([Mod, ": closing log file: ", Name, $\n]),
     file:close(FD).
+
+%% @doc Notify registered log event handler of an error event.
+-spec log_error(iolist()) -> ok.
+log_error(LogMsg) ->
+    gen_event:sync_notify(?EVENT_LOGGER, {log_error, LogMsg}).
+
+%% @doc Notify registered log event handler of an error event.
+-spec log_error(pos_integer(), #wm_reqdata{}, term()) -> ok.
+log_error(Code, Req, Reason) ->
+    gen_event:sync_notify(?EVENT_LOGGER, {log_error, Code, Req, Reason}).
+
+%% @doc Notify registered log event handler of an info event.
+-spec log_info(iolist()) -> ok.
+log_info(LogMsg) ->
+    gen_event:sync_notify(?EVENT_LOGGER, {log_info, LogMsg}).
 
 %% @doc Open a new log file for writing
 -spec log_open(string()) -> {file:io_device(), non_neg_integer()}.
@@ -154,7 +173,7 @@ log_open(FileName, DateHour) ->
 
 -spec log_write(file:io_device(), iolist()) -> ok | {error, term()}.
 log_write(FD, IoData) ->
-    file:write(FD, lists:flatten(IoData)).
+    file:write(FD, IoData).
 
 %% @doc Rotate a log file if the hour it represents
 %% has passed.

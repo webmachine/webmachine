@@ -28,7 +28,7 @@
 render_error(Code, Req, Reason) ->
     case Req:has_response_body() of
         {true,_} ->
-            maybe_log(Req, Reason),
+            maybe_log(Code, Req, Reason),
             Req:response_body();
         {false,_} -> render_error_body(Code, Req:trim_state(), Reason)
     end.
@@ -39,18 +39,17 @@ render_error_body(404, Req, _Reason) ->
 
 render_error_body(500, Req, Reason) ->
     {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
-    maybe_log(Req, Reason),
+    maybe_log(500, Req, Reason),
     STString = io_lib:format("~p", [Reason]),
     ErrorStart = "<html><head><title>500 Internal Server Error</title></head><body><h1>Internal Server Error</h1>The server encountered an error while processing this request:<br><pre>",
     ErrorEnd = "</pre><P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></body></html>",
     ErrorIOList = [ErrorStart,STString,ErrorEnd],
     {erlang:iolist_to_binary(ErrorIOList), ReqState};
 
-render_error_body(501, Req, _Reason) ->
+render_error_body(501, Req, Reason) ->
     {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
     {Method,_} = Req:method(),
-    error_logger:error_msg("Webmachine does not support method ~p~n",
-                           [Method]),
+    webmachine_log:log_error(501, Req, Reason),
     ErrorStr = io_lib:format("<html><head><title>501 Not Implemented</title>"
                              "</head><body><h1>Not Implemented</h1>"
                              "The server does not support the ~p method.<br>"
@@ -59,10 +58,9 @@ render_error_body(501, Req, _Reason) ->
                              [Method]),
     {erlang:iolist_to_binary(ErrorStr), ReqState};
 
-render_error_body(503, Req, _Reason) ->
+render_error_body(503, Req, Reason) ->
     {ok, ReqState} = Req:add_response_header("Content-Type", "text/html"),
-    error_logger:error_msg("Webmachine cannot fulfill"
-                           " the request at this time"),
+    webmachine_log:log_error(503, Req, Reason),
     ErrorStr = "<html><head><title>503 Service Unavailable</title>"
                "</head><body><h1>Service Unavailable</h1>"
                "The server is currently unable to handle "
@@ -86,11 +84,10 @@ render_error_body(Code, Req, Reason) ->
             "<p><hr><address>mochiweb+webmachine web server</address></body></html>"],
     {iolist_to_binary(Body), ReqState}.
 
-maybe_log(_Req, {error, {exit, normal, _Stack}}) ->
+maybe_log(_Code, _Req, {error, {exit, normal, _Stack}}) ->
     %% webmachine_request did an exit(normal), so suppress this
     %% message. This usually happens when a chunked upload is
     %% interrupted by network failure.
     ok;
-maybe_log(Req, Reason) ->
-    {Path,_} = Req:path(),
-    error_logger:error_msg("webmachine error: path=~p~n~p~n", [Path, Reason]).
+maybe_log(Code, Req, Reason) ->
+    webmachine_log:log_error(Code, Req, Reason).
