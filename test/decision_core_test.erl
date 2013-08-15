@@ -194,7 +194,7 @@
 
 %% L17 - A path to L17 without accept headers
 -define(PATH_TO_L17_NO_ACPTHEAD,
-       ?PATH_TO_L13_NO_ACPTHEAD++[v3l14,v3l15,v3l17]).
+        ?PATH_TO_L13_NO_ACPTHEAD++[v3l14,v3l15,v3l17]).
 
 %% I13 - Two paths to I13 without accept headers
 -define(PATH_TO_I13_VIA_H10_G8_F6_E6_D5_C4,
@@ -366,7 +366,7 @@ service_unavailable() ->
 
 %% 503 result via B13 (at ping)
 ping_invalid() ->
-    % "breakout" for "anything other than pong"
+                                                % "breakout" for "anything other than pong"
     put_setting(ping, breakout),
     {ok, Result} = httpc:request(head, {url(), []}, [], []),
     ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
@@ -381,7 +381,7 @@ ping_error() ->
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B13,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.    
+    ok.
 
 %% 500 error response via O18 from a callback raising an error
 internal_server_error_o18() ->
@@ -702,8 +702,11 @@ authorized_b8() ->
     put_setting(is_authorized, "Basic"),
     put_setting(allowed_methods, ['GET']),
     {ok, Result} = httpc:request(get, {url("foo"), []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 401, "Unauthorized"},
-                  [_, _, {"www-authenticate", "Basic"}, _], _}, Result),
+    {{Protocol, Code, Status}, Headers, _} = Result,
+    ?assertEqual("HTTP/1.1", Protocol),
+    ?assertEqual(401, Code),
+    ?assertEqual("Unauthorized", Status),
+    ?assertEqual({"www-authenticate", "Basic"}, lists:keyfind("www-authenticate", 1, Headers)),
     ExpectedDecisionTrace = ?PATH_TO_B8,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
@@ -779,7 +782,7 @@ multiple_choices_o18() ->
     ?assertMatch({{"HTTP/1.1", 300, "Multiple Choices"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_O18_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.    
+    ok.
 
 %% 301 result via I4
 moved_permanently_i4() ->
@@ -1262,9 +1265,9 @@ validate_checksum_for_md5stream(ReqData, Context, Result) ->
 process_post_for_md5_stream(ReqData, Context, NewLocation) ->
     Headers = [{"Location", NewLocation}],
     RDWithLocation = wrq:set_resp_headers(Headers, ReqData),
-%    ReqBody = wrq:stream_req_body(ReqData, 1024),
-%    Text = get_streamed_body(ReqBody, []),
-%    Text = wrq:req_body(ReqData),
+    %% ReqBody = wrq:stream_req_body(ReqData, 1024),
+    %% Text = get_streamed_body(ReqBody, []),
+    %% Text = wrq:req_body(ReqData),
     {true, RDWithLocation, Context}.
 
 %%
@@ -1349,7 +1352,7 @@ service_available(ReqData, Context) ->
 
 validate_content_checksum(ReqData, Context) ->
     Setting = lookup_setting(validate_content_checksum),
-    case Setting of 
+    case Setting of
         %% general callback
         {mfa, Mod, Fun, Arg} ->
             erlang:apply(Mod, Fun, [ReqData, Context, Arg]);
