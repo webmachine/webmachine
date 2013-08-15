@@ -17,7 +17,7 @@
 
 -ifdef(TEST).
 
--include_lib("webmachine/include/wm_reqdata.hrl").
+-include("wm_reqdata.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -compile(export_all).

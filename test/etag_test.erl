@@ -20,8 +20,7 @@
 
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
--include_lib("webmachine/include/webmachine.hrl").
+-include("webmachine.hrl").
 
 -compile(export_all).
 

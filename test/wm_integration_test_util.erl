@@ -25,8 +25,8 @@
 
 -export([init/1, service_available/2]).
 
+-include("webmachine.hrl").
 -include_lib("eunit/include/eunit.hrl").
--include_lib("webmachine/include/webmachine.hrl").
 
 -define(EPHEMERAL_PORT, 0).
 
