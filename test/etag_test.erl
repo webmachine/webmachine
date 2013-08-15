@@ -140,7 +140,7 @@ setup() ->
 cleanup({Pid0, Pid1}) ->
     %% clean up
     unlink(Pid0),
-    exit(Pid0, kill),
+    exit(Pid0, normal),
     unlink(Pid1),
     exit(Pid1, kill),
     application:stop(inets).
