@@ -14,9 +14,9 @@
 %% specific language governing permissions and limitations
 %% under the License.
 
-%% @doc Default log handler for webmachine
+%% @doc Default access log handler for webmachine
 
--module(webmachine_log_handler).
+-module(webmachine_access_log_handler).
 
 -behaviour(gen_event).
 
@@ -110,12 +110,16 @@ format_req(#wm_log_data{method=Method,
             undefined -> "";
             U -> U
         end,
-    fmt_alog(Time, Peer, User, atom_to_list(Method), Path, Version,
+    fmt_alog(Time, Peer, User, Method, Path, Version,
              Status, Length, Referer, UserAgent).
 
+fmt_alog(Time, Ip, User, Method, Path, Version,
+         Status,  Length, Referer, UserAgent) when is_atom(Method) ->
+    fmt_alog(Time, Ip, User, atom_to_list(Method), Path, Version,
+             Status, Length, Referer, UserAgent);
 fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
-         Status,  Length, Referrer, UserAgent) ->
+         Status,  Length, Referer, UserAgent) ->
     [webmachine_log:fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
-     Status, [$\s], Length, [$\s,$"], Referrer,
+     Status, [$\s], Length, [$\s,$"], Referer,
      [$",$\s,$"], UserAgent, [$",$\n]].
