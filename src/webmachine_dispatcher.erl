@@ -234,18 +234,18 @@ run_guard(Fun, RD) when is_function(Fun) ->
     try
         Fun(RD) == true
     catch _Type : Msg ->
-            error_logger:error_msg("Error running guard ~p: ~p~n", [Fun, Msg]),
+            webmachine_log:log_error(["Error running guard ", Fun, ": ", Msg, $\n]),
             throw({error_running_guard, Fun, Msg})
     end;
 run_guard({Mod, Fun}, RD) ->
     try
         Mod:Fun(RD) == true
     catch _Type : Msg ->
-            error_logger:error_msg("Error running guard ~p:~p/1: ~p~n", [Mod, Fun, Msg]),
+            webmachine_log:log_error(["Error running guard ", Mod, $:, Fun, "/1: ", Msg, $\n]),
             throw({error_running_guard, {Mod, Fun}, Msg})
     end;
 run_guard(Other, _) ->
-    error_logger:error_msg("Unknown guard type in webmachine_dispatcher: ~p~n", [Other]),
+    webmachine_log:log_error(["Unknown guard type in webmachine_dispatcher: ", Other, $\n]),
     throw({unknown_guard_type, Other}).
 
 bind([], [], Bindings, Depth) ->
