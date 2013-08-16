@@ -1,6 +1,9 @@
 ERL          ?= erl
 APP          := webmachine
 
+REPO = ${shell echo `basename "$${PWD}"`}
+ARTIFACTSFILE = ${shell echo ${REPO}-`date +%F_%H-%M-%S`.tgz}
+
 .PHONY: deps
 
 all: deps compile
@@ -20,7 +23,7 @@ distclean: clean
 edoc:
 	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
 
-test: all	
+test: all
 	@(./rebar skip_deps=true eunit)
 
 APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
@@ -48,3 +51,10 @@ cleanplt:
 	@ech
 	sleep 5
 	rm $(COMBO_PLT)
+
+verbosetest: all
+	@(./rebar -v skip_deps=true eunit)
+
+travisupload:
+	tar cvfz ${ARTIFACTSFILE} --exclude '*.beam' --exclude '*.erl' test.log .eunit
+	travis-artifacts upload --path ${ARTIFACTSFILE}

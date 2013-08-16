@@ -18,7 +18,7 @@
 -module(webmachine_mochiweb).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([start/1, stop/0, loop/2]).
+-export([start/1, stop/0, stop/1, loop/2]).
 
 %% The `log_dir' option is deprecated, but remove it from the
 %% options list if it is present
@@ -40,7 +40,10 @@ start(Options) ->
 stop() ->
     {registered_name, PName} = process_info(self(), registered_name),
     MochiName = list_to_atom(atom_to_list(PName) ++ "_mochiweb"),
-    mochiweb_http:stop(MochiName).
+    stop(MochiName).
+
+stop(Name) ->
+    mochiweb_http:stop(Name).
 
 loop(Name, MochiReq) ->
     Req = webmachine:new_request(mochiweb, MochiReq),

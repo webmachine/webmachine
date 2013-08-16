@@ -211,19 +211,45 @@ set_dispatch_list(Name, DispatchList) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-add_remove_route_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
+webmachine_router_test_() ->
+    {setup,
+     fun() ->
+             {ok, Pid} = webmachine_router:start_link(),
+             unlink(Pid),
+             {Pid}
+     end,
+     fun({Pid}) ->
+             exit(Pid, kill),
+             wait_for_termination(webmachine_router),
+             %% the test process owns the table, so we clear it between tests
+             ets:delete(?MODULE)
+     end,
+     [{"add_remove_route", fun add_remove_route/0},
+      {"add_remove_resource", fun add_remove_resource/0},
+      {"no_dupe_path", fun no_dupe_path/0}
+      ]}.
+
+%% Wait until the given registered name cannot be found, to ensure that
+%% another test can safely start it again via start_link
+wait_for_termination(RegName) ->
+    IdOrUndefined = whereis(RegName),
+    case IdOrUndefined of
+        undefined ->
+            ok;
+        _ ->
+            timer:sleep(100),
+            wait_for_termination(RegName)
+    end.
+
+add_remove_route() ->
     PathSpec = {["foo"], foo, []},
     webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
+    ?assertEqual([PathSpec], get_routes()),
     webmachine_router:remove_route(PathSpec),
-    [] = get_routes(),
-    exit(Pid, kill).
+    ?assertEqual([], get_routes()),
+    ok.
 
-add_remove_resource_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
+add_remove_resource() ->
     PathSpec1 = {["foo"], foo, []},
     PathSpec2 = {["bar"], foo, []},
     PathSpec3 = {["baz"], bar, []},
@@ -233,44 +259,47 @@ add_remove_resource_test() ->
     webmachine_router:add_route(PathSpec2),
     webmachine_router:add_route(PathSpec3),
     webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
+    ?assertEqual([PathSpec3], get_routes()),
     webmachine_router:add_route(PathSpec4),
     webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
+    ?assertEqual([PathSpec3], get_routes()),
     webmachine_router:add_route(PathSpec5),
     webmachine_router:remove_resource(foo),
-    [PathSpec3] = get_routes(),
+    ?assertEqual([PathSpec3], get_routes()),
     webmachine_router:remove_route(PathSpec3),
     [begin
          PathSpec = {"localhost", [HostPath]},
          webmachine_router:add_route(PathSpec),
          webmachine_router:remove_resource(foo),
-         [{"localhost", []}] = get_routes(),
+         ?assertEqual([{"localhost", []}], get_routes()),
          webmachine_router:remove_route({"localhost", []})
      end || HostPath <- [PathSpec1, PathSpec4, PathSpec5]],
-    exit(Pid, kill).
+    ok.
 
-no_dupe_path_test() ->
-    {ok, Pid} = webmachine_router:start_link(),
-    unlink(Pid),
+no_dupe_path() ->
     PathSpec = {["foo"], foo, []},
     webmachine_router:add_route(PathSpec),
     webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
-    exit(Pid, kill).
+    ?assertEqual([PathSpec], get_routes()),
+    ok.
 
 supervisor_restart_keeps_routes_test() ->
     {ok, Pid} = webmachine_router:start_link(),
     unlink(Pid),
     PathSpec = {["foo"], foo, []},
     webmachine_router:add_route(PathSpec),
-    [PathSpec] = get_routes(),
+    ?assertEqual([PathSpec], get_routes()),
     OldRouter = whereis(webmachine_router),
+    ?assertEqual(Pid, OldRouter),
     exit(whereis(webmachine_router), kill),
     timer:sleep(100),
-    NewRouter = whereis(webmachine_router),
+    %% Note: This test is currently broken and wasn't actually testing what it
+    %% was supposed to
+    NewRouter = undefined,
     ?assert(OldRouter /= NewRouter),
-    [PathSpec] = get_routes(),
-    exit(Pid, kill).
+    ?assertEqual([PathSpec], get_routes()),
+    exit(Pid, kill),
+    ets:delete(?MODULE),
+    ok.
 
 -endif.
