@@ -394,6 +394,7 @@ send_ok_response(ReasonPhrase, {?MODULE, ReqState}=Req) ->
 send_response(Code, #wm_reqstate{}=ReqState) -> send_response(Code,ReqState,{?MODULE,ReqState});
 send_response(Code, {?MODULE, ReqState}=Req) -> send_response(Code,ReqState,Req).
 send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
+    ok = ensure_body_read(PassedState),
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
         {stream, StreamBody} -> {{stream, StreamBody}, chunked};
@@ -427,6 +428,25 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
                                            response_length=FinalLength},
     {ok, PassedState#wm_reqstate{reqdata=wrq:set_response_code(Code, RD),
                      log_data=FinalLogData}}.
+
+%% NOTE: might exit...
+-spec ensure_body_read(#wm_reqstate{}) -> ok.
+ensure_body_read(#wm_reqstate{bodyfetch=stream}) ->
+    %% Can we do anything here? Not sure if the request body has been
+    %% all the way read or not
+    ok;
+ensure_body_read(#wm_reqstate{bodyfetch=standard}) ->
+    %% the body has already been read
+    ok;
+ensure_body_read(ReqState=#wm_reqstate{bodyfetch=undefined}) ->
+    _ = stream_body_to_garbage(wrq:stream_req_body(ReqState#wm_reqstate.reqdata)),
+    ok.
+
+-spec stream_body_to_garbage({binary(), done | fun()}) -> ok.
+stream_body_to_garbage({_Data, done}) ->
+    ok;
+stream_body_to_garbage({_Data, Fun}) ->
+    stream_body_to_garbage(Fun()).
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->
