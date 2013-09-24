@@ -439,7 +439,8 @@ ensure_body_read(#wm_reqstate{bodyfetch=standard}) ->
     %% the body has already been read
     ok;
 ensure_body_read(ReqState=#wm_reqstate{bodyfetch=undefined}) ->
-    _ = stream_body_to_garbage(wrq:stream_req_body(ReqState#wm_reqstate.reqdata)),
+    _ = stream_body_to_garbage(wrq:stream_req_body(ReqState#wm_reqstate.reqdata,
+                                                   1048576)),
     ok.
 
 -spec stream_body_to_garbage({binary(), done | fun()}) -> ok.
