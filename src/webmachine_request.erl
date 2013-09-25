@@ -394,7 +394,8 @@ send_ok_response(ReasonPhrase, {?MODULE, ReqState}=Req) ->
 send_response(Code, #wm_reqstate{}=ReqState) -> send_response(Code,ReqState,{?MODULE,ReqState});
 send_response(Code, {?MODULE, ReqState}=Req) -> send_response(Code,ReqState,Req).
 send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
-    ok = ensure_body_read(PassedState),
+    MaxThrowaway = webmachine_config:get_max_request_body_throwaway_bytes(),
+    ok = ensure_body_read(PassedState, MaxThrowaway),
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
         {stream, StreamBody} -> {{stream, StreamBody}, chunked};
@@ -430,30 +431,43 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
                      log_data=FinalLogData}}.
 
 %% NOTE: might exit...
--spec ensure_body_read(#wm_reqstate{}) -> ok.
-ensure_body_read(#wm_reqstate{bodyfetch=stream}) ->
+-spec ensure_body_read(#wm_reqstate{}, MaxBytes :: integer()) -> ok.
+ensure_body_read(#wm_reqstate{bodyfetch=stream}, _MaxBytes) ->
     %% Can we do anything here? Not sure if the request body has been
     %% all the way read or not
     ok;
-ensure_body_read(#wm_reqstate{bodyfetch=standard}) ->
+ensure_body_read(#wm_reqstate{bodyfetch=standard}, _MaxBytes) ->
     %% the body has already been read
     ok;
 ensure_body_read(ReqState=#wm_reqstate{bodyfetch=undefined,
-                                       reqdata=ReqData}) ->
+                                       reqdata=ReqData},
+                 MaxBytes) ->
     %% The `reqdata' inside of `ReqState' normally has a `wm_reqstate' field
     %% itself, but [https://github.com/basho/webmachine/pull/152] removes
     %% that late in the request cycle. In order to use
     %% `wrq:stream_req_body/2', we need to put it back
     ReqData2 = ReqData#wm_reqdata{wm_state=ReqState},
+    %% 1mb hunk size
+    HunkSize = 1048576,
     _ = stream_body_to_garbage(wrq:stream_req_body(ReqData2,
-                                                   1048576)),
+                                                   HunkSize),
+                               MaxBytes),
     ok.
 
--spec stream_body_to_garbage({binary(), done | fun()}) -> ok.
-stream_body_to_garbage({_Data, done}) ->
+-spec stream_body_to_garbage({binary(), done | fun()},
+                             MaxBytes :: integer()) -> ok.
+stream_body_to_garbage(Stream, MaxBytes) ->
+    stream_body_to_garbage(Stream, MaxBytes, 0).
+
+stream_body_to_garbage({_Data, done}, _MaxBytes, _BytesSoFar) ->
     ok;
-stream_body_to_garbage({_Data, Fun}) ->
-    stream_body_to_garbage(Fun()).
+stream_body_to_garbage(_Stream, MaxBytes, BytesSoFar) when
+        BytesSoFar >= MaxBytes ->
+    %% should we just close the connection and `exit' here?
+    ok;
+stream_body_to_garbage({Data, Fun}, MaxBytes, BytesSoFar) ->
+    stream_body_to_garbage(Fun(), MaxBytes,
+                          BytesSoFar + byte_size(Data)).
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->
