@@ -14,8 +14,20 @@
 
 -module(webmachine_config).
 
+-export([get_env/3]).
+
 -export([set_max_request_body_throwaway_bytes/1,
          get_max_request_body_throwaway_bytes/0]).
+
+%% @doc `application:get_env/3' was added in R16. We need to support
+%% R15 still.
+get_env(Application, Parameter, Default) ->
+    case application:get_env(Application, Parameter) of
+        {ok, Val} ->
+            Val;
+        undefined ->
+                Default
+    end.
 
 %% 64MB in bytes
 -define(DEFAULT_MAX_REQUEST_BODY_THROWAWAY_BYTES, 67108864).
@@ -26,5 +38,5 @@ set_max_request_body_throwaway_bytes(NumBytes) when is_integer(NumBytes) ->
 
 -spec get_max_request_body_throwaway_bytes() -> integer().
 get_max_request_body_throwaway_bytes() ->
-    application:get_env(webmachine, max_request_body_throwaway_bytes,
-                        ?DEFAULT_MAX_REQUEST_BODY_THROWAWAY_BYTES).
+    get_env(webmachine, max_request_body_throwaway_bytes,
+            ?DEFAULT_MAX_REQUEST_BODY_THROWAWAY_BYTES).
