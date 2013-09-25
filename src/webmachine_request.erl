@@ -438,8 +438,14 @@ ensure_body_read(#wm_reqstate{bodyfetch=stream}) ->
 ensure_body_read(#wm_reqstate{bodyfetch=standard}) ->
     %% the body has already been read
     ok;
-ensure_body_read(ReqState=#wm_reqstate{bodyfetch=undefined}) ->
-    _ = stream_body_to_garbage(wrq:stream_req_body(ReqState#wm_reqstate.reqdata,
+ensure_body_read(ReqState=#wm_reqstate{bodyfetch=undefined,
+                                       reqdata=ReqData}) ->
+    %% The `reqdata' inside of `ReqState' normally has a `wm_reqstate' field
+    %% itself, but [https://github.com/basho/webmachine/pull/152] removes
+    %% that late in the request cycle. In order to use
+    %% `wrq:stream_req_body/2', we need to put it back
+    ReqData2 = ReqData#wm_reqdata{wm_state=ReqState},
+    _ = stream_body_to_garbage(wrq:stream_req_body(ReqData2,
                                                    1048576)),
     ok.
 
