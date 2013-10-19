@@ -67,6 +67,7 @@
          get_out_header/2,
          has_out_header/2,
          peer/1,
+         peer_port/1,
          get_header_value/2,
          add_response_header/3,
          add_response_headers/2,
@@ -844,6 +845,9 @@ set_response_code(Code, ReqState) ->
 
 peer(#wm_reqstate{}=ReqState) -> call(peer, {?MODULE, ReqState});
 peer(Req) -> call(peer, Req).
+
+peer_port(#wm_reqstate{}=ReqState) -> call(peer_port, {?MODULE, ReqState});
+peer_port(Req) -> call(peer_port, Req).
 
 range(#wm_reqstate{}=ReqState) -> call(range, {?MODULE, ReqState});
 range(Req) -> call(range, Req).
