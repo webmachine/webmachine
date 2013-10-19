@@ -245,6 +245,7 @@ call(get_path_info, {?MODULE, ReqState}) ->
 call({get_path_info, Key}, {?MODULE, ReqState}) ->
     {wrq:path_info(Key, ReqState#wm_reqstate.reqdata), ReqState};
 call(peer, Req) -> get_peer(Req);
+call(peer_port, Req) -> get_peer_port(Req);
 call(sock, Req) -> get_sock(Req);
 call(range, Req) -> get_range(Req);
 call(response_code, {?MODULE, ReqState}) ->
