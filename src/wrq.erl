@@ -46,6 +46,7 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
+      peer_port="defined_in_wm_req_srv_init",
       sock="defined_in_wm_req_srv_init",
       req_body=not_fetched_yet,
       max_recv_body=(1024*(1024*1024)),
