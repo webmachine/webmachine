@@ -17,7 +17,7 @@
 -author('Justin Sheehy <justin@basho.com>').
 
 -export([create/4, create/5,load_dispatch_data/7]).
--export([method/1,scheme/1,version/1,peer/1,disp_path/1,path/1,raw_path/1,
+-export([method/1,scheme/1,version/1,peer/1,peer_port/1,disp_path/1,path/1,raw_path/1,
          path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
          resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1,
@@ -83,6 +83,8 @@ version(_RD = #wm_reqdata{version=Version})
      is_integer(element(1,Version)), is_integer(element(2,Version)) -> Version.
 
 peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
+
+peer_port(_RD = #wm_reqdata{peer_port=PeerPort}) when is_integer(PeerPort) -> PeerPort.
 
 sock(_RD = #wm_reqdata{sock=Sock}) when is_list(Sock) -> Sock.
 
