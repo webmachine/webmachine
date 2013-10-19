@@ -4,6 +4,7 @@
          method :: atom(),
          headers,
          peer,
+         peer_port,
          sock,
          path :: string(),
          version,
