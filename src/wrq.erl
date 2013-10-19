@@ -28,7 +28,7 @@
          merge_resp_headers/2,remove_resp_header/2,
          append_to_resp_body/2,append_to_response_body/2, set_resp_range/2,
          max_recv_body/1,set_max_recv_body/2,
-         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,
+         get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,set_peer_port/2,
          set_sock/2,add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
@@ -169,6 +169,8 @@ do_redirect(true, RD) ->  RD#wm_reqdata{resp_redirect=true};
 do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.
 
 set_peer(P, RD) when is_list(P) -> RD#wm_reqdata{peer=P}. % string
+
+set_peer_port(P, RD)   when is_integer(P) -> RD#wm_reqdata{peer_port=P}. % integer
 
 set_sock(S, RD) when is_list(S) -> RD#wm_reqdata{sock=S}. % string
 
