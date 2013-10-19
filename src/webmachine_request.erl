@@ -185,6 +185,9 @@ x_peername(Default, Req) ->
         string:strip(lists:last(string:tokens(Hosts, ",")))
     end.
 
+peer_port_from_peername({ok, {_Addr, Port}}, _Req) ->
+  Port.
+
 call(base_uri, {?MODULE, ReqState}) ->
     {wrq:base_uri(ReqState#wm_reqstate.reqdata), ReqState};
 call(socket, {?MODULE, ReqState}) -> {ReqState#wm_reqstate.socket,ReqState};
