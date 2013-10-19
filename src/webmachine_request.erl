@@ -42,6 +42,7 @@
 -author('Andy Gross <andy@basho.com>').
 
 -export([get_peer/1, get_sock/1]). % used in initialization
+-export([get_peer_port/1]).          
 -export([call/2]). % internal switching interface, used by wrcall
 
 % actual interface for resource functions
@@ -129,6 +130,23 @@ get_peer({?MODULE, ReqState}=Req) ->
     end;
 get_peer(ReqState) ->
     get_peer({?MODULE, ReqState}).
+
+get_peer_port({?MODULE, ReqState}=Req) ->
+    case ReqState#wm_reqstate.peer of
+    undefined ->
+        PeerName = case ReqState#wm_reqstate.socket of
+            testing -> {ok, {{127,0,0,1}, 80}};
+            {ssl,SslSocket} -> ssl:peername(SslSocket);
+            _ -> inet:peername(ReqState#wm_reqstate.socket) 
+        end,
+        PeerPort = peer_port_from_peername(PeerName, Req),
+        NewReqState = ReqState#wm_reqstate{peer_port=PeerPort},
+        {PeerPort, NewReqState};
+    _ ->
+        {ReqState#wm_reqstate.peer_port, ReqState}
+    end;
+get_peer_port(ReqState) ->
+    get_peer_port({?MODULE, ReqState}).
 
 get_sock({?MODULE, ReqState} = Req) ->
     case ReqState#wm_reqstate.sock of
