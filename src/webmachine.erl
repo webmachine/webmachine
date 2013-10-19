@@ -57,7 +57,7 @@ new_request(mochiweb, Request) ->
 
     InitReq = {webmachine_request,InitState},
     {Peer, _ReqState} = InitReq:get_peer(),
-    {PeerPort, _ReqState} = InitReq:get_peer_port(),
+    {PeerPort, _XReqState} = InitReq:get_peer_port(),
     {Sock, ReqState} = InitReq:get_sock(),
     ReqDataPeerSet = wrq:set_sock(Sock,
                            wrq:set_peer(Peer,
