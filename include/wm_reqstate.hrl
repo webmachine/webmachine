@@ -2,6 +2,7 @@
                    metadata=orddict:new(),
                    range=undefined,
                    peer=undefined,
+                   peer_port=undefined,
                    sock=undefined,
                    reqdata=undefined,
                    bodyfetch=undefined,
