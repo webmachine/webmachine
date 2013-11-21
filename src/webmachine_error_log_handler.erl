@@ -109,4 +109,6 @@ format_req(error, 503, Req, _) ->
     ["[error] ", Reason, ": path=", Path, $\n];
 format_req(error, _Code, Req, Reason) ->
     {Path, _} = Req:path(),
-    ["[error] path=", Path, $\x20, Reason, $\n].
+    Str = io_lib:format("~p", [Reason]),
+    ["[error] path=", Path, $\x20, Str, $\n].
+
