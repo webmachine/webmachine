@@ -107,7 +107,7 @@ get_routes() ->
 get_routes(Name) ->
     get_dispatch_list(Name).
 
-%% @spec init_routes() -> ok
+%% @spec init_routes([hostmatchterm() | pathmatchterm()]) -> ok
 %% @doc Set the default routes, unless the routing table isn't empty.
 init_routes(DefaultRoutes) ->
     init_routes(default, DefaultRoutes).
