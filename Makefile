@@ -11,14 +11,17 @@ all: deps compile
 compile: deps
 	./rebar compile
 
-deps:
+deps: DEV_MODE
 	@(./rebar get-deps)
 
 clean:
 	@(./rebar clean)
 
-distclean: clean
-	@(./rebar delete-deps)
+# nuke deps first to avoid wasting time having rebar recurse into deps
+# for clean
+distclean:
+	@rm -rf deps ./rebar/DEV_MODE
+	@(./rebar clean)
 
 edoc:
 	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
@@ -34,3 +37,6 @@ verbosetest: all
 travisupload:
 	tar cvfz ${ARTIFACTSFILE} --exclude '*.beam' --exclude '*.erl' test.log .eunit
 	travis-artifacts upload --path ${ARTIFACTSFILE}
+
+DEV_MODE:
+	@touch ./.rebar/DEV_MODE
