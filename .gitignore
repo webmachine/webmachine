@@ -3,3 +3,4 @@ deps/*
 .eunit/*
 ebin/*.app
 doc/*
+DEV_MODE
