@@ -390,6 +390,8 @@ now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
 parse_range(RawRange, ResourceLength) when is_list(RawRange) ->
     parse_range(mochiweb_http:parse_range_request(RawRange), ResourceLength, []).
 
+parse_range(fail, _ResourceLength, _Acc) ->
+    [];
 parse_range([], _ResourceLength, Acc) ->
     lists:reverse(Acc);
 parse_range([Spec | Rest], ResourceLength, Acc) ->
@@ -498,6 +500,16 @@ now_diff_milliseconds_test() ->
     Early2 = {9, 9, 9},
     ?assertEqual(1000, now_diff_milliseconds(Late, Early1)),
     ?assertEqual(1000001000, now_diff_milliseconds(Late, Early2)).
+
+parse_range_test() ->
+    ValidRange = "bytes=1-2",
+    InvalidRange = "bytes=2-1",
+    EmptyRange = "bytes=",
+    UnparsableRange = "bytes=foo",
+    ?assertEqual([{1,2}], parse_range(ValidRange, 10)),
+    ?assertEqual([], parse_range(InvalidRange, 10)),
+    ?assertEqual([], parse_range(EmptyRange, 10)),
+    ?assertEqual([], parse_range(UnparsableRange, 10)).
 
 -ifdef(EQC).
 
