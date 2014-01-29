@@ -46,7 +46,7 @@
          zeropad/2,
          zone/0]).
 
--record(state, {hourstamp :: non_neg_integer(),
+-record(state, {hourstamp :: datehour(),
                 filename :: string(),
                 handle :: file:io_device()}).
 
@@ -71,7 +71,7 @@ call(Mod, Msg, Timeout) ->
 
 %% @doc Return a four-tuple containing year, month, day, and hour
 %% of the current time.
--type datehour() :: {calendar:year(), calendar:month(), calendar:day(), calendar:hour()}.
+-type datehour() :: {non_neg_integer(), 1..12, 1..31, 0..23}.
 -spec datehour() -> datehour().
 datehour() ->
     datehour(os:timestamp()).
@@ -135,7 +135,7 @@ log_access(#wm_log_data{}=LogData) ->
 %% @doc Close a log file.
 -spec log_close(atom(), string(), file:io_device()) -> ok | {error, term()}.
 log_close(Mod, Name, FD) ->
-    log_info([Mod, ": closing log file: ", Name, $\n]),
+    log_info([atom_to_list(Mod), ": closing log file: ", Name, $\n]),
     file:close(FD).
 
 %% @doc Notify registered log event handler of an error event.
@@ -154,13 +154,13 @@ log_info(LogMsg) ->
     gen_event:sync_notify(?EVENT_LOGGER, {log_info, LogMsg}).
 
 %% @doc Open a new log file for writing
--spec log_open(string()) -> {file:io_device(), non_neg_integer()}.
+-spec log_open(string()) -> {file:io_device(), datehour()}.
 log_open(FileName) ->
     DateHour = datehour(),
     {log_open(FileName, DateHour), DateHour}.
 
 %% @doc Open a new log file for writing
--spec log_open(string(), non_neg_integer()) -> file:io_device().
+-spec log_open(string(), datehour()) -> file:io_device().
 log_open(FileName, DateHour) ->
     LogName = FileName ++ suffix(DateHour),
     error_logger:info_msg("opening log file: ~p~n", [LogName]),
@@ -251,7 +251,7 @@ zone() ->
 
 %% Ugly reformatting code to get times like +0000 and -1300
 
--spec zone(integer()) -> string().
+-spec zone(float()) -> string().
 zone(Val) when Val < 0 ->
     io_lib:format("-~4..0w", [trunc(abs(Val))]);
 zone(Val) when Val >= 0 ->
