@@ -4,6 +4,9 @@ test: compile
 docs:
 	./rebar doc skip_deps=true
 
+xref: compile
+	./rebar xref skip_deps=true
+
 PLT ?= $(HOME)/.riak_combo_dialyzer_plt
 LOCAL_PLT = .local_dialyzer_plt
 DIALYZER_FLAGS ?= -Wunmatched_returns
