@@ -90,12 +90,24 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 -include_lib("eunit/include/eunit.hrl").
 
 start_stop_test() ->
+    application:start(crypto),
     application:start(inets),
+    application:start(public_key),
+    application:start(ssl),
+    application:start(xmerl),
+    application:start(compiler),
+    application:start(syntax_tools),
     application:start(mochiweb),
     ?assertEqual(ok, webmachine:start()),
     ?assertEqual(ok, webmachine:stop()),
     application:stop(mochiweb),
+    application:stop(syntax_tools),
+    application:stop(compiler),
+    application:stop(xmerl),
+    application:stop(ssl),
+    application:stop(public_key),
     application:stop(inets),
+    application:stop(crypto),
     ok.
 
 -endif.
