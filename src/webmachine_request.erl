@@ -271,7 +271,7 @@ call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req) when is_integer(C
                 send_response(CodeAndReason, Req)
         end,
     LogData = NewState#wm_reqstate.log_data,
-    NewLogData = LogData#wm_log_data{finish_time=now()},
+    NewLogData = LogData#wm_log_data{finish_time=os:timestamp()},
     {Reply, NewState#wm_reqstate{log_data=NewLogData}};
 call(resp_body, {?MODULE, ReqState}) ->
     {wrq:resp_body(ReqState#wm_reqstate.reqdata), ReqState};

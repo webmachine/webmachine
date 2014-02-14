@@ -61,7 +61,7 @@ new_request(mochiweb, Request) ->
     ReqData = wrq:set_sock(Sock,
                            wrq:set_peer(Peer,
                                         ReqState#wm_reqstate.reqdata)),
-    LogData = #wm_log_data{start_time=now(),
+    LogData = #wm_log_data{start_time=os:timestamp(),
                            method=Method,
                            headers=Headers,
                            peer=Peer,
