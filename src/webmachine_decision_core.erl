@@ -63,7 +63,7 @@ respond(Code) when is_integer(Code) ->
     respond({Code, undefined});
 respond({_, _}=CodeAndPhrase) ->
     Resource = get(resource),
-    EndTime = now(),
+    EndTime = os:timestamp(),
     respond(CodeAndPhrase, Resource, EndTime).
 
 respond({Code, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime)
@@ -104,7 +104,7 @@ error_response(Reason) ->
 
 error_response(Code, Reason) ->
     Resource = get(resource),
-    EndTime = now(),
+    EndTime = os:timestamp(),
     error_response({Code, undefined}, Reason, Resource, EndTime).
 
 error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->

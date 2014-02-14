@@ -246,7 +246,7 @@ log_decision(File, DecisionID) ->
     io:format(File, "{decision, ~p}.~n", [DecisionID]).
 
 open_log_file(Dir, Mod) ->
-    Now = {_,_,US} = now(),
+    Now = {_,_,US} = os:timestamp(),
     {{Y,M,D},{H,I,S}} = calendar:now_to_universal_time(Now),
     Filename = io_lib:format(
                  "~s/~p-~4..0B-~2..0B-~2..0B"
