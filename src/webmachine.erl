@@ -92,6 +92,7 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 start_stop_test() ->
     application:start(crypto),
     application:start(inets),
+    application:start(asn1),
     application:start(public_key),
     application:start(ssl),
     application:start(xmerl),
@@ -106,6 +107,7 @@ start_stop_test() ->
     application:stop(xmerl),
     application:stop(ssl),
     application:stop(public_key),
+    application:stop(asn1),
     application:stop(inets),
     application:stop(crypto),
     ok.
