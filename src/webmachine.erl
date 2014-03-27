@@ -28,8 +28,12 @@
 %% @doc Start the webmachine server.
 start() ->
     ok = webmachine_deps:ensure(),
-    _ = application:start(crypto),
-    application:start(webmachine).
+    ok = case application:start(crypto) of
+             ok -> ok;
+             {error, {already_started, crypto}} -> ok;
+             Error -> Error
+         end,
+    ok = application:start(webmachine).
 
 %% @spec stop() -> ok
 %% @doc Stop the webmachine server.
@@ -89,27 +93,32 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
+ensure_all_started(App, Apps0) ->
+    case application:start(App) of
+        ok ->
+            {ok, Apps0};
+        {error,{already_started,App}} ->
+            {ok, Apps0};
+        {error,{not_started,BaseApp}} ->
+            {ok, Apps} = ensure_all_started(BaseApp, Apps0),
+            ensure_all_started(App, [BaseApp|Apps])
+    end.
+
+start_mochiweb() ->
+    case erlang:function_exported(application, ensure_all_started, 1) of
+        true ->
+            {ok, Apps} = application:ensure_all_started(mochiweb),
+            {ok, lists:reverse(Apps)};
+        false ->
+            ensure_all_started(mochiweb,[])
+    end.
+
 start_stop_test() ->
-    application:start(crypto),
-    application:start(inets),
-    application:start(asn1),
-    application:start(public_key),
-    application:start(ssl),
-    application:start(xmerl),
-    application:start(compiler),
-    application:start(syntax_tools),
-    application:start(mochiweb),
+    {Res, Apps} = start_mochiweb(),
+    ?assertEqual(ok, Res),
     ?assertEqual(ok, webmachine:start()),
     ?assertEqual(ok, webmachine:stop()),
-    application:stop(mochiweb),
-    application:stop(syntax_tools),
-    application:stop(compiler),
-    application:stop(xmerl),
-    application:stop(ssl),
-    application:stop(public_key),
-    application:stop(asn1),
-    application:stop(inets),
-    application:stop(crypto),
+    [application:stop(App) || App <- Apps],
     ok.
 
 -endif.
