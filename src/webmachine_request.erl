@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2012 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %% Based on mochiweb_request.erl, which is Copyright 2007 Mochi Media, Inc.
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
@@ -100,8 +100,8 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.10.5").
--define(QUIP, "jokes are better explained").
+-define(WMVSN, "1.10.6").
+-define(QUIP, "no drinks").
 -define(IDLE_TIMEOUT, infinity).
 
 new(#wm_reqstate{}=ReqState) ->
