@@ -16,12 +16,11 @@
 
 -module(etag_test).
 
-
 -ifdef(EQC).
 
--include("wm_reqdata.hrl").
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("webmachine.hrl").
 
 -compile(export_all).
 
@@ -41,6 +40,8 @@ unique(L) ->
 etag(Bin) ->
     integer_to_list(erlang:crc32(Bin)).
 
+etag_list([]) ->
+    "*";
 etag_list(Bins) ->
     string:join([[$", etag(B), $"] || B <- Bins], ",").
 
@@ -59,42 +60,89 @@ http_request(Match, IfVals, NewVal, Count) ->
             http_request(Match, IfVals, NewVal, Count-1)
     end.
 
-
 etag_prop() ->
     ?LET({AllVals, Match}, {non_empty(list(binary())), oneof(["If-Match", "If-None-Match"])},
          ?FORALL({IfVals0, CurVal, NewVal},
-              {list(oneof(AllVals)), oneof(AllVals), oneof(AllVals)},
-              begin
-                  ets:insert(?MODULE, [{etag, etag(CurVal)}]),
-                  IfVals = unique(IfVals0),
-                  {ok, Result} = http_request(Match, IfVals, NewVal, 3),
-                  Code = element(2, element(1, Result)),
-                  case {Match, lists:member(CurVal, IfVals)} of
-                      {"If-Match", true} ->
-                          ?assertEqual(204, Code);
-                      {"If-Match", false} ->
-                          ?assertEqual(412, Code);
-                      {"If-None-Match", true} ->
-                          ?assertEqual(412, Code);
-                      {"If-None-Match", false} ->
-                          ?assertEqual(204, Code)
-                  end,
-                  true
+                 {list(oneof(AllVals)), oneof(AllVals), oneof(AllVals)},
+                 begin
+                     ets:insert(?MODULE, [{etag, etag(CurVal)}]),
+                     IfVals = unique(IfVals0),
+                     {ok, Result} = http_request(Match, IfVals, NewVal, 3),
+                     Code = element(2, element(1, Result)),
+                     ExpectedCode =
+                         expected_response_code(Match,
+                                                IfVals,
+                                                lists:member(CurVal, IfVals)),
+                     equals(ExpectedCode, Code)
                  end)).
 
+expected_response_code("If-Match", _, true) ->
+    204;
+expected_response_code("If-Match", [], false) ->
+    204;
+expected_response_code("If-Match", _, false) ->
+    412;
+expected_response_code("If-None-Match", _, true) ->
+    412;
+expected_response_code("If-None-Match", [], false) ->
+    412;
+expected_response_code("If-None-Match", _, false) ->
+    204.
 
-etag_test() ->
+etag_test_() ->
+    Time = 10,
+    {spawn,
+     [{setup,
+       fun setup/0,
+       fun cleanup/1,
+       [
+        {timeout, Time*3,
+         ?_assert(eqc:quickcheck(eqc:testing_time(Time, ?QC_OUT(etag_prop()))))}
+       ]}]}.
+
+%% The EQC tests can periodically fail, however the counter examples it
+%% produces are just coincidental. One reduction in particlar (the tuple of the
+%% empty list and two empty binaries) is enough of a red herring that it's
+%% included here as a sanity check.
+etag_regressions_test_() ->
+    CounterExample1 = [{[], <<>>, <<>>}],
+    CounterExample2 = [{[<<25,113,71,254>>, <<25,113,71,254>>, <<"?">>],
+                        <<"?">>, <<"r?}">>}],
+    CounterExample3 = [{[<<19>>, <<70,6,56,181,38,128>>,
+                         <<70,6,56,181,38,128>>, <<19>>, <<19>>, <<19>>,
+                         <<70,6,56,181,38,128>>, <<19>>, <<19>>, <<19>>,
+                         <<19>>, <<70,6,56,181,38,128>>], <<19>>,
+                         <<70,6,56,181,38,128>>}],
+    {spawn,
+     [{setup, fun setup/0, fun cleanup/1,
+       [{"counter example 1",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample1))},
+        {"counter example 2",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample2))},
+        {"counter example 3",
+         ?_assert(eqc:check(?QC_OUT(etag_prop()), CounterExample3))}]}]}.
+
+setup() ->
+    error_logger:tty(false),
     %% Setup ETS table to hold current etag value
     ets:new(?MODULE, [named_table, public]),
 
     %% Spin up webmachine
+    application:start(inets),
     WebConfig = [{ip, "0.0.0.0"}, {port, 12000},
                  {dispatch, [{["etagtest", '*'], ?MODULE, []}]}],
-    {ok, Pid} = webmachine_mochiweb:start(WebConfig),
-    link(Pid),
+    {ok, Pid0} = webmachine_sup:start_link(),
+    {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
+    link(Pid1),
+    {Pid0, Pid1}.
 
-    ?assert(eqc:quickcheck(eqc:numtests(250, ?QC_OUT(etag_prop())))).
-
+cleanup({Pid0, Pid1}) ->
+    %% clean up
+    unlink(Pid0),
+    exit(Pid0, normal),
+    unlink(Pid1),
+    exit(Pid1, kill),
+    application:stop(inets).
 
 init([]) ->
     {ok, undefined}.
@@ -115,8 +163,5 @@ generate_etag(ReqData, Context) ->
         [{etag, ETag}] ->
             {ETag, ReqData, Context}
     end.
-
-ping(ReqData, State) ->
-    {pong, ReqData, State}.
 
 -endif.

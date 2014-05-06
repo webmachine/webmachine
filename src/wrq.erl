@@ -21,15 +21,15 @@
          path_info/1,response_code/1,req_cookie/1,req_qs/1,req_headers/1,
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
          resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1,
-         base_uri/1]).
+         base_uri/1,sock/1]).
 -export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
          merge_resp_headers/2,remove_resp_header/2,
-         append_to_resp_body/2,append_to_response_body/2,
+         append_to_resp_body/2,append_to_response_body/2, set_resp_range/2,
          max_recv_body/1,set_max_recv_body/2,
          get_cookie_value/2,get_qs_value/2,get_qs_value/3,set_peer/2,
-         add_note/3, get_notes/1]).
+         set_sock/2,add_note/3, get_notes/1]).
 
 % @type reqdata(). The opaque data type used for req/resp data structures.
 -include("wm_reqdata.hrl").
@@ -46,16 +46,18 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       req_cookie=defined_in_create,
       req_qs=defined_in_create,
       peer="defined_in_wm_req_srv_init",
+      sock="defined_in_wm_req_srv_init",
       req_body=not_fetched_yet,
       max_recv_body=(1024*(1024*1024)),
       % Stolen from R13B03 inet_drv.c's TCP_MAX_PACKET_SIZE definition
       max_recv_hunk=(64*(1024*1024)),
       app_root="defined_in_load_dispatch_data",
-      path_info=dict:new(),
+      path_info=orddict:new(),
       path_tokens=defined_in_load_dispatch_data,
       disp_path=defined_in_load_dispatch_data,
       resp_redirect=false, resp_headers=mochiweb_headers:empty(),
       resp_body = <<>>, response_code=500,
+      resp_range = follow_request,
       notes=[]}).
 create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
@@ -82,6 +84,8 @@ version(_RD = #wm_reqdata{version=Version})
 
 peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
 
+sock(_RD = #wm_reqdata{sock=Sock}) when is_list(Sock) -> Sock.
+
 app_root(_RD = #wm_reqdata{app_root=AR}) when is_list(AR) -> AR.
 
 % all three paths below are strings
@@ -99,6 +103,7 @@ host_tokens(_RD = #wm_reqdata{host_tokens=HostT}) -> HostT. % list of strings
 
 port(_RD = #wm_reqdata{port=Port}) -> Port. % integer
 
+response_code(_RD = #wm_reqdata{response_code={C,_ReasonPhrase}}) when is_integer(C) -> C;
 response_code(_RD = #wm_reqdata{response_code=C}) when is_integer(C) -> C.
 
 req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C. % string
@@ -141,6 +146,7 @@ resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
 resp_body(_RD = #wm_reqdata{resp_body={stream,X}}) -> {stream,X};
+resp_body(_RD = #wm_reqdata{resp_body={known_length_stream,X,Y}}) -> {known_length_stream,X,Y};
 resp_body(_RD = #wm_reqdata{resp_body={stream,X,Y}}) -> {stream,X,Y};
 resp_body(_RD = #wm_reqdata{resp_body={writer,X}}) -> {writer,X};
 resp_body(_RD = #wm_reqdata{resp_body=RespB}) when is_binary(RespB) -> RespB;
@@ -149,7 +155,7 @@ resp_body(_RD = #wm_reqdata{resp_body=RespB}) -> iolist_to_binary(RespB).
 %% --
 
 path_info(Key, RD) when is_atom(Key) ->
-    case dict:find(Key, path_info(RD)) of
+    case orddict:find(Key, path_info(RD)) of
         {ok, Value} when is_list(Value); is_integer(Value) ->
             Value; % string (for host or path match)
                    % or integer (for port match)
@@ -164,12 +170,16 @@ do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.
 
 set_peer(P, RD) when is_list(P) -> RD#wm_reqdata{peer=P}. % string
 
+set_sock(S, RD) when is_list(S) -> RD#wm_reqdata{sock=S}. % string
+
 set_disp_path(P, RD) when is_list(P) -> RD#wm_reqdata{disp_path=P}. % string
 
 set_req_body(Body, RD) -> RD#wm_reqdata{req_body=Body}.
 
 set_resp_body(Body, RD) -> RD#wm_reqdata{resp_body=Body}.
 
+set_response_code({Code, _ReasonPhrase}=CodeAndReason, RD) when is_integer(Code) ->
+    RD#wm_reqdata{response_code=CodeAndReason};
 set_response_code(Code, RD) when is_integer(Code) ->
     RD#wm_reqdata{response_code=Code}.
 
@@ -204,6 +214,13 @@ append_to_response_body(Data, RD=#wm_reqdata{resp_body=RespB}) ->
         false -> % MUST BE an iolist! else, fail.
             append_to_response_body(iolist_to_binary(Data), RD)
     end.
+
+-spec set_resp_range(follow_request | ignore_request, #wm_reqdata{}) -> #wm_reqdata{}.
+%% follow_request : range responce for range request, normal responce for non-range one
+%% ignore_request : normal resopnse for either range reuqest or non-range one
+set_resp_range(RespRange, RD)
+  when RespRange =:= follow_request orelse RespRange =:= ignore_request ->
+    RD#wm_reqdata{resp_range = RespRange}.
 
 get_cookie_value(Key, RD) when is_list(Key) -> % string
     case lists:keyfind(Key, 1, req_cookie(RD)) of

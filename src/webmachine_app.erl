@@ -21,14 +21,28 @@
 -author('Andy Gross <andy@basho.com>').
 
 -behaviour(application).
--export([start/2,stop/1]).
 
+-export([start/2,
+         stop/1]).
+
+-include("webmachine_logger.hrl").
 
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for webmachine.
 start(_Type, _StartArgs) ->
     webmachine_deps:ensure(),
-    webmachine_sup:start_link().
+    {ok, _Pid} = SupLinkRes = webmachine_sup:start_link(),
+    Handlers = case application:get_env(webmachine, log_handlers) of
+        undefined ->
+            [];
+        {ok, Val} ->
+            Val
+    end,
+    %% handlers failing to start are handled in the handler_watcher
+    _ = [supervisor:start_child(webmachine_logger_watcher_sup,
+                                [?EVENT_LOGGER, Module, Config]) ||
+            {Module, Config} <- Handlers],
+    SupLinkRes.
 
 %% @spec stop(_State) -> ServerRet
 %% @doc application stop callback for webmachine.

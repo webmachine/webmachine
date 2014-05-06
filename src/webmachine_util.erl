@@ -20,23 +20,26 @@
 -module(webmachine_util).
 -export([guess_mime/1]).
 -export([convert_request_date/1, compare_ims_dates/2]).
--export([choose_media_type/2]).
+-export([rfc1123_date/1]).
+-export([choose_media_type/2, format_content_type/1]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
 -export([now_diff_milliseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
          split_quoted_strings/1]).
+-export([parse_range/2]).
 
 -ifdef(TEST).
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -endif.
 -include_lib("eunit/include/eunit.hrl").
+-export([accept_header_to_media_types/1]).
 -endif.
 
 convert_request_date(Date) ->
-    try 
+    try
         case httpd_util:convert_request_date(Date) of
             ReqDate -> ReqDate
         end
@@ -49,6 +52,13 @@ compare_ims_dates(D1, D2) ->
     GD1 = calendar:datetime_to_gregorian_seconds(D1),
     GD2 = calendar:datetime_to_gregorian_seconds(D2),
     GD1 > GD2.
+
+%% @doc Convert tuple style GMT datetime to RFC1123 style one
+rfc1123_date({{YYYY, MM, DD}, {Hour, Min, Sec}}) ->
+    DayNumber = calendar:day_of_the_week({YYYY, MM, DD}),
+    lists:flatten(io_lib:format("~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+                                [httpd_util:day(DayNumber), DD, httpd_util:month(MM),
+                                 YYYY, Hour, Min, Sec])).
 
 %% @spec guess_mime(string()) -> string()
 %% @doc  Guess the mime type of a file by the extension of its filename.
@@ -76,6 +86,8 @@ guess_mime(File) ->
             "image/jpeg";
         ".js" ->
             "application/x-javascript";
+        ".less" ->
+            "text/css";
         ".m4v" ->
             "video/mp4";
         ".manifest" ->
@@ -174,7 +186,7 @@ media_params_match(Req,Prov) ->
 
 prioritize_media(TyParam) ->
     {Type, Params} = TyParam,
-    prioritize_media(Type,Params,[]).    
+    prioritize_media(Type,Params,[]).
 prioritize_media(Type,Params,Acc) ->
     case Params of
         [] ->
@@ -186,9 +198,11 @@ prioritize_media(Type,Params,Acc) ->
                     QVal = case Val of
                                "1" ->
                                    1;
+                               "0" ->
+                                   0;
                                [$.|_] ->
                                    %% handle strange FeedBurner Accept
-                                   list_to_float([$0|Val]); 
+                                   list_to_float([$0|Val]);
                                _ -> list_to_float(Val)
                            end,
                     {QVal, Type, Rest ++ Acc};
@@ -198,10 +212,7 @@ prioritize_media(Type,Params,Acc) ->
     end.
 
 media_type_to_detail(MType) ->
-    [CType|Params] = string:tokens(MType, ";"),
-    MParams = [list_to_tuple([string:strip(KV) || KV <- string:tokens(X,"=")])
-                || X <- Params],
-    {CType, MParams}.                       
+    mochiweb_util:parse_header(MType).
 
 accept_header_to_media_types(HeadVal) ->
     % given the value of an accept header, produce an ordered list
@@ -217,10 +228,29 @@ accept_header_to_media_types(HeadVal) ->
 normalize_provided(Provided) ->
     [normalize_provided1(X) || X <- Provided].
 normalize_provided1(Type) when is_list(Type) -> {Type, []};
-normalize_provided1({Type,Params}) -> {Type, Params}.
+normalize_provided1({Type,Params}) -> {Type, normalize_media_params(Params)}.
+
+normalize_media_params(Params) ->
+    normalize_media_params(Params,[]).
+
+normalize_media_params([],Acc) ->
+    Acc;
+normalize_media_params([{K,V}|T], Acc) when is_atom(K) ->
+    normalize_media_params(T,[{atom_to_list(K),V}|Acc]);
+normalize_media_params([H|T], Acc) ->
+    normalize_media_params(T, [H|Acc]).
+
+
+format_content_type(Type) when is_list(Type) ->
+    Type;
+format_content_type({Type,Params}) ->
+    format_content_type(Type,Params).
 
 format_content_type(Type,[]) -> Type;
-format_content_type(Type,[H|T]) -> format_content_type(Type ++ "; " ++ H, T).
+format_content_type(Type,[{K,V}|T]) when is_atom(K) ->
+    format_content_type(Type, [{atom_to_list(K),V}|T]);
+format_content_type(Type,[{K,V}|T]) ->
+    format_content_type(Type ++ "; " ++ K ++ "=" ++ V, T).
 
 choose_charset(CSets, AccCharHdr) -> do_choose(CSets, AccCharHdr, "ISO-8859-1").
 
@@ -274,7 +304,7 @@ do_choose(Default, DefaultOkay, AnyOkay, Choices, [AccPair|AccRest]) ->
             % doing this a little more work than needed in
             % order to be easily insensitive but preserving
             case lists:member(LAcc, LChoices) of
-                true -> 
+                true ->
                     hd([X || X <- Choices,
                              string:to_lower(X) =:= LAcc]);
                 false -> do_choose(Default, DefaultOkay, AnyOkay,
@@ -346,10 +376,29 @@ unescape_quoted_string([Char | Rest], Acc) ->
 
 %% @doc  Compute the difference between two now() tuples, in milliseconds.
 %% @spec now_diff_milliseconds(now(), now()) -> integer()
+now_diff_milliseconds(undefined, undefined) ->
+    0;
+now_diff_milliseconds(undefined, T2) ->
+    now_diff_milliseconds(os:timestamp(), T2);
 now_diff_milliseconds({M,S,U}, {M,S1,U1}) ->
     ((S-S1) * 1000) + ((U-U1) div 1000);
 now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
     ((M-M1)*1000000+(S-S1))*1000 + ((U-U1) div 1000).
+
+-spec parse_range(RawRange::string(), ResourceLength::non_neg_integer()) ->
+                         [{Start::non_neg_integer(), End::non_neg_integer()}].
+parse_range(RawRange, ResourceLength) when is_list(RawRange) ->
+    parse_range(mochiweb_http:parse_range_request(RawRange), ResourceLength, []).
+
+parse_range([], _ResourceLength, Acc) ->
+    lists:reverse(Acc);
+parse_range([Spec | Rest], ResourceLength, Acc) ->
+    case mochiweb_http:range_skip_length(Spec, ResourceLength) of
+        invalid_range ->
+            parse_range(Rest, ResourceLength, Acc);
+        {Skip, Length} ->
+            parse_range(Rest, ResourceLength, [{Skip, Skip + Length - 1} | Acc])
+    end.
 
 %%
 %% TEST
@@ -378,6 +427,42 @@ choose_media_type_qval_test() ->
     [ ?assertEqual("image/jpeg", choose_media_type(Provided, I))
       || I <- JpgMatch ].
 
+accept_header_to_media_types_test() ->
+    Header1 = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0.5",
+    Header2 = "audio/*; q=0, audio/basic",
+    OddHeader = "text/html,application/xhtml+xml,application/xml,application/x-javascript,*/*;q=0,5",
+    Result1 = accept_header_to_media_types(Header1),
+    Result2 = accept_header_to_media_types(Header2),
+    Result3 = accept_header_to_media_types(OddHeader),
+    ExpResult1 = [{1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0.5,"*/*",[]}],
+    ExpResult2 = [{1,"audio/basic",[]},{0,"audio/*",[]}],
+    ExpResult3 = [{1, "5", []},
+                  {1,"application/x-javascript", []},
+                  {1,"application/xml",[]},
+                  {1,"application/xhtml+xml",[]},
+                  {1,"text/html",[]},
+                  {0,"*/*",[]}],
+    ?assertEqual(ExpResult1, Result1),
+    ?assertEqual(ExpResult2, Result2),
+    ?assertEqual(ExpResult3, Result3).
+
+media_type_extra_whitespace_test() ->
+    MType = "application/x-www-form-urlencoded          ;      charset      =       utf8",
+    ?assertEqual({"application/x-www-form-urlencoded",[{"charset","utf8"}]},
+                 webmachine_util:media_type_to_detail(MType)).
+
+format_content_type_test() ->
+    Types = ["audio/vnd.wave; codec=31",
+             "text/x-okie; charset=iso-8859-1; declaration=<f950118.AEB0@XIson.com>"],
+    [?assertEqual(Type, format_content_type(
+                          webmachine_util:media_type_to_detail(Type)))
+     || Type <- Types],
+    ?assertEqual(hd(Types), format_content_type("audio/vnd.wave", [{codec, "31"}])).
+
 convert_request_date_test() ->
     ?assertMatch({{_,_,_},{_,_,_}},
                  convert_request_date("Wed, 30 Dec 2009 14:39:02 GMT")),
@@ -389,6 +474,10 @@ compare_ims_dates_test() ->
     Early = {{2009,12,30},{13,39,02}},
     ?assertEqual(true, compare_ims_dates(Late, Early)),
     ?assertEqual(false, compare_ims_dates(Early, Late)).
+
+rfc1123_date_test() ->
+    ?assertEqual("Thu, 11 Jul 2013 04:33:19 GMT",
+                 rfc1123_date({{2013, 7, 11}, {4, 33, 19}})).
 
 guess_mime_test() ->
     TextTypes = [".html",".css",".htc",".manifest",".txt"],

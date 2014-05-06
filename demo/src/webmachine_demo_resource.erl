@@ -5,7 +5,7 @@
 -module(webmachine_demo_resource).
 -author('Justin Sheehy <justin@basho.com>').
 -export([init/1, to_html/2, to_text/2, content_types_provided/2,
-         is_authorized/2, generate_etag/2, expires/2]).
+         is_authorized/2, generate_etag/2, expires/2, last_modified/2]).
 
 -include_lib("webmachine/include/webmachine.hrl").
 
@@ -44,5 +44,8 @@ is_authorized(ReqData, Context) ->
     end.
 
 expires(ReqData, Context) -> {{{2021,1,1},{0,0,0}}, ReqData, Context}.
+
+last_modified(ReqData, Context) ->
+    {calendar:now_to_universal_time(os:timestamp()), ReqData, Context}.
 
 generate_etag(ReqData, Context) -> {wrq:raw_path(ReqData), ReqData, Context}.

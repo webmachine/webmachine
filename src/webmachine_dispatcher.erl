@@ -59,7 +59,10 @@ split_host_port(HostAsString, Scheme) ->
             {split_host(HostPart), default_port(Scheme)};
         [] ->
             %% no host header
-            {[], default_port(Scheme)}
+            {[], default_port(Scheme)};
+        _ ->
+            %% Invalid host header
+            {invalid_host, default_port(Scheme)}
     end.
 
 split_host(HostAsString) ->
@@ -150,6 +153,8 @@ default_port(https) -> 443.
 
 %% @type dispfail() = {no_dispatch_match, pathtokens()}.
 
+try_host_binding(_Dispatch, invalid_host, _Port, _Path, _Depth, _RD) ->
+    {error, invalid_host};
 try_host_binding(Dispatch, Host, Port, Path, Depth, RD) ->
     %% save work during each dispatch attempt by reversing Host up front
     try_host_binding1(Dispatch, lists:reverse(Host), Port, Path, Depth, RD).
@@ -204,11 +209,11 @@ try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings,
         {ok, Remainder, NewBindings, Depth} ->
             AppRoot = calculate_app_root(Depth + ExtraDepth),
             StringPath = reconstitute(Remainder),
-            PathInfo = dict:from_list(NewBindings),
+            PathInfo = orddict:from_list(NewBindings),
             RD1 =
                 case RD of
-                    testing ->
-                        testing;
+                    testing_ignore_dialyzer_warning_here ->
+                        testing_ignore_dialyzer_warning_here;
                     _ ->
                         wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
                                                AppRoot, StringPath, RD)
@@ -229,18 +234,18 @@ run_guard(Fun, RD) when is_function(Fun) ->
     try
         Fun(RD) == true
     catch _Type : Msg ->
-            error_logger:error_msg("Error running guard ~p: ~p~n", [Fun, Msg]),
+            webmachine_log:log_error(["Error running guard ", Fun, ": ", Msg, $\n]),
             throw({error_running_guard, Fun, Msg})
     end;
 run_guard({Mod, Fun}, RD) ->
     try
         Mod:Fun(RD) == true
     catch _Type : Msg ->
-            error_logger:error_msg("Error running guard ~p:~p/1: ~p~n", [Mod, Fun, Msg]),
+            webmachine_log:log_error(["Error running guard ", Mod, $:, Fun, "/1: ", Msg, $\n]),
             throw({error_running_guard, {Mod, Fun}, Msg})
     end;
 run_guard(Other, _) ->
-    error_logger:error_msg("Unknown guard type in webmachine_dispatcher: ~p~n", [Other]),
+    webmachine_log:log_error(["Unknown guard type in webmachine_dispatcher: ", Other, $\n]),
     throw({unknown_guard_type, Other}).
 
 bind([], [], Bindings, Depth) ->
@@ -359,7 +364,7 @@ bind_path_string_fail_test() ->
     ?assertEqual(fail, bind(["a","b"], ["a","c"], [], 0)).
 
 try_path_matching_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     ?assertEqual({bar, baz, [], [], ".", ""},
                  try_path_binding([{["foo"], bar, baz}], ["foo"], [], 80, [], 0, RD)),
     Dispatch = [{["a", x], foo, bar},
@@ -375,14 +380,14 @@ try_path_matching_test() ->
                  try_path_binding(Dispatch, ["b","c","z","v"], [], 80, [], 0, RD)).
 
 try_path_failing_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     ?assertEqual({no_dispatch_match, ["a"]},
                  try_path_binding([{["b"], x, y}], ["a"], [], 80, [], 0, RD)).
 
 %% host binding
 
 try_host_binding_nohosts_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     PathDispatches = [{["a"], foo, bar},
                       {["b"], baz, quux}],
     ?assertEqual(try_host_binding([{{['*'],'*'},PathDispatches}],
@@ -403,7 +408,7 @@ try_host_binding_nohosts_test() ->
                                   ["quux","baz"], 1234, ["b"], 0, RD)).
 
 try_host_binding_noport_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     Dispatch = [{["foo","bar"], [{["a"],x,y}]},
                 {["baz","quux"],[{["b"],z,q}]},
                 {[m,"quux"],    [{["c"],r,s}]},
@@ -427,7 +432,7 @@ try_host_binding_noport_test() ->
                                   ["quux","no"], 82, ["d"], 0, RD)).
 
 try_host_binding_fullmatch_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     Dispatch = [{{["foo","bar"],80},[{["a"],x,y}]},
                 {{[foo,"bar"],80},  [{["b"],z,q}]},
                 {{[foo,"bar"],baz}, [{["c"],r,s}]},
@@ -461,7 +466,7 @@ try_host_binding_wildcard_token_order_test() ->
                  dispatch("foo.bar.baz.quux.com","/",Dispatch,RD)).
 
 try_host_binding_fail_test() ->
-    RD = testing,
+    RD = testing_ignore_dialyzer_warning_here,
     ?assertEqual({no_dispatch_match, {["bar","foo"], 1234}, ["x","y","z"]},
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 
