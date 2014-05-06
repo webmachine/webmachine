@@ -1,4 +1,5 @@
-case erlang:system_info(otp_release) =< "R15B01" of
+OtpVersion = erlang:system_info(otp_release). % R17* -> "17"
+case string:len(OtpVersion) > 3 andalso OtpVersion =< "R15B01" of
     true  ->
         HashDefine = [{d,old_hash}],
         case lists:keysearch(erl_opts, 1, CONFIG) of
