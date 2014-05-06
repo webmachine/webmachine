@@ -736,16 +736,16 @@ md5_final(Ctx) ->
     crypto:hash_final(Ctx).
 -else.
 md5(Bin) ->
-    crypto:md5(Bin).
+    crypto:hash(md5, Bin).
 
 md5_init() ->
-    crypto:md5_init().
+    crypto:init(md5).
 
 md5_update(Ctx, Bin) ->
-    crypto:md5_update(Ctx, Bin).
+    crypto:hash_update(Ctx, Bin).
 
 md5_final(Ctx) ->
-    crypto:md5_final(Ctx).
+    crypto:hash_final(Ctx).
 -endif.
 
 
