@@ -27,6 +27,14 @@
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
 
+-ifndef(old_hash).
+md5(Bin) ->
+    crypto:hash(md5,Bin).
+-else.
+md5(Bin) ->
+    crypto:md5(Bin).
+-endif.
+
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
                            'CONNECT', 'OPTIONS']).
@@ -642,7 +650,7 @@ content_md5_valid_b9a() ->
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     Body = "foo",
-    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    MD5Sum = base64:encode_to_string(md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
@@ -659,7 +667,7 @@ content_md5_valid_b9a_validated() ->
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     Body = "foo",
-    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    MD5Sum = base64:encode_to_string(md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
@@ -886,7 +894,7 @@ see_other_n11() ->
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -933,7 +941,7 @@ see_other_n11_resource_calls_base_uri(Value) ->
     put_setting(create_path, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     put_setting(base_uri, Value),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -949,7 +957,7 @@ see_other_n5() ->
     put_setting(allow_missing_post, true),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_N5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1237,7 +1245,7 @@ stream_content_md5() ->
     put_setting(allow_missing_post, true),
     ContentType = "text/plain",
     Content = "foo",
-    ValidMD5Sum = base64:encode_to_string(crypto:md5(Content)),
+    ValidMD5Sum = base64:encode_to_string(md5(Content)),
     ibrowse:start(),
     Url = url("post"),
     Headers = [{"Content-Type", ContentType},
