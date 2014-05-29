@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2011-2014 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -44,7 +44,7 @@
 
 %% @private
 init([BaseDir]) ->
-    webmachine_log:defer_refresh(?MODULE),
+    {ok,_} = webmachine_log:defer_refresh(?MODULE),
     FileName = filename:join(BaseDir, ?FILENAME),
     {Handle, DateHour} = webmachine_log:log_open(FileName),
     {ok, #state{filename=FileName, handle=Handle, hourstamp=DateHour}}.
@@ -61,19 +61,19 @@ handle_call(_Request, State) ->
 handle_event({log_error, Msg}, State) ->
     NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
     FormattedMsg = format_req(error, undefined, undefined, Msg),
-    webmachine_log:log_write(NewState#state.handle, FormattedMsg),
+    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
     {ok, NewState};
 handle_event({log_error, Code, _Req, _Reason}, State) when Code < 500 ->
     {ok, State};
 handle_event({log_error, Code, Req, Reason}, State) ->
     NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
     Msg = format_req(error, Code, Req, Reason),
-    webmachine_log:log_write(NewState#state.handle, Msg),
+    _ = webmachine_log:log_write(NewState#state.handle, Msg),
     {ok, NewState};
 handle_event({log_info, Msg}, State) ->
     NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
     FormattedMsg = format_req(info, undefined, undefined, Msg),
-    webmachine_log:log_write(NewState#state.handle, FormattedMsg),
+    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
     {ok, NewState};
 handle_event(_Event, State) ->
     {ok, State}.

@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2012 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2011-2014 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -164,11 +164,11 @@ log_open(FileName) ->
 log_open(FileName, DateHour) ->
     LogName = FileName ++ suffix(DateHour),
     error_logger:info_msg("opening log file: ~p~n", [LogName]),
-    filelib:ensure_dir(LogName),
+    ok = filelib:ensure_dir(LogName),
     {ok, FD} = file:open(LogName, [read, write, raw]),
     {ok, Location} = file:position(FD, eof),
     fix_log(FD, Location),
-    file:truncate(FD),
+    ok = file:truncate(FD),
     FD.
 
 -spec log_write(file:io_device(), iolist()) -> ok | {error, term()}.
@@ -183,8 +183,8 @@ maybe_rotate(Mod, Time, State) ->
     if ThisHour == State#state.hourstamp ->
             State;
        true ->
-            defer_refresh(Mod),
-            log_close(Mod, State#state.filename, State#state.handle),
+            {ok,_} = defer_refresh(Mod),
+            ok = log_close(Mod, State#state.filename, State#state.handle),
             Handle = log_open(State#state.filename, ThisHour),
             State#state{hourstamp=ThisHour, handle=Handle}
     end.
