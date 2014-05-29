@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2008 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@
 start(Options) ->
     {DispatchList, PName, DGroup, WMOptions, OtherOptions} = get_wm_options(Options),
     webmachine_router:init_routes(DGroup, DispatchList),
-    [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
+    _ = [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
     MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
     LoopFun = fun(X) -> loop(DGroup, X) end,
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).

@@ -318,9 +318,7 @@ get_header_value(K, ReqState) ->
 
 get_outheader_value(K, {?MODULE, ReqState}) ->
     {mochiweb_headers:get_value(K,
-                                wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState};
-get_outheader_value(K, ReqState) ->
-    get_outheader_value(K, {?MODULE, ReqState}).
+                                wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
 
 send(Socket, Data) ->
     case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of

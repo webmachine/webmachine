@@ -1,7 +1,7 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
 %% @author Bryan Fink <bryan@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
 -include("webmachine_logger.hrl").
 
 handle_request(Resource, ReqState) ->
-    [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
+    _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
     put(resource, Resource),
     put(reqstate, ReqState),
     try
