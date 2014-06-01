@@ -65,10 +65,7 @@ split_host_port(HostAsString, Scheme) ->
             {split_host(HostPart), list_to_integer(PortPart)};
         no_host ->
             %% no host header
-            {[], default_port(Scheme)};
-        _ ->
-            %% Invalid host header
-            {invalid_host, default_port(Scheme)}
+            {[], default_port(Scheme)}
     end.
 
 parse_port_from_host([]) ->
@@ -219,8 +216,6 @@ default_port(https) -> 443.
 
 %% @type dispfail() = {no_dispatch_match, pathtokens()}.
 
-try_host_binding(_Dispatch, invalid_host, _Port, _Path, _Depth, _RD) ->
-    {error, invalid_host};
 try_host_binding(Dispatch, Host, Port, Path, Depth, RD) ->
     %% save work during each dispatch attempt by reversing Host up front
     try_host_binding1(Dispatch, lists:reverse(Host), Port, Path, Depth, RD).

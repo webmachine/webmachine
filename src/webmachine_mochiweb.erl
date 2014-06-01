@@ -57,8 +57,6 @@ loop(Name, MochiReq) ->
 
     %% Run the dispatch code, catch any errors...
     try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
-        {error, invalid_host} ->
-            handle_error(400, "Invalid Host", Req);
         {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
             handle_error(404, {none, none, []}, Req);
         {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
