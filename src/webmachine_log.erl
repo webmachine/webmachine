@@ -243,16 +243,19 @@ zeropad_str(NumStr, _) ->
 
 -spec zone() -> string().
 zone() ->
-    Time = erlang:universaltime(),
-    LocalTime = calendar:universal_time_to_local_time(Time),
+    {DiffH, DiffM} = zone(erlang:universaltime(), erlang:localtime()),
+    %% Ugly reformatting code to get times like +0000 and -1300
+    if DiffH < 0 ->
+            io_lib:format("-~2..0w~2..0w", [abs(DiffH), abs(DiffM)]);
+       true ->
+            io_lib:format("+~2..0w~2..0w", [DiffH, DiffM])
+    end.
+
+-spec zone(calendar:datetime(), calendar:datetime()) -> {integer(), integer()}.
+zone(UniversalTime, LocalTime) ->
     DiffSecs = calendar:datetime_to_gregorian_seconds(LocalTime) -
-        calendar:datetime_to_gregorian_seconds(Time),
-    zone((DiffSecs/3600)*100).
-
-%% Ugly reformatting code to get times like +0000 and -1300
-
--spec zone(float()) -> string().
-zone(Val) when Val < 0 ->
-    io_lib:format("-~4..0w", [trunc(abs(Val))]);
-zone(Val) when Val >= 0 ->
-    io_lib:format("+~4..0w", [trunc(abs(Val))]).
+        calendar:datetime_to_gregorian_seconds(UniversalTime),
+    Mins = (DiffSecs / 60),
+    H = trunc(Mins / 60),
+    M =  trunc(Mins - H * 60),
+    {H, M}.
