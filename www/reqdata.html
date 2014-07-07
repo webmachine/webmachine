@@ -95,7 +95,7 @@ A couple of nonstandard types are assumed here:
 <tr><td><code> resp_redirect(rd()) -&gt; bool() </code></td><td>the last value passed to do_redirect, false otherwise -- if true, then some responses will be 303 instead of 2xx where applicable</td></tr>
 <tr><td><code> resp_headers(rd()) -&gt; mochiheaders() </code></td><td>The outgoing HTTP headers.  Generally, get_resp_header is more useful.</td></tr>
 
-<tr><td><code> resp_body(rd()) -&gt; 'undefined' | binary() </code></td><td>The outgoing response body, if one has been set.  Usually, append_to_response_body is the best way to set this.</td></tr>
+<tr><td><code> resp_body(rd()) -&gt; 'undefined' | binary() </code></td><td>The outgoing response body, if one has been set.  Usually, append_to_resp_body is the best way to set this.</td></tr>
 <tr><td><code> app_root(rd()) -&gt; string() </code></td><td>Indicates the "height" above the requested URI that this resource is dispatched from.  Typical values are <code> "." </code>, <code> ".." </code>, <code> "../.." </code> and so on.</td></tr>
 
 </table>
@@ -108,7 +108,7 @@ A couple of nonstandard types are assumed here:
 
 <table><tr><th>Function</th><th>Description</th></tr>
 <tr><td><code> set_resp_header(string(),string(),rd()) -&gt; rd() </code></td><td>Given a header name and value, set an outgoing request header to that value.</td></tr>
-<tr><td><code> append_to_response_body(binary(),rd()) -&gt; rd() </code></td><td>Append the given value to the body of the outgoing response.</td></tr>
+<tr><td><code> append_to_resp_body(binary(),rd()) -&gt; rd() </code></td><td>Append the given value to the body of the outgoing response.</td></tr>
 
 <tr><td><code> do_redirect(bool(),rd()) -&gt; rd() </code></td><td>see resp_redirect; this sets that value.</td></tr>
 <tr><td><code> set_disp_path(string(),rd()) -&gt; rd() </code></td><td>The disp_path is the only path that can be changed during a request.  This function will do so.</td></tr>
