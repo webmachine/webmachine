@@ -26,6 +26,12 @@
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
 
+-type pathspec() :: ['*' | atom() | string()].
+-type guard() :: fun((wrq:reqdata()) -> boolean()).
+-type route() :: {pathspec(), module(), list()} | {pathspec(), guard(), module(), list()}.
+
+-export_type([route/0]).
+
 %% @spec dispatch(Path::string(), DispatchList::[matchterm()],
 %%                wrq:reqdata()) ->
 %%                                            dispterm() | dispfail()

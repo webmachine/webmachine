@@ -1,48 +1,41 @@
-%% @author author <author@example.com>
-%% @copyright YYYY author.
-
-%% @doc {{appid}} startup code
-
 -module({{appid}}).
--author('author <author@example.com>').
--export([start/0, start_link/0, stop/0]).
+-export([
+    start/0
+]).
 
-ensure_started(App) ->
-    case application:start(App) of
-        ok ->
-            ok;
-        {error, {already_started, App}} ->
-            ok
-    end.
-
-%% @spec start_link() -> {ok,Pid::pid()}
-%% @doc Starts the app for inclusion in a supervisor tree
-start_link() ->
-    ensure_started(inets),
-    ensure_started(crypto),
-    ensure_started(mochiweb),
-    application:set_env(webmachine, webmachine_logger_module, 
-                        webmachine_logger),
-    ensure_started(webmachine),
-    {{appid}}_sup:start_link().
-
-%% @spec start() -> ok
-%% @doc Start the {{appid}} server.
+-spec start() -> ok.
 start() ->
-    ensure_started(inets),
-    ensure_started(crypto),
-    ensure_started(mochiweb),
-    application:set_env(webmachine, webmachine_logger_module, 
-                        webmachine_logger),
-    ensure_started(webmachine),
-    application:start({{appid}}).
+    _ = [ application:start(Dep) || Dep <- resolve_deps({{appid}}),
+                                           not is_otp_base_app(Dep) ],
+    ok.
 
-%% @spec stop() -> ok
-%% @doc Stop the {{appid}} server.
-stop() ->
-    Res = application:stop({{appid}}),
-    application:stop(webmachine),
-    application:stop(mochiweb),
-    application:stop(crypto),
-    application:stop(inets),
-    Res.
+-spec dep_apps(atom()) -> [atom()].
+dep_apps(App) ->
+    application:load(App),
+    {ok, Apps} = application:get_key(App, applications),
+    Apps.
+
+-spec all_deps(atom(), [atom()]) -> [atom()].
+all_deps(App, Deps) ->
+    [[ all_deps(Dep, [App|Deps]) || Dep <- dep_apps(App),
+                                           not lists:member(Dep, Deps)], App].
+
+-spec resolve_deps(atom()) -> [atom()].
+resolve_deps(App) ->
+    DepList = all_deps(App, []),
+    {AppOrder, _} = lists:foldl(fun(A,{List,Set}) ->
+                                        case sets:is_element(A, Set) of
+                                            true ->
+                                                {List, Set};
+                                            false ->
+                                                {List ++ [A], sets:add_element(A, Set)}
+                                        end
+                                end,
+                                {[], sets:new()},
+                                lists:flatten(DepList)),
+    AppOrder.
+
+-spec is_otp_base_app(atom()) -> boolean().
+is_otp_base_app(kernel) -> true;
+is_otp_base_app(stdlib) -> true;
+is_otp_base_app(_) -> false.
