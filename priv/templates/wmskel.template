@@ -26,9 +26,9 @@
 {template, "src/wmskel.erl", "{{prefix}}/src/{{appid}}.erl"}.
 {template, "src/wmskel_app.erl", "{{prefix}}/src/{{appid}}_app.erl"}.
 {template, "src/wmskel_sup.erl", "{{prefix}}/src/{{appid}}_sup.erl"}.
+{template, "src/wmskel_config.erl", "{{prefix}}/src/{{appid}}_config.erl"}.
 {template, "src/wmskel_resource.erl", "{{prefix}}/src/{{appid}}_resource.erl"}.
 
-{template, "priv/dispatch.conf", "{{prefix}}/priv/dispatch.conf"}.
 {dir, "{{prefix}}/priv/www"}.
 
 %% dependencies
