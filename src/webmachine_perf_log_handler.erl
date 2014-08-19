@@ -53,13 +53,23 @@ init([BaseDir]) ->
 handle_call({_Label, MRef, get_modules}, State) ->
     {ok, {MRef, [?MODULE]}, State};
 handle_call({refresh, Time}, State) ->
-    {ok, ok, webmachine_log:maybe_rotate(?MODULE, Time, State)};
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       Time,
+                                                       State#state.hourstamp),
+    {ok, ok, State#state{hourstamp=NewHour, handle=NewHandle}};
 handle_call(_Request, State) ->
     {ok, ok, State}.
 
 %% @private
 handle_event({log_access, LogData}, State) ->
-    NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       os:timestamp(),
+                                                       State#state.hourstamp),
+    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
     Msg = format_req(LogData),
     _ = webmachine_log:log_write(NewState#state.handle, Msg),
     {ok, NewState};
