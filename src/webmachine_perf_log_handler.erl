@@ -104,11 +104,35 @@ format_req(#wm_log_data{resource_module=Mod,
     Length = integer_to_list(ResponseLength),
     TTPD = webmachine_util:now_diff_milliseconds(EndTime, StartTime),
     TTPS = webmachine_util:now_diff_milliseconds(FinishTime, EndTime),
-    fmt_plog(Time, Peer, atom_to_list(Method), Path, Version,
+    fmt_plog(Time, Peer, Method, Path, Version,
              Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
              integer_to_list(TTPS)).
 
+fmt_plog(Time, Ip,  Method0, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS)
+  when is_atom(Method0) ->
+    Method = atom_to_list(Method0),
+    fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS);
 fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS) ->
     [webmachine_log:fmt_ip(Ip), " - ", [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, " " , Mod, " ", TTPD, " ", TTPS, $\n].
+
+
+-ifdef(TEST).
+
+non_standard_method_test() ->
+    LogData = #wm_log_data{resource_module=foo,
+                           start_time=now(),
+                           method="FOO",
+                           peer={127,0,0,1},
+                           path="/",
+                           version={1,1},
+                           response_code=501,
+                           response_length=1234,
+                           end_time=now(),
+                           finish_time=now()},
+    LogEntry = format_req(LogData),
+    ?assert(is_list(LogEntry)),
+    ok.
+
+-endif.

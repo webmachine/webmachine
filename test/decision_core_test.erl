@@ -1,5 +1,5 @@
 %% @author Macneil Shonle <mshonle@basho.com>
-%% @copyright 2007-2013 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -250,6 +250,8 @@ core_tests() ->
      fun request_entity_too_large_b4/0,
      fun head_method_allowed/0,
      fun head_method_not_allowed/0,
+     fun non_standard_method_501/0,
+     fun non_standard_method_200/0,
      fun bad_request_b9/0,
      fun simple_get/0,
      fun not_acceptable_c4/0,
@@ -480,6 +482,34 @@ head_method_not_allowed() ->
     ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B10,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 501 from non-standard method
+non_standard_method_501() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    Ctx = get_context(),
+    Port = wm_integration_test_util:get_port(Ctx),
+    Url = wm_integration_test_util:url(Ctx, "foo"),
+    {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
+    ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\nConnection: close\r\n\r\n"]),
+    ?assertMatch({ok, <<"HTTP/1.1 501 Not Implemented", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
+    ok = gen_tcp:close(Sock),
+    ok.
+
+%% 200 from non-standard method
+non_standard_method_200() ->
+    Method = "FOO",
+    put_setting(known_methods, [Method|?HTTP_1_1_METHODS]),
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT', Method]),
+    Ctx = get_context(),
+    Port = wm_integration_test_util:get_port(Ctx),
+    Url = wm_integration_test_util:url(Ctx, "foo"),
+    {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
+    ok = gen_tcp:send(Sock, [Method, " ", Url, " HTTP/1.1\r\nConnection: close\r\n\r\n"]),
+    ?assertMatch({ok, <<"HTTP/1.1 200 OK\r\n", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
+    ok = gen_tcp:close(Sock),
     ok.
 
 %% 400 result via B9

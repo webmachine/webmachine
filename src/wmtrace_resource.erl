@@ -269,8 +269,11 @@ base_decision_name(Decision) ->
     end.
 
 encode_request(ReqData) when is_record(ReqData, wm_reqdata) ->
-    {struct, [{"method", atom_to_list(
-                           wrq:method(ReqData))},
+    Method = case wrq:method(ReqData) of
+                 M when is_atom(M) -> atom_to_list(M);
+                 M -> M
+             end,
+    {struct, [{"method", Method},
               {"path", wrq:raw_path(ReqData)},
               {"headers", encode_headers(wrq:req_headers(ReqData))},
               {"body", case ReqData#wm_reqdata.req_body of
@@ -349,3 +352,16 @@ tag(Name, Attrs, Content) ->
               Content,
               "</",Name,">"]
      end].
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+non_standard_method_test() ->
+    Method = "FOO",
+    ReqData = wrq:create(Method, http, "/", mochiweb_headers:from_list([])),
+    {struct, Props} = encode_request(ReqData),
+    ?assertMatch({"method",Method}, lists:keyfind("method", 1, Props)),
+    ok.
+
+-endif.

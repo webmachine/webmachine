@@ -174,8 +174,12 @@ decision(v3b10) ->
         true ->
             d(v3b9);
         false ->
+            Allowed = [case is_atom(M) of
+                           true -> atom_to_list(M);
+                           false -> M
+                       end || M <- Methods],
             wrcall({set_resp_headers, [{"Allow",
-                   string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
+                   string:join(Allowed, ", ")}]}),
             respond(405)
     end;
 
