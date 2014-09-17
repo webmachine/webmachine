@@ -123,3 +123,20 @@ fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, [$\s,$"], Referer,
      [$",$\s,$"], UserAgent, [$",$\n]].
+
+
+-ifdef(TEST).
+
+non_standard_method_test() ->
+    LogData = #wm_log_data{method="FOO",
+                           headers=mochiweb_headers:make([]),
+                           peer={127,0,0,1},
+                           path="/",
+                           version={1,1},
+                           response_code=501,
+                           response_length=1234},
+    LogEntry = format_req(LogData),
+    ?assert(is_list(LogEntry)),
+    ok.
+
+-endif.
