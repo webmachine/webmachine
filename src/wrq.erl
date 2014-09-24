@@ -1,5 +1,5 @@
 %% @author Justin Sheehy <justin@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -35,14 +35,15 @@
 -include("wm_reqdata.hrl").
 -include("wm_reqstate.hrl").
 
--type method() :: 'GET' | 'HEAD' | 'PUT' | 'POST' | 'DELETE'.
+-type method() :: 'GET' | 'HEAD' | 'PUT' | 'POST' | 'DELETE' |
+                  'OPTIONS' | 'TRACE' | 'CONNECT' | string().
 -type scheme() :: http | https.
 -type version() :: {1, 0|1}.
 -type wm_reqdata() :: #wm_reqdata{}.
 
 -export_type([method/0, scheme/0, version/0, wm_reqdata/0]).
 
--spec create(method(), version(), string(), gb_tree()) -> wm_reqdata().
+-spec create(method(), version(), string(), req_headers()) -> wm_reqdata().
 create(Method,Version,RawPath,Headers) ->
 	create(Method,http,Version,RawPath,Headers).
 create(Method,Scheme,Version,RawPath,Headers) ->
@@ -92,10 +93,10 @@ version(_RD = #wm_reqdata{version=Version})
   when is_tuple(Version), size(Version) == 2,
      is_integer(element(1,Version)), is_integer(element(2,Version)) -> Version.
 
--spec peer(wm_reqdata()) -> inet:ip_address().
+-spec peer(wm_reqdata()) -> string().
 peer(_RD = #wm_reqdata{peer=Peer}) when is_list(Peer) -> Peer.
 
--spec sock(wm_reqdata()) -> inet:socket().
+-spec sock(wm_reqdata()) -> string().
 sock(_RD = #wm_reqdata{sock=Sock}) when is_list(Sock) -> Sock.
 
 -spec app_root(wm_reqdata()) -> string().
@@ -111,8 +112,8 @@ path(_RD = #wm_reqdata{path=Path}) when is_list(Path) -> Path.
 -spec raw_path(wm_reqdata()) -> string().
 raw_path(_RD = #wm_reqdata{raw_path=RawPath}) when is_list(RawPath) -> RawPath.
 
--spec path_info(wm_reqdata()) -> dict().
-path_info(_RD = #wm_reqdata{path_info=PathInfo}) -> PathInfo. % dict
+-spec path_info(wm_reqdata()) -> orddict:orddict().
+path_info(_RD = #wm_reqdata{path_info=PathInfo}) -> PathInfo. % orddict
 
 -spec path_tokens(wm_reqdata()) -> [string()].
 path_tokens(_RD = #wm_reqdata{path_tokens=PathT}) -> PathT. % list of strings
@@ -127,13 +128,13 @@ port(_RD = #wm_reqdata{port=Port}) -> Port. % integer
 response_code(_RD = #wm_reqdata{response_code={C,_ReasonPhrase}}) when is_integer(C) -> C;
 response_code(_RD = #wm_reqdata{response_code=C}) when is_integer(C) -> C.
 
--spec req_cookie(wm_reqdata()) -> string().
-req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C. % string
+-spec req_cookie(wm_reqdata()) -> [{string(), string()}].
+req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C.
 
 -spec req_qs(wm_reqdata()) -> [{string(), string()}].
 req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 
--spec req_headers(wm_reqdata()) -> gb_tree().
+-spec req_headers(wm_reqdata()) -> req_headers().
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
 -spec req_body(wm_reqdata()) -> binary().

@@ -1,11 +1,11 @@
--record(wm_reqstate, {socket=undefined :: undefined | inet:socket(),
+-record(wm_reqstate, {socket :: inet:socket() | {ssl, ssl:sslsocket()} |
+                                atom() | undefined,
                       metadata=orddict:new() :: orddict:orddict(),
-                      range=undefined     :: undefined | string(),
-                      peer=undefined      :: undefined | inet:ip_address(),
-                      sock=undefined,
-                      reqdata=undefined,  %% reqdata
-                      bodyfetch=undefined,
-                      reqbody=undefined   :: undefined | binary(),
-                      log_data=undefined
+                      range  :: undefined | ignore | [{integer(),integer()|none}],
+                      peer   :: undefined | inet:ip_address() | string(),
+                      sock,
+                      reqdata,  %% reqdata
+                      bodyfetch,
+                      reqbody :: undefined | binary(),
+                      log_data
                      }).
-
