@@ -39,7 +39,7 @@
                   'OPTIONS' | 'TRACE' | 'CONNECT' | string().
 -type scheme() :: http | https.
 -type version() :: {1, 0|1}.
--type wm_reqdata() :: #wm_reqdata{}.
+-opaque wm_reqdata() :: #wm_reqdata{}.
 -type streamfun() :: fun(() -> stream()).
 -type chunk() :: iodata().
 -type stream() :: {chunk(), done | streamfun()}.
