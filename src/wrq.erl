@@ -40,6 +40,22 @@
 -type scheme() :: http | https.
 -type version() :: {1, 0|1}.
 -type wm_reqdata() :: #wm_reqdata{}.
+-type streamfun() :: fun(() -> stream()).
+-type chunk() :: iodata().
+-type stream() :: {chunk(), done | streamfun()}.
+-type socket_writer() :: fun((iodata()) -> non_neg_integer()).
+-type writer_body_fun() :: fun((socket_writer()) -> any()).
+-type encoder() :: fun((iodata()) -> iodata()).
+-type charsetter() :: fun((iodata()) -> iodata()).
+-type writer() :: {encoder(), charsetter(), writer_body_fun()}.
+-type response_body() ::
+        iodata() |
+        {stream, stream()} |
+        {known_length_stream, Size::non_neg_integer(), streamfun()} |
+        {stream, Size::non_neg_integer(),
+         fun((non_neg_integer(), non_neg_integer()) -> streamfun())} |
+        {writer, writer()}.
+
 
 -export_type([method/0, scheme/0, version/0, wm_reqdata/0]).
 
@@ -174,7 +190,7 @@ resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
 resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 %% TODO: make resp_body type
--spec resp_body(wm_reqdata()) -> any().
+-spec resp_body(wm_reqdata()) -> response_body().
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
 resp_body(_RD = #wm_reqdata{resp_body={stream,X}}) -> {stream,X};
 resp_body(_RD = #wm_reqdata{resp_body={known_length_stream,X,Y}}) -> {known_length_stream,X,Y};
@@ -313,19 +329,19 @@ accessor_test() ->
     ?assertEqual('GET', method(R)),
     ?assertEqual({1,1}, version(R)),
     ?assertEqual("/foo", path(R)),
-    ?assertEqual("/foo?a=1&b=2", raw_path(R)),     
+    ?assertEqual("/foo?a=1&b=2", raw_path(R)),
     ?assertEqual([{"a", "1"}, {"b", "2"}], req_qs(R)),
     ?assertEqual({"1", "2"}, {get_qs_value("a", R), get_qs_value("b", R)}),
     ?assertEqual("3", get_qs_value("c", "3", R)),
     ?assertEqual([{"foo", "bar"}], req_cookie(R)),
     ?assertEqual("bar", get_cookie_value("foo", R)),
     ?assertEqual("127.0.0.1", peer(R)).
-    
+
 simple_dispatch_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
-    R1 = set_peer("127.0.0.1", R0),    
-    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} = 
-        webmachine_dispatcher:dispatch("127.0.0.1", "/foo", 
+    R1 = set_peer("127.0.0.1", R0),
+    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} =
+        webmachine_dispatcher:dispatch("127.0.0.1", "/foo",
                                        [{["foo"], foo_resource, []}], R1),
     R = load_dispatch_data(Bindings,
                            HostTokens,
