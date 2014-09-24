@@ -1,6 +1,5 @@
 -export([ping/2]).
 
--include("wm_reqdata.hrl").
-
+-spec ping(wrq:wm_reqdata(), term()) -> {pong, wrq:wm_reqdata(), term()}.
 ping(ReqData, State) ->
     {pong, ReqData, State}.
