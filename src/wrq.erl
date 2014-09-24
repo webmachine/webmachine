@@ -61,33 +61,21 @@
         {writer, writer()}.
 
 
--export_type([method/0, scheme/0, version/0, wm_reqdata/0]).
+-export_type([method/0, scheme/0, version/0, wm_reqdata/0, response_body/0]).
 
--spec create(method(), version(), string(), req_headers()) -> wm_reqdata().
+-spec create(method(), version(), string(), headers()) -> wm_reqdata().
 create(Method,Version,RawPath,Headers) ->
-	create(Method,http,Version,RawPath,Headers).
+    create(Method,http,Version,RawPath,Headers).
+
+-spec create(method(), scheme(), version(), string(), headers()) -> wm_reqdata().
 create(Method,Scheme,Version,RawPath,Headers) ->
-    create(#wm_reqdata{method=Method,scheme=Scheme,version=Version,
-                       raw_path=RawPath,req_headers=Headers,
-      wm_state=defined_on_call,
-      path="defined_in_create",
-      req_cookie=defined_in_create,
-      req_qs=defined_in_create,
-      peer="defined_in_wm_req_srv_init",
-      sock="defined_in_wm_req_srv_init",
-      req_body=not_fetched_yet,
-      max_recv_body=(1024*(1024*1024)),
-      % Stolen from R13B03 inet_drv.c's TCP_MAX_PACKET_SIZE definition
-      max_recv_hunk=(64*(1024*1024)),
-      app_root="defined_in_load_dispatch_data",
-      path_info=orddict:new(),
-      path_tokens=defined_in_load_dispatch_data,
-      disp_path=defined_in_load_dispatch_data,
-      resp_redirect=false, resp_headers=mochiweb_headers:empty(),
-      resp_body = <<>>, response_code=500,
-      resp_range = follow_request,
-      notes=[]}).
-create(RD = #wm_reqdata{raw_path=RawPath}) ->
+    parse_uri_and_cookies(#wm_reqdata{method=Method,
+                                      scheme=Scheme,
+                                      version=Version,
+                                      raw_path=RawPath,
+                                      req_headers=Headers}).
+
+parse_uri_and_cookies(RD = #wm_reqdata{raw_path=RawPath}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
     Cookie = case get_req_header("cookie", RD) of
                  undefined -> [];
@@ -96,11 +84,16 @@ create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {_, QueryString, _} = mochiweb_util:urlsplit_path(RawPath),
     ReqQS = mochiweb_util:parse_qs(QueryString),
     RD#wm_reqdata{path=Path,req_cookie=Cookie,req_qs=ReqQS}.
+
+-spec load_dispatch_data(_,_,_,_,_,_,wm_reqdata()) -> wm_reqdata().                       
 load_dispatch_data(PathInfo, HostTokens, Port, PathTokens, AppRoot,
                    DispPath, RD) ->
-    RD#wm_reqdata{path_info=PathInfo,host_tokens=HostTokens,
-                  port=Port,path_tokens=PathTokens,
-                  app_root=AppRoot,disp_path=DispPath}.
+    RD#wm_reqdata{path_info=PathInfo,
+                  host_tokens=HostTokens,
+                  port=Port,
+                  path_tokens=PathTokens,
+                  app_root=AppRoot,
+                  disp_path=DispPath}.
 
 -spec method(wm_reqdata()) -> method().
 method(_RD = #wm_reqdata{method=Method}) -> Method.
@@ -154,7 +147,7 @@ req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C.
 -spec req_qs(wm_reqdata()) -> [{string(), string()}].
 req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 
--spec req_headers(wm_reqdata()) -> req_headers().
+-spec req_headers(wm_reqdata()) -> headers().
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
 -spec req_body(wm_reqdata()) -> binary().
@@ -194,7 +187,7 @@ resp_redirect(_RD = #wm_reqdata{resp_redirect=false}) -> false.
 resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 %% TODO: make resp_body type
--spec resp_body(wm_reqdata()) -> response_body().
+-spec resp_body(wm_reqdata()) -> response_body() | undefined.
 resp_body(_RD = #wm_reqdata{resp_body=undefined}) -> undefined;
 resp_body(_RD = #wm_reqdata{resp_body={stream,X}}) -> {stream,X};
 resp_body(_RD = #wm_reqdata{resp_body={known_length_stream,X,Y}}) -> {known_length_stream,X,Y};
