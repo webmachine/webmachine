@@ -39,16 +39,12 @@
          log_open/1,
          log_open/2,
          log_write/2,
-         maybe_rotate/3,
+         maybe_rotate/5,
          month/1,
          refresh/2,
          suffix/1,
          zeropad/2,
          zone/0]).
-
--record(state, {hourstamp :: datehour(),
-                filename :: string(),
-                handle :: file:io_device()}).
 
 %% @doc Add a handler to receive log events
 -type add_handler_result() :: ok | {'EXIT', term()} | term().
@@ -177,17 +173,22 @@ log_write(FD, IoData) ->
 
 %% @doc Rotate a log file if the hour it represents
 %% has passed.
--spec maybe_rotate(atom(), erlang:timestamp(), #state{}) -> #state{}.
-maybe_rotate(Mod, Time, State) ->
-    ThisHour = datehour(Time),
-    if ThisHour == State#state.hourstamp ->
-            State;
-       true ->
-            {ok,_} = defer_refresh(Mod),
-            ok = log_close(Mod, State#state.filename, State#state.handle),
-            Handle = log_open(State#state.filename, ThisHour),
-            State#state{hourstamp=ThisHour, handle=Handle}
-    end.
+-spec maybe_rotate(atom(), string(), file:io_device(), erlang:timestamp(), datehour()) ->
+                          {datehour(), file:io_device()}.
+maybe_rotate(Mod, FileName, Handle, Time, Hour) ->
+    Rotate = datehour(Time) == Hour,
+    maybe_rotate(Mod, FileName, Handle, Time, Hour, Rotate).
+
+-spec maybe_rotate(atom(), string(), file:io_device(), erlang:timestamp(), datehour(), boolean()) ->
+                          {datehour(), file:io_device()}.
+maybe_rotate(_Mod, _FileName, Handle, _Time, Hour, true) ->
+    {Hour, Handle};
+maybe_rotate(Mod, FileName, Handle, Time, _Hour, false) ->
+    NewHour = datehour(Time),
+    {ok,_} = defer_refresh(Mod),
+    ok = log_close(Mod, FileName, Handle),
+    NewHandle = log_open(FileName, NewHour),
+    {NewHour, NewHandle}.
 
 %% @doc Convert numeric month value to the abbreviation
 -spec month(1..12) -> string().
