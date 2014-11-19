@@ -4,8 +4,8 @@
 -export([start/0, start_link/0, stop/0]).
 
 ensure_started(App) ->
-    case application:start(App) of
-        ok ->
+    case application:ensure_all_started(App) of
+        {ok, _} ->
             ok;
         {error, {already_started, App}} ->
             ok
