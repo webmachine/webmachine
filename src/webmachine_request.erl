@@ -100,8 +100,8 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.10.6").
--define(QUIP, "no drinks").
+-define(WMVSN, "1.10.7").
+-define(QUIP, "we're aiming for the pool, right?").
 -define(IDLE_TIMEOUT, infinity).
 
 new(#wm_reqstate{}=ReqState) ->
