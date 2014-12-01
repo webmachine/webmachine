@@ -22,7 +22,8 @@
          req_body/1,stream_req_body/2,resp_redirect/1,resp_headers/1,
          resp_body/1,app_root/1,path_tokens/1, host_tokens/1, port/1,
          base_uri/1]).
--export([path_info/2,get_req_header/2,do_redirect/2,fresh_resp_headers/2,
+-export([path_info/2,get_req_header/2,get_req_header_norm/2,
+         do_redirect/2,fresh_resp_headers/2,
          get_resp_header/2,set_resp_header/3,set_resp_headers/2,
          set_disp_path/2,set_req_body/2,set_resp_body/2,set_response_code/2,
          merge_resp_headers/2,remove_resp_header/2,
@@ -60,7 +61,7 @@ create(Method,Scheme,Version,RawPath,Headers) ->
       notes=[]}).
 create(RD = #wm_reqdata{raw_path=RawPath}) ->
     {Path, _, _} = mochiweb_util:urlsplit_path(RawPath),
-    Cookie = case get_req_header("cookie", RD) of
+    Cookie = case get_req_header_norm("cookie", RD) of
                  undefined -> [];
                  Value -> mochiweb_cookies:parse_cookie(Value)
              end,
@@ -161,6 +162,9 @@ path_info(Key, RD) when is_atom(Key) ->
 
 get_req_header(HdrName, RD) -> % string->string
     mochiweb_headers:get_value(HdrName, req_headers(RD)).
+
+get_req_header_norm(HdrName, RD) -> % string->string
+    mochiweb_headers:get_value_norm(HdrName, req_headers(RD)).
 
 do_redirect(true, RD) ->  RD#wm_reqdata{resp_redirect=true};
 do_redirect(false, RD) -> RD#wm_reqdata{resp_redirect=false}.

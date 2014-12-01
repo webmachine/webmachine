@@ -101,12 +101,12 @@ format_req(#wm_log_data{method=Method,
              end,
     Length = integer_to_list(ResponseLength),
     Referer =
-        case mochiweb_headers:get_value("Referer", Headers) of
+        case mochiweb_headers:get_value_norm("referer", Headers) of
             undefined -> "";
             R -> R
         end,
     UserAgent =
-        case mochiweb_headers:get_value("User-Agent", Headers) of
+        case mochiweb_headers:get_value_norm("user-agent", Headers) of
             undefined -> "";
             U -> U
         end,

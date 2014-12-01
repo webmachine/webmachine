@@ -139,7 +139,7 @@ application_set_unless_env(App, Var, Value) ->
     end.
 
 host_headers(Req) ->
-    [ V || {V,_ReqState} <- [Req:get_header_value(H)
+    [ V || {V,_ReqState} <- [Req:get_header_value_norm(H)
                              || H <- ["x-forwarded-host",
                                       "x-forwarded-server",
                                       "host"]],

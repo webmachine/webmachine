@@ -57,6 +57,7 @@
          path/1,
          raw_path/1,
          get_req_header/2,
+         get_req_header_norm/2,
          req_headers/1,
          req_body/2,
          stream_req_body/2,
@@ -67,6 +68,7 @@
          has_out_header/2,
          peer/1,
          get_header_value/2,
+         get_header_value_norm/2,
          add_response_header/3,
          add_response_headers/2,
          remove_response_header/2,
@@ -143,7 +145,7 @@ peer_from_peername({ok, {Addr, _Port}}, _Req) ->
     inet_parse:ntoa(Addr).
 
 x_peername(Default, Req) ->
-    case get_header_value("x-forwarded-for", Req) of
+    case get_header_value_norm("x-forwarded-for", Req) of
     {undefined, _} ->
         Default;
     {Hosts, _} ->
@@ -218,6 +220,8 @@ call(path, {?MODULE, ReqState}) ->
     {wrq:path(ReqState#wm_reqstate.reqdata), ReqState};
 call({get_req_header, K}, {?MODULE, ReqState}) ->
     {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState};
+call({get_req_header_norm, K}, {?MODULE, ReqState}) ->
+    {wrq:get_req_header_norm(K, ReqState#wm_reqstate.reqdata), ReqState};
 call({set_response_code, Code}, {?MODULE, ReqState}) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_response_code(
                                      Code, ReqState#wm_reqstate.reqdata)}};
@@ -297,6 +301,11 @@ get_header_value(K, {?MODULE, ReqState}) ->
     {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState};
 get_header_value(K, ReqState) ->
     get_header_value(K, {?MODULE, ReqState}).
+
+get_header_value_norm(K, {?MODULE, ReqState}) ->
+    {wrq:get_req_header_norm(K, ReqState#wm_reqstate.reqdata), ReqState};
+get_header_value_norm(K, ReqState) ->
+    get_header_value_norm(K, {?MODULE, ReqState}).
 
 get_outheader_value(K, {?MODULE, ReqState}) ->
     {mochiweb_headers:get_value(K,
@@ -412,9 +421,9 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->
-    case get_header_value("transfer-encoding", Req) of
+    case get_header_value_norm("transfer-encoding", Req) of
         {undefined, _} ->
-            case get_header_value("content-length", Req) of
+            case get_header_value_norm("content-length", Req) of
                 {undefined, _} -> undefined;
                 {Length, _} -> list_to_integer(Length)
             end;
@@ -447,7 +456,7 @@ read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
 
 recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     put(mochiweb_request_recv, true),
-    case get_header_value("expect", PassedState) of
+    case get_header_value_norm("expect", PassedState) of
         {"100-continue", _} ->
             send(PassedState#wm_reqstate.socket,
                  [make_version(wrq:version(RD)),
@@ -526,7 +535,7 @@ get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
         ignore_request ->
             {ignore, ReqState#wm_reqstate{range=undefined}};
         follow_request ->
-            case get_header_value("range", Req) of
+            case get_header_value_norm("range", Req) of
                 {undefined, _} ->
                     {undefined, ReqState#wm_reqstate{range=undefined}};
                 {RawRange, _} ->
@@ -727,7 +736,7 @@ make_headers(Code, Length, RD) when is_integer(Code) ->
       {ok, ServerHeader} when is_list(ServerHeader) -> ok
     end,
     WithSrv = mochiweb_headers:enter("Server", ServerHeader, Hdrs0),
-    Hdrs = case mochiweb_headers:get_value("date", WithSrv) of
+    Hdrs = case mochiweb_headers:get_value_norm("date", WithSrv) of
         undefined ->
             mochiweb_headers:enter("Date", httpd_util:rfc1123_date(), WithSrv);
         _ ->
@@ -846,6 +855,9 @@ response_body(Req) -> resp_body(Req).
 get_req_header(K, #wm_reqstate{}=ReqState) -> call({get_req_header, K}, {?MODULE, ReqState});
 get_req_header(K, Req) -> call({get_req_header, K}, Req).
 
+get_req_header_norm(K, #wm_reqstate{}=ReqState) -> call({get_req_header_norm, K}, {?MODULE, ReqState});
+get_req_header_norm(K, Req) -> call({get_req_header_norm, K}, Req).
+
 set_resp_header(K, V, Req) -> call({set_resp_header, K, V}, Req).
 add_response_header(K, V, #wm_reqstate{}=ReqState) -> set_resp_header(K, V, {?MODULE, ReqState});
 add_response_header(K, V, Req) -> set_resp_header(K, V, Req).
@@ -922,6 +934,15 @@ header_test() ->
     {ok, ReqState} = set_reqdata(ReqData, #wm_reqstate{}),
     ?assertEqual({HdrValue, ReqState}, get_header_value(HdrName, ReqState)),
     ?assertEqual({HdrValue, ReqState}, get_req_header(HdrName, ReqState)).
+
+header_norm_test() ->
+    HdrName = "accept",
+    HdrValue = "application/json",
+    ReqData = #wm_reqdata{req_headers = mochiweb_headers:make([{HdrName, HdrValue}])},
+    {ok, ReqState} = set_reqdata(ReqData, #wm_reqstate{}),
+    %% Use the functions that assume normalized header names.
+    ?assertEqual({HdrValue, ReqState}, get_header_value_norm(HdrName, ReqState)),
+    ?assertEqual({HdrValue, ReqState}, get_req_header_norm(HdrName, ReqState)).
 
 metadata_test() ->
     Key = "webmachine",
