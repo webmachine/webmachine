@@ -4,3 +4,4 @@ deps/*
 ebin/*.app
 doc/*
 .local_dialyzer_plt
+/.rebar
