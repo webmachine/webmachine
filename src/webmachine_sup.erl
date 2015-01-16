@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2008 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -44,12 +44,12 @@ upgrade() ->
     Kill = sets:subtract(Old, New),
 
     sets:fold(fun (Id, ok) ->
-                      supervisor:terminate_child(?MODULE, Id),
-                      supervisor:delete_child(?MODULE, Id),
+                      _ = supervisor:terminate_child(?MODULE, Id),
+                      _ = supervisor:delete_child(?MODULE, Id),
                       ok
               end, ok, Kill),
 
-    [supervisor:start_child(?MODULE, Spec) || Spec <- Specs],
+    _ = [supervisor:start_child(?MODULE, Spec) || Spec <- Specs],
     ok.
 
 %% @spec init([]) -> SupervisorTree

@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2011-2014 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -44,7 +44,7 @@
 
 %% @private
 init([BaseDir]) ->
-    webmachine_log:defer_refresh(?MODULE),
+    {ok,_} = webmachine_log:defer_refresh(?MODULE),
     FileName = filename:join(BaseDir, ?FILENAME),
     {Handle, DateHour} = webmachine_log:log_open(FileName),
     {ok, #state{filename=FileName, handle=Handle, hourstamp=DateHour}}.
@@ -53,15 +53,25 @@ init([BaseDir]) ->
 handle_call({_Label, MRef, get_modules}, State) ->
     {ok, {MRef, [?MODULE]}, State};
 handle_call({refresh, Time}, State) ->
-    {ok, ok, webmachine_log:maybe_rotate(?MODULE, Time, State)};
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       Time,
+                                                       State#state.hourstamp),
+    {ok, ok, State#state{hourstamp=NewHour, handle=NewHandle}};
 handle_call(_Request, State) ->
     {ok, ok, State}.
 
 %% @private
 handle_event({log_access, LogData}, State) ->
-    NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       os:timestamp(),
+                                                       State#state.hourstamp),
+    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
     Msg = format_req(LogData),
-    webmachine_log:log_write(NewState#state.handle, Msg),
+    _ = webmachine_log:log_write(NewState#state.handle, Msg),
     {ok, NewState};
 handle_event(_Event, State) ->
     {ok, State}.
@@ -104,11 +114,35 @@ format_req(#wm_log_data{resource_module=Mod,
     Length = integer_to_list(ResponseLength),
     TTPD = webmachine_util:now_diff_milliseconds(EndTime, StartTime),
     TTPS = webmachine_util:now_diff_milliseconds(FinishTime, EndTime),
-    fmt_plog(Time, Peer, atom_to_list(Method), Path, Version,
+    fmt_plog(Time, Peer, Method, Path, Version,
              Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
              integer_to_list(TTPS)).
 
+fmt_plog(Time, Ip,  Method0, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS)
+  when is_atom(Method0) ->
+    Method = atom_to_list(Method0),
+    fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS);
 fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS) ->
     [webmachine_log:fmt_ip(Ip), " - ", [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, " " , Mod, " ", TTPD, " ", TTPS, $\n].
+
+
+-ifdef(TEST).
+
+non_standard_method_test() ->
+    LogData = #wm_log_data{resource_module=foo,
+                           start_time=now(),
+                           method="FOO",
+                           peer={127,0,0,1},
+                           path="/",
+                           version={1,1},
+                           response_code=501,
+                           response_length=1234,
+                           end_time=now(),
+                           finish_time=now()},
+    LogEntry = format_req(LogData),
+    ?assert(is_list(LogEntry)),
+    ok.
+
+-endif.

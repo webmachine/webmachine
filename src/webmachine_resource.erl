@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2012 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ handle_wm_call(Fun, ReqData, {?MODULE,R_Mod,R_ModState,R_ModExports,R_Trace}=Req
             end
     end.
 
-trim_trace([{M,F,[RD = #wm_reqdata{},S]}|STRest]) ->
+trim_trace([{M,F,[RD = #wm_reqdata{},S],_}|STRest]) ->
     TrimState = (RD#wm_reqdata.wm_state)#wm_reqstate{reqdata='REQDATA'},
     TrimRD = RD#wm_reqdata{wm_state=TrimState},
     [{M,F,[TrimRD,S]}|STRest];

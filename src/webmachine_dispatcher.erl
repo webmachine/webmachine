@@ -1,6 +1,6 @@
 %% @author Robert Ahrens <rahrens@basho.com>
 %% @author Justin Sheehy <justin@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -25,6 +25,12 @@
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
+
+-type pathspec() :: ['*' | atom() | string()].
+-type guard() :: fun((wrq:reqdata()) -> boolean()).
+-type route() :: {pathspec(), module(), list()} | {pathspec(), guard(), module(), list()}.
+
+-export_type([route/0]).
 
 %% @spec dispatch(Path::string(), DispatchList::[matchterm()],
 %%                wrq:reqdata()) ->
@@ -210,14 +216,8 @@ try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings,
             AppRoot = calculate_app_root(Depth + ExtraDepth),
             StringPath = reconstitute(Remainder),
             PathInfo = orddict:from_list(NewBindings),
-            RD1 =
-                case RD of
-                    testing_ignore_dialyzer_warning_here ->
-                        testing_ignore_dialyzer_warning_here;
-                    _ ->
-                        wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
-                                               AppRoot, StringPath, RD)
-                end,
+            RD1 = wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
+                                         AppRoot, StringPath, RD),
             case run_guard(Guard, RD1) of
                 true ->
                     {Mod, Props, Remainder, NewBindings, AppRoot, StringPath};
@@ -364,7 +364,7 @@ bind_path_string_fail_test() ->
     ?assertEqual(fail, bind(["a","b"], ["a","c"], [], 0)).
 
 try_path_matching_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({bar, baz, [], [], ".", ""},
                  try_path_binding([{["foo"], bar, baz}], ["foo"], [], 80, [], 0, RD)),
     Dispatch = [{["a", x], foo, bar},
@@ -380,14 +380,14 @@ try_path_matching_test() ->
                  try_path_binding(Dispatch, ["b","c","z","v"], [], 80, [], 0, RD)).
 
 try_path_failing_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({no_dispatch_match, ["a"]},
                  try_path_binding([{["b"], x, y}], ["a"], [], 80, [], 0, RD)).
 
 %% host binding
 
 try_host_binding_nohosts_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     PathDispatches = [{["a"], foo, bar},
                       {["b"], baz, quux}],
     ?assertEqual(try_host_binding([{{['*'],'*'},PathDispatches}],
@@ -408,7 +408,7 @@ try_host_binding_nohosts_test() ->
                                   ["quux","baz"], 1234, ["b"], 0, RD)).
 
 try_host_binding_noport_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     Dispatch = [{["foo","bar"], [{["a"],x,y}]},
                 {["baz","quux"],[{["b"],z,q}]},
                 {[m,"quux"],    [{["c"],r,s}]},
@@ -432,7 +432,7 @@ try_host_binding_noport_test() ->
                                   ["quux","no"], 82, ["d"], 0, RD)).
 
 try_host_binding_fullmatch_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     Dispatch = [{{["foo","bar"],80},[{["a"],x,y}]},
                 {{[foo,"bar"],80},  [{["b"],z,q}]},
                 {{[foo,"bar"],baz}, [{["c"],r,s}]},
@@ -466,7 +466,7 @@ try_host_binding_wildcard_token_order_test() ->
                  dispatch("foo.bar.baz.quux.com","/",Dispatch,RD)).
 
 try_host_binding_fail_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({no_dispatch_match, {["bar","foo"], 1234}, ["x","y","z"]},
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 

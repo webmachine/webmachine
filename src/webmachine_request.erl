@@ -100,8 +100,8 @@
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
--define(WMVSN, "1.10.6").
--define(QUIP, "no drinks").
+-define(WMVSN, "1.10.7").
+-define(QUIP, "we're aiming for the pool, right?").
 -define(IDLE_TIMEOUT, infinity).
 
 new(#wm_reqstate{}=ReqState) ->
@@ -318,9 +318,7 @@ get_header_value(K, ReqState) ->
 
 get_outheader_value(K, {?MODULE, ReqState}) ->
     {mochiweb_headers:get_value(K,
-                                wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState};
-get_outheader_value(K, ReqState) ->
-    get_outheader_value(K, {?MODULE, ReqState}).
+                                wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
 
 send(Socket, Data) ->
     case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of

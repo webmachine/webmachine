@@ -1,4 +1,4 @@
-%% Copyright (c) 2011-2013 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2011-2014 Basho Technologies, Inc.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -44,7 +44,7 @@
 
 %% @private
 init([BaseDir]) ->
-    webmachine_log:defer_refresh(?MODULE),
+    {ok,_} = webmachine_log:defer_refresh(?MODULE),
     FileName = filename:join(BaseDir, ?FILENAME),
     {Handle, DateHour} = webmachine_log:log_open(FileName),
     {ok, #state{filename=FileName, handle=Handle, hourstamp=DateHour}}.
@@ -53,27 +53,47 @@ init([BaseDir]) ->
 handle_call({_Label, MRef, get_modules}, State) ->
     {ok, {MRef, [?MODULE]}, State};
 handle_call({refresh, Time}, State) ->
-    {ok, ok, webmachine_log:maybe_rotate(?MODULE, Time, State)};
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       Time,
+                                                       State#state.hourstamp),
+    {ok, ok, State#state{hourstamp=NewHour, handle=NewHandle}};
 handle_call(_Request, State) ->
     {ok, ok, State}.
 
 %% @private
 handle_event({log_error, Msg}, State) ->
-    NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       os:timestamp(),
+                                                       State#state.hourstamp),
+    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
     FormattedMsg = format_req(error, undefined, undefined, Msg),
-    webmachine_log:log_write(NewState#state.handle, FormattedMsg),
+    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
     {ok, NewState};
 handle_event({log_error, Code, _Req, _Reason}, State) when Code < 500 ->
     {ok, State};
 handle_event({log_error, Code, Req, Reason}, State) ->
-    NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       os:timestamp(),
+                                                       State#state.hourstamp),
+    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
     Msg = format_req(error, Code, Req, Reason),
-    webmachine_log:log_write(NewState#state.handle, Msg),
+    _ = webmachine_log:log_write(NewState#state.handle, Msg),
     {ok, NewState};
 handle_event({log_info, Msg}, State) ->
-    NewState = webmachine_log:maybe_rotate(?MODULE, os:timestamp(), State),
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       os:timestamp(),
+                                                       State#state.hourstamp),
+    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
     FormattedMsg = format_req(info, undefined, undefined, Msg),
-    webmachine_log:log_write(NewState#state.handle, FormattedMsg),
+    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
     {ok, NewState};
 handle_event(_Event, State) ->
     {ok, State}.
@@ -111,4 +131,3 @@ format_req(error, _Code, Req, Reason) ->
     {Path, _} = Req:path(),
     Str = io_lib:format("~p", [Reason]),
     ["[error] path=", Path, $\x20, Str, $\n].
-
