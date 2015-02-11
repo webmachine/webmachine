@@ -27,13 +27,19 @@
 %% @spec start() -> ok
 %% @doc Start the webmachine server.
 start() ->
-    ok = webmachine_deps:ensure(),
-    ok = case application:start(crypto) of
-             ok -> ok;
-             {error, {already_started, crypto}} -> ok;
-             Error -> Error
-         end,
-    ok = application:start(webmachine).
+    webmachine_deps:ensure(),
+    ok = ensure_started(crypto),
+    ok = ensure_started(webmachine).
+
+ensure_started(App) ->
+    case application:start(App) of
+        ok ->
+            ok;
+        {error, {already_started, App}} ->
+            ok;
+        {error, _} = E ->
+            E
+    end.
 
 %% @spec stop() -> ok
 %% @doc Stop the webmachine server.
