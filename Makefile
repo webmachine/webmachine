@@ -20,7 +20,7 @@ clean:
 # nuke deps first to avoid wasting time having rebar recurse into deps
 # for clean
 distclean:
-	@rm -rf deps ./rebar/DEV_MODE
+	@rm -rf ./deps ./.rebar
 	@(./rebar clean)
 
 edoc:
@@ -39,4 +39,5 @@ travisupload:
 	travis-artifacts upload --path ${ARTIFACTSFILE}
 
 DEV_MODE:
+	@[ -d ./.rebar ] || mkdir ./.rebar
 	@touch ./.rebar/DEV_MODE
