@@ -1,7 +1,7 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
 %% @author Bryan Fink <bryan@basho.com>
-%% @copyright 2007-2014 Basho Technologies
+%% @copyright 2007-2015 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -21,8 +21,11 @@
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
 -author('Bryan Fink <bryan@basho.com>').
+
 -export([handle_request/2]).
 -export([do_log/1]).
+
+-include_lib("otp_compat/include/crypto_hash.hrl").
 -include("webmachine_logger.hrl").
 
 handle_request(Resource, ReqState) ->
@@ -738,51 +741,24 @@ variances() ->
     end,
     Accept ++ AcceptEncoding ++ AcceptCharset ++ resource_call(variances).
 
--ifndef(old_hash).
-md5(Bin) ->
-    crypto:hash(md5, Bin).
-
-md5_init() ->
-    crypto:hash_init(md5).
-
-md5_update(Ctx, Bin) ->
-    crypto:hash_update(Ctx, Bin).
-
-md5_final(Ctx) ->
-    crypto:hash_final(Ctx).
--else.
-md5(Bin) ->
-    crypto:md5(Bin).
-
-md5_init() ->
-    crypto:md5_init().
-
-md5_update(Ctx, Bin) ->
-    crypto:md5_update(Ctx, Bin).
-
-md5_final(Ctx) ->
-    crypto:md5_final(Ctx).
--endif.
-
-
 compute_body_md5() ->
     case wrcall({req_body, 52428800}) of
         stream_conflict ->
             compute_body_md5_stream();
         Body ->
-            md5(Body)
+            ?crypto_hash_md5(Body)
     end.
 
 compute_body_md5_stream() ->
-    MD5Ctx = md5_init(),
+    MD5Ctx = ?crypto_hash_md5_init(),
     compute_body_md5_stream(MD5Ctx, wrcall({stream_req_body, 8192}), <<>>).
 
 compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     %% Save the body so it can be retrieved later
     put(reqstate, wrq:set_resp_body(Body, get(reqstate))),
-    md5_final(md5_update(MD5, Hunk));
+    ?crypto_hash_md5_final(?crypto_hash_md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
-    compute_body_md5_stream(md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
+    compute_body_md5_stream(?crypto_hash_md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
 
 maybe_flush_body_stream() ->
     maybe_flush_body_stream(wrcall({stream_req_body, 8192})).

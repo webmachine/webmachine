@@ -1,5 +1,5 @@
 %% @author Macneil Shonle <mshonle@basho.com>
-%% @copyright 2007-2014 Basho Technologies
+%% @copyright 2007-2015 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@
 
 -ifdef(TEST).
 
--include("wm_reqdata.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("otp_compat/include/crypto_hash.hrl").
+-include("wm_reqdata.hrl").
 
 -compile(export_all).
 
@@ -27,13 +28,8 @@
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
 
--ifndef(old_hash).
 md5(Bin) ->
-    crypto:hash(md5,Bin).
--else.
-md5(Bin) ->
-    crypto:md5(Bin).
--endif.
+    ?crypto_hash_md5(Bin).
 
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
