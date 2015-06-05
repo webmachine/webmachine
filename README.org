@@ -1,4 +1,6 @@
 * webmachine
+This project began [at Basho](http://basho.com), creators and maintainers of Riak. Due to the importance of webmachine to the broader Erlang community, a new organization was formed. Please contact @seancribbs for more details.
+
 ** Overview
 
 [[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://secure.travis-ci.org/basho/webmachine.png]]
