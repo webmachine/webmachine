@@ -1,5 +1,5 @@
 * webmachine
-This project began [[http://basho.com][at Basho]], the creators and maintainers of Riak. Due to the importance of webmachine to the broader Erlang community, a new organization was formed. Please contact @seancribbs to get involved.
+This project began [[http://basho.com][at Basho]], the creators and maintainers of Riak. Due to the importance of webmachine to the broader Erlang community, a new organization was formed. Please contact [[http://github.com/seancribbs][@seancribbs]] to get involved.
 
 ** Overview
 
