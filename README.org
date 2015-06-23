@@ -1,14 +1,16 @@
 * webmachine
+This project began [[http://basho.com][at Basho]], the creators and maintainers of Riak. Due to the importance of webmachine to the broader Erlang community, a new organization was formed. Please contact [[http://github.com/seancribbs][@seancribbs]] to get involved.
+
 ** Overview
 
-[[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://secure.travis-ci.org/basho/webmachine.png]]
+[[http://travis-ci.org/basho/webmachine][Travis-CI]] :: [[https://travis-ci.org/Webmachine/webmachine.svg?branch=develop]]
 
 Webmachine is an application layer that adds HTTP semantic awareness
 on top of the excellent bit-pushing and HTTP syntax-management
 provided by mochiweb, and provides a simple and clean way to connect
 that to your application's behavior.
 
-More information is available [[http://webmachine.basho.com/][here]].
+More information is available [[https://github.com/Webmachine/webmachine/wiki][here]]. You can also read past blog post about Webmachine [[http://basho.com/tag/webmachine/][here]].
 
 ** Quick Start
 A shell script is provided in the =webmachine= repository to help
@@ -37,7 +39,7 @@ make
 
 The application will be available at [[http://localhost:8080]].
 
-To learn more continue reading [[http://webmachine.basho.com/][here]].
+To learn more continue reading [[https://github.com/Webmachine/webmachine/wiki][here]].
 
 ** Contributing
    We encourage contributions to =webmachine= from the community.
