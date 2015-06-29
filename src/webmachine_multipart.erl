@@ -51,6 +51,8 @@ find_boundary(ReqData) ->
 
 % @doc Turn a multipart form into component parts.
 % @spec get_all_parts(incoming_req_body(), boundary()) -> [fpart()]
+get_all_parts(Body, Boundary) when is_list(Body), is_list(Boundary) ->
+    get_all_parts(list_to_binary(Body), Boundary);
 get_all_parts(Body, Boundary) when is_binary(Body), is_list(Boundary) ->
     StreamStruct = send_streamed_body(Body,1024),
     getparts1(stream_parts(StreamStruct, Boundary), []).
@@ -70,6 +72,8 @@ stream_form(_, _, [<<"--\n">>|_]) -> done_parts;
 stream_form({Hunk, Next}, Boundary, []) ->
     stream_form(get_more_data(Next), Boundary, re:split(Hunk, Boundary,[]));
 stream_form({Hunk, Next}, Boundary, [<<>>|DQ]) ->
+    stream_form({Hunk, Next}, Boundary, DQ);
+stream_form({Hunk, Next}, Boundary, [<<"\r\n">>|DQ]) ->
     stream_form({Hunk, Next}, Boundary, DQ);
 stream_form({Hunk, Next}, Boundary, [H|[T1|T2]]) ->
     {make_part(H), fun() ->
@@ -94,7 +98,7 @@ stream_parts([H|T]) -> {make_part(H), fun() -> stream_parts(T) end}.
 
 get_more_data(done) -> {<<"--\n">>, really_done};
 get_more_data(Fun) -> Fun().
-   
+
 make_part(PartData) ->
     %% Remove the trailing \r\n
     [HeadData, BodyWithCRLF] = re:split(PartData, "\\r\\n\\r\\n", [{parts,2}]),
