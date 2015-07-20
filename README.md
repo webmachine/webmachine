@@ -14,10 +14,24 @@ that to your application's behavior.
 
 More information is available [here](https://github.com/webmachine/webmachine/wiki). You can also read past blog post about Webmachine [here](http://basho.com/tag/webmachine/).
 
+### Development
+
+An eunit test suite is found in `test` and can be run with [rebar3](http://rebar3.org):
+
+```
+$ rebar3 eunit
+```
+
+Also check that your changes pass dialyzer:
+
+```
+$ rebar3 dialyzer
+```
+
 ### Quick Start
 
-A shell script is provided in the `webmachine` repository to help
-users quickly and easily create a new `webmachine` application.
+A [rebar3](http://rebar3.org) template is provided for users quickly
+and easily create a new `webmachine` application.
 
 ```
 $ mkdir -p ~/.config/rebar3/templates
