@@ -1,29 +1,11 @@
 ---
-env:
-  global:
-  - ARTIFACTS_AWS_REGION=us-east-1
-  - ARTIFACTS_S3_BUCKET=basho-build-artifacts
-  - secure: ! 'hac9Me1aMVkVB7DKBDrkMLlZTvdv837806N9X7whHmtP5/CtG8s/opghWENI
-      AuLHzOlyhsQ5L8r87MnEAXpS3tTU+1rd2zn2tLEJcFdWrWN+8/dtzub46xOR
-      Kh5hyLwY8iaY/bo4y28TmF6PzRAjtDWdCygNuawt5iHb2YraSpM='
-  - secure: ! 'uAvtAKoYdLB2H2nCweAdEP28tcrnnbJOUKHpP3WCfG0PBqIKJTcAkpQUp2U8
-      J4sZ1j+6dwKCERBcTosLpWkyrcKmzuFi9JQL5n/7lGbcKEAUmq155dfcBNoW
-      Oz6bs53zp0lWEaskn/HCx4EzgPaYZe+CiMnJbwXKn2qikloYzJ4='
-before_script:
-  - "gem install travis-artifacts"
-script: "set -o pipefail; make verbosetest 2>&1 | tee test.log"
-after_failure:
-  - "make travisupload"
+script: "make all"
 language: erlang
-notifications:
-  webhooks: http://basho-engbot.herokuapp.com/travis?key=66724b424957d598311ba00bb2d137fcae4eae21
-  email: eng@basho.com
+sudo: false
+install: "true" # don't let travis run get-deps
 otp_release:
-  - R16B02
-  - R16B01
-  - R15B03
-  - R15B02
-  - R15B01
-  - R15B
-  - R14B04
-  - R14B03
+  - 17.5
+  - R16B03-1
+## These won't work until we have checks for application:ensure_all_started
+#  - R15B03
+#  - R14B04
