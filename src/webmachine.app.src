@@ -10,5 +10,11 @@
                   crypto,
                   mochiweb]},
   {mod, {webmachine_app, []}},
-  {env, []}
+  {env, []},
+
+  {contributors,["Sean Cribbs", "Joe DeVivo" "Bryan Fink",
+                 "Kelly McLaughlin", "Jared Morrow", "Andy Gross",
+                 "Steve Vinoski"]},
+  {licenses,["Apache"]},
+  {links,[{"Github","https://github.com/webmachine/webmachine"}]}
  ]}.
