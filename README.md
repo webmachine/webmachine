@@ -1,7 +1,7 @@
 webmachine
 ==========
 
-This project began [at Basho](http://basho.com), the creators and
+This project began at [Basho](http://basho.com), the creators and
 maintainers of Riak. Due to the importance of webmachine to the
 broader Erlang community, a new organization was formed. Please
 contact [@seancribbs](http://github.com/seancribbs) to get involved.
@@ -17,7 +17,7 @@ that to your application's behavior.
 
 More information is available
 [here](https://github.com/webmachine/webmachine/wiki). You can also
-read past blog post about Webmachine
+read past blog posts about Webmachine
 [here](http://basho.com/tag/webmachine/).
 
 ### Development
@@ -67,6 +67,7 @@ To learn more continue reading [here](https://github.com/webmachine/webmachine/w
    We encourage contributions to `webmachine` from the community.
 
    1) Fork the `webmachine` repository on [Github](https://github.com/webmachine/webmachine).
+   
    2) Clone your fork or add the remote if you already have a clone of
    the repository.
 
@@ -89,6 +90,7 @@ git checkout -b some-topic-branch
    4) Make your change and commit. Use a clear and descriptive commit
       message, spanning multiple lines if detailed explanation is
       needed.
+      
    5) Push to your fork of the repository and then send a pull-request
       through Github.
 
