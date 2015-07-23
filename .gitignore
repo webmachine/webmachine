@@ -1,7 +1,9 @@
 deps/*
 *.beam
 .eunit/*
-ebin/*.app
+ebin
 doc/*
 .local_dialyzer_plt
 /.rebar
+_build
+.DS_Store
