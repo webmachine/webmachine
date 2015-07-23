@@ -1,43 +1,28 @@
-ERL          ?= erl
-APP          := webmachine
+REBAR3_URL=https://s3.amazonaws.com/rebar3/rebar3
 
-REPO = ${shell echo `basename "$${PWD}"`}
-ARTIFACTSFILE = ${shell echo ${REPO}-`date +%F_%H-%M-%S`.tgz}
+# If there is a rebar in the current directory, use it
+ifeq ($(wildcard rebar3),rebar3)
+REBAR3 = $(CURDIR)/rebar3
+endif
 
-.PHONY: deps
+# Fallback to rebar on PATH
+REBAR3 ?= $(shell which rebar3)
 
-all: deps compile
+# And finally, prep to download rebar if all else fails
+ifeq ($(REBAR3),)
+REBAR3 = $(CURDIR)/rebar3
+endif
 
-compile: deps
-	./rebar compile
 
-deps: DEV_MODE
-	@(./rebar get-deps)
+all: $(REBAR3)
+	@$(REBAR3) do update, clean, compile, eunit, dialyzer
 
-clean:
-	@(./rebar clean)
+$(REBAR3):
+	curl -Lo rebar3 $(REBAR3_URL) || wget $(REBAR3_URL)
+	chmod a+x rebar3
 
-# nuke deps first to avoid wasting time having rebar recurse into deps
-# for clean
 distclean:
-	@rm -rf ./deps ./.rebar
-	@(./rebar clean)
+	@rm -rf ./_build
 
 edoc:
-	@$(ERL) -noshell -run edoc_run application '$(APP)' '"."' '[{preprocess, true},{includes, ["."]}]'
-DIALYZER_APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
-	xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
-COMBO_PLT = $(HOME)/.webmachine_dialyzer_plt
-
-include tools.mk
-
-verbosetest: all
-	@(./rebar -v skip_deps=true eunit)
-
-travisupload:
-	tar cvfz ${ARTIFACTSFILE} --exclude '*.beam' --exclude '*.erl' test.log .eunit
-	travis-artifacts upload --path ${ARTIFACTSFILE}
-
-DEV_MODE:
-	@[ -d ./.rebar ] || mkdir ./.rebar
-	@touch ./.rebar/DEV_MODE
+	@$(REBAR3) edoc
