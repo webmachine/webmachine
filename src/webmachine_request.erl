@@ -147,6 +147,14 @@ get_sock({?MODULE, ReqState} = Req) ->
 get_sock(ReqState) ->
     get_sock({?MODULE, ReqState}).
 
+%% While this error clause will at least stop erlang from reporting
+%% "no matching clause", webmachine would need a more robust error
+%% handling case for request creation before anything more could be
+%% done with this return tuple aside from assigning it to
+%% #wm_reqstate.peer or .sock for now, which will most likely break
+%% somewhere else down the line.
+peer_from_peername({error, Error}, _Req) ->
+    {error, Error};
 peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}, Req) ->
     x_peername(inet_parse:ntoa(Addr), Req);
 peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}, Req)
