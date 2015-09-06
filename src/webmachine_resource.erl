@@ -231,7 +231,20 @@ escape_trace_data(R=#wm_reqstate{}) ->
 escape_trace_data(Tuple) when is_tuple(Tuple) ->
     list_to_tuple(escape_trace_data(tuple_to_list(Tuple)));
 escape_trace_data(Other) ->
-    Other.
+    case code:ensure_loaded(maps) of
+        {module, _Maps} ->
+            case is_map(Other) of
+                true ->
+                    %% TODO: replace with maps comprehension when implemented
+                    %% #{escape_trace_data(K), escape_trace_data(V) || K := V <- Other} 
+                    Fun = fun(K, V, Acc) -> maps:put(escape_trace_data(K), escape_trace_data(V), Acc) end,
+                    maps:fold(Fun, maps:new(), Other);
+                _ ->
+                    Other
+            end;                       
+        {error, _What} ->
+            Other
+    end. 
 
 escape_trace_list([Head|Tail], Acc) ->
     escape_trace_list(Tail, [escape_trace_data(Head)|Acc]);
