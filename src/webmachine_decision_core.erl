@@ -212,6 +212,7 @@ decision(v3b9b) ->
 decision(v3b8) ->
     case resource_call(is_authorized) of
         true -> d(v3b7);
+        false -> respond(401);
         {error, Reason} ->
             error_response(Reason);
         {halt, Code}  ->
