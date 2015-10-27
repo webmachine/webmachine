@@ -33,8 +33,6 @@ default(service_available) ->
     true;
 default(resource_exists) ->
     true;
-default(auth_required) ->
-    true;
 default(is_authorized) ->
     true;
 default(forbidden) ->
