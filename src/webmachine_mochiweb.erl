@@ -46,37 +46,41 @@ stop(Name) ->
     mochiweb_http:stop(Name).
 
 loop(Name, MochiReq) ->
-    Req = webmachine:new_request(mochiweb, MochiReq),
-    DispatchList = webmachine_router:get_routes(Name),
-    Host = case host_headers(Req) of
-               [H|_] -> H;
-               [] -> []
-           end,
-    {Path, _} = Req:path(),
-    {RD, _} = Req:get_reqdata(),
+    case webmachine:new_request(mochiweb, MochiReq) of
+      {{error, NewRequestError}, ErrorReq} ->
+        handle_error(500, {error, NewRequestError}, ErrorReq);
+      Req ->
+        DispatchList = webmachine_router:get_routes(Name),
+        Host = case host_headers(Req) of
+                   [H|_] -> H;
+                   [] -> []
+               end,
+        {Path, _} = Req:path(),
+        {RD, _} = Req:get_reqdata(),
 
-    %% Run the dispatch code, catch any errors...
-    try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
-        {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
-            handle_error(404, {none, none, []}, Req);
-        {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
-         AppRoot, StringPath} ->
-            BootstrapResource = webmachine_resource:new(x,x,x,x),
-            {ok,RS1} = Req:load_dispatch_data(Bindings,HostTokens,Port,
-                                              PathTokens,AppRoot,StringPath),
-            XReq1 = {webmachine_request,RS1},
-            try
-                {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
-                {ok,RS2} = XReq1:set_metadata('resource_module',
-                                              resource_module(Mod, ModOpts)),
-                webmachine_decision_core:handle_request(Resource, RS2)
-            catch
-                error:Error ->
-                    handle_error(500, {error, Error}, Req)
-            end
-    catch
-        Type : Error ->
-            handle_error(500, {Type, Error}, Req)
+        %% Run the dispatch code, catch any errors...
+        try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
+            {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
+                handle_error(404, {none, none, []}, Req);
+            {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
+             AppRoot, StringPath} ->
+                BootstrapResource = webmachine_resource:new(x,x,x,x),
+                {ok,RS1} = Req:load_dispatch_data(Bindings,HostTokens,Port,
+                                                  PathTokens,AppRoot,StringPath),
+                XReq1 = {webmachine_request,RS1},
+                try
+                    {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
+                    {ok,RS2} = XReq1:set_metadata('resource_module',
+                                                  resource_module(Mod, ModOpts)),
+                    webmachine_decision_core:handle_request(Resource, RS2)
+                catch
+                    error:Error ->
+                        handle_error(500, {error, Error}, Req)
+                end
+        catch
+            Type : Error ->
+                handle_error(500, {Type, Error}, Req)
+        end
     end.
 
 handle_error(Code, Error, Req) ->
