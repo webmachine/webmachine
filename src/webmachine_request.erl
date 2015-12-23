@@ -147,6 +147,8 @@ get_sock({?MODULE, ReqState} = Req) ->
 get_sock(ReqState) ->
     get_sock({?MODULE, ReqState}).
 
+peer_from_peername({error, Error}, _Req) ->
+    {error, Error};
 peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}, Req) ->
     x_peername(inet_parse:ntoa(Addr), Req);
 peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}, Req)

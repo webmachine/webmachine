@@ -62,26 +62,41 @@ new_request(mochiweb, Request) ->
             {Request:get(headers), Request:get(raw_path)}
     end,
     Socket = Request:get(socket),
-    InitState = #wm_reqstate{socket=Socket,
-                          reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
 
+    InitialReqData = wrq:create(Method,Scheme,Version,RawPath,Headers),
+    InitialLogData = #wm_log_data{start_time=os:timestamp(),
+                                  method=Method,
+                                  headers=Headers,
+                                  path=RawPath,
+                                  version=Version,
+                                  response_code=404,
+                                  response_length=0},
+
+    InitState = #wm_reqstate{socket=Socket,
+                             log_data=InitialLogData,
+                             reqdata=InitialReqData},
     InitReq = {webmachine_request,InitState},
-    {Peer, _ReqState} = InitReq:get_peer(),
-    {Sock, ReqState} = InitReq:get_sock(),
-    ReqData = wrq:set_sock(Sock,
-                           wrq:set_peer(Peer,
-                                        ReqState#wm_reqstate.reqdata)),
-    LogData = #wm_log_data{start_time=os:timestamp(),
-                           method=Method,
-                           headers=Headers,
-                           peer=Peer,
-                           sock=Sock,
-                           path=RawPath,
-                           version=Version,
-                           response_code=404,
-                           response_length=0},
-    webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
-                                                reqdata=ReqData}).
+
+    case InitReq:get_peer() of
+      {ErrorGetPeer = {error,_}, ErrorGetPeerReqState} ->
+        % failed to get peer
+        { ErrorGetPeer, webmachine_request:new (ErrorGetPeerReqState) };
+      {Peer, _ReqState} ->
+        case InitReq:get_sock() of
+          {ErrorGetSock = {error,_}, ErrorGetSockReqState} ->
+            LogDataWithPeer = InitialLogData#wm_log_data {peer=Peer},
+            ReqStateWithSockErr =
+              ErrorGetSockReqState#wm_reqstate{log_data=LogDataWithPeer},
+            { ErrorGetSock, webmachine_request:new (ReqStateWithSockErr) };
+          {Sock, ReqState} ->
+            ReqData = wrq:set_sock(Sock, wrq:set_peer(Peer, InitialReqData)),
+            LogData =
+              InitialLogData#wm_log_data {peer=Peer, sock=Sock},
+            webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
+                                                        reqdata=ReqData})
+        end
+    end.
+
 
 do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
     case RewriteMod:rewrite(Method, Scheme, Version, Headers, RawPath) of
