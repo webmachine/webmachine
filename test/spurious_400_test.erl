@@ -13,7 +13,7 @@ http_request(Timeout, Value, Count) ->
                              "binary/octet-stream", % Content-type
                              Value}, % body
                        [{timeout, Timeout}], % HTTPoptions
-                       [{sync, false}, {receiver, {?MODULE, handle_response, []}}]) of
+                       [{full_result, false}, {socket_opts, [{keepalive, true}]}]) of
         {ok, Result} ->
             {ok, Result};
         {error, socket_closed_remotely} ->
@@ -26,10 +26,7 @@ provoke_400_test_() ->
      [{setup,
        fun setup/0,
        fun cleanup/1,
-       [
-        {timeout, 60,
-         ?_assert(provoke_400())}
-       ]}]}.
+       fun({_Pid0, MochiPid}) -> [{timeout, 60, ?_assert(provoke_400(MochiPid))}] end}]}.
 
 
 handle_response(Data) ->
@@ -46,7 +43,6 @@ setup() ->
     {ok, Pid0} = webmachine_sup:start_link(),
     {ok, Pid1} = webmachine_mochiweb:start(WebConfig),
     link(Pid1),
-    put(mw_pid, Pid1),
     {Pid0, Pid1}.
 
 cleanup({Pid0, Pid1}) ->
@@ -69,14 +65,20 @@ content_types_accepted(ReqData, Context) ->
 on_put(ReqData, Context) ->
     {ok, ReqData, Context}.
 
-provoke_400() ->
+provoke_400(MochiPid) ->
     Timeout = 30*1000,
-    %% Send an HTTP request, get the pid for the request, and then send a crazy message into it
-    _ = http_request(Timeout, "foobar", 3),
-    MochiPid = get(mw_pid),
-    MochiPid ! 'foo',
+    %% Get acceptor pool from mochiweb state
+    State = sys:get_state(MochiPid),
+    %% This is brittle - if record changes, element number might change too
+    %% importing the record which also is bad, this will work.
+    %% NB Acceptors is a sets data type - not a list
+    Acceptors = element(14, State),
+    {ok, {Status1, _}} = http_request(Timeout, "foobar", 3),
+    ?assertEqual(204, Status1),
+    send_everyone_crazy_msg(sets:to_list(Acceptors)),
+    {ok, {Status2, _}} = http_request(Timeout, "barbaz", 3),
+    ?assertEqual(204, Status2),
     true.
 
-
-
-
+send_everyone_crazy_msg(Pids) ->
+    lists:foreach(fun(P) -> P ! 'foo' end, Pids).
