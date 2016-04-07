@@ -132,15 +132,15 @@ fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS) ->
 
 non_standard_method_test() ->
     LogData = #wm_log_data{resource_module=foo,
-                           start_time=now(),
+                           start_time=os:timestamp(),
                            method="FOO",
                            peer={127,0,0,1},
                            path="/",
                            version={1,1},
                            response_code=501,
                            response_length=1234,
-                           end_time=now(),
-                           finish_time=now()},
+                           end_time=os:timestamp(),
+                           finish_time=os:timestamp()},
     LogEntry = format_req(LogData),
     ?assert(is_list(LogEntry)),
     ok.
