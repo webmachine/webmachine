@@ -642,7 +642,7 @@ parts_to_body(BodyList, Size, Req) when is_list(BodyList) ->
             {CT, _} ->
                 CT
         end,
-    Boundary = mochihex:to_hex(crypto:rand_bytes(8)),
+    Boundary = mochihex:to_hex(crypto:strong_rand_bytes(8)),
     HeaderList = [{"Content-Type",
                    ["multipart/byteranges; ",
                     "boundary=", Boundary]}],
