@@ -240,8 +240,6 @@ md5(Bin) ->
 %%
 core_tests() ->
     [fun service_unavailable/0,
-     fun ping_invalid/0,
-     fun ping_error/0,
      fun internal_server_error_o18/0,
      fun not_implemented_b12/0,
      fun not_implemented_b6/0,
@@ -374,24 +372,6 @@ service_unavailable() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 503 result via B13 (at ping)
-ping_invalid() ->
-                                                % "breakout" for "anything other than pong"
-    put_setting(ping, breakout),
-    {ok, Result} = httpc:request(head, {url(), []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B13,
-    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.
-
-%% 500 error response result via B13 (ping raises error)
-ping_error() ->
-    put_setting(ping, ping_raise_error),
-    {ok, Result} = httpc:request(head, {url(), []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B13,
-    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.
 
 %% 500 error response via O18 from a callback raising an error
 internal_server_error_o18() ->
@@ -1376,13 +1356,6 @@ url(Path) ->
 
 init([]) ->
     {ok, undefined}.
-
-ping(ReqData, State) ->
-    Setting = lookup_setting(ping),
-    case Setting of
-        ping_raise_error -> error(foobar);
-        _ -> {Setting, ReqData, State}
-    end.
 
 service_available(ReqData, Context) ->
     Setting = lookup_setting(service_available),

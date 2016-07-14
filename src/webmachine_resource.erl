@@ -27,8 +27,6 @@
 new(R_Mod, R_ModState, R_ModExports, R_Trace) ->
     {?MODULE, R_Mod, R_ModState, R_ModExports, R_Trace}.
 
-default(ping) ->
-    no_default;
 default(service_available) ->
     true;
 default(resource_exists) ->
