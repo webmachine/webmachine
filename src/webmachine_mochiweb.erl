@@ -20,6 +20,10 @@
 -author('Andy Gross <andy@basho.com>').
 -export([start/1, stop/0, stop/1, loop/2]).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% The `log_dir' option is deprecated, but remove it from the
 %% options list if it is present
 -define(WM_OPTIONS, [error_handler,
@@ -51,10 +55,8 @@ loop(Name, MochiReq) ->
         handle_error(500, {error, NewRequestError}, ErrorReq);
       Req ->
         DispatchList = webmachine_router:get_routes(Name),
-        Host = case host_headers(Req) of
-                   [H|_] -> H;
-                   [] -> []
-               end,
+        HostHeaders = host_headers(Req),
+        Host = host_from_host_values(HostHeaders),
         {Path, _} = Req:path(),
         {RD, _} = Req:get_reqdata(),
 
@@ -143,6 +145,23 @@ application_set_unless_env(App, Var, Value) ->
             application:set_env(App, Var, Value)
     end.
 
+%% X-Forwarded-Host/Server can contain comma-separated values.
+%% Reference: https://httpd.apache.org/docs/current/mod/mod_proxy.html#x-headers
+%% In that case, we'll take the first as our host, since proxies will append
+%% additional values to the original.
+host_from_host_values(HostValues) ->
+    case HostValues of
+        [] ->
+            [];
+        [H|_] ->
+            case string:tokens(H, ",") of
+                [FirstHost|_] ->
+                    FirstHost;
+                [] ->
+                    H
+            end
+    end.
+
 host_headers(Req) ->
     [ V || {V,_ReqState} <- [Req:get_header_value(H)
                              || H <- ["x-forwarded-host",
@@ -173,3 +192,35 @@ to_list(L) when is_list(L) ->
     L;
 to_list(A) when is_atom(A) ->
     atom_to_list(A).
+
+-ifdef(TEST).
+
+host_from_host_values_test_() ->
+    [
+     {"when a host value is multi-part it resolves the first host correctly",
+          ?_assertEqual("host1",
+                       host_from_host_values(["host1,host2,host3:443","other", "other1"]))
+     },
+     {"when a host value is multi-part it retains the port",
+          ?_assertEqual("host1:443",
+                       host_from_host_values(["host1:443,host2","other", "other1"]))
+     },
+     {"a single host per header is resolved correctly",
+          ?_assertEqual("host1:80",
+                       host_from_host_values(["host1:80","other", "other1"]))
+     },
+     {"a missing host is resolved correctly",
+          ?_assertEqual([],
+                       host_from_host_values([]))
+     }
+    ].
+
+    %[
+     %{"when a host value is multi-part it resolves the first host correctly",
+      %?_assertEqual("host1:443",
+                    %host_from_host_values(["host1,host2,host3:443","other", "other1"])) }
+    %].
+
+-endif.
+
+

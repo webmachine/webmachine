@@ -305,7 +305,7 @@ core_tests() ->
      fun head_length_access_for_cs/0,
      fun get_known_length_for_cs/0,
      fun get_for_range_capable_stream/0
-     %% known_failure -- fun stream_content_md5/0
+     % known_failure -- fun stream_content_md5/0
     ].
 
 decision_core_test_() ->
@@ -491,7 +491,9 @@ non_standard_method_501() ->
     Port = wm_integration_test_util:get_port(Ctx),
     Url = wm_integration_test_util:url(Ctx, "foo"),
     {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
-    ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\nConnection: close\r\n\r\n"]),
+    ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\n",
+                             "Host: http://localhost:", integer_to_list(Port),
+                             "\r\n\r\n"]),
     ?assertMatch({ok, <<"HTTP/1.1 501 Not Implemented", _/binary>>},
                  gen_tcp:recv(Sock, 0, 2000)),
     ok = gen_tcp:close(Sock),
@@ -506,7 +508,9 @@ non_standard_method_200() ->
     Port = wm_integration_test_util:get_port(Ctx),
     Url = wm_integration_test_util:url(Ctx, "foo"),
     {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
-    ok = gen_tcp:send(Sock, [Method, " ", Url, " HTTP/1.1\r\nConnection: close\r\n\r\n"]),
+    ok = gen_tcp:send(Sock, [Method, " ", Url, " HTTP/1.1\r\n",
+                             "Host: http://localhost:", integer_to_list(Port),
+                             "\r\n\r\n"]),
     ?assertMatch({ok, <<"HTTP/1.1 200 OK\r\n", _/binary>>},
                  gen_tcp:recv(Sock, 0, 2000)),
     ok = gen_tcp:close(Sock),
