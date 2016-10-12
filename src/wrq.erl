@@ -115,13 +115,13 @@ req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH. % mochiheaders
 
 req_body(_RD = #wm_reqdata{wm_state=ReqState0,max_recv_body=MRB}) ->
     Req = webmachine_request:new(ReqState0),
-    {ReqResp, ReqState} = Req:req_body(MRB),
+    {ReqResp, ReqState} = webmachine_request:req_body(MRB, Req),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
 stream_req_body(_RD = #wm_reqdata{wm_state=ReqState0}, MaxHunk) ->
     Req = webmachine_request:new(ReqState0),
-    {ReqResp, ReqState} = Req:stream_req_body(MaxHunk),
+    {ReqResp, ReqState} = webmachine_request:stream_req_body(MaxHunk, Req),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
@@ -283,19 +283,19 @@ accessor_test() ->
     ?assertEqual('GET', method(R)),
     ?assertEqual({1,1}, version(R)),
     ?assertEqual("/foo", path(R)),
-    ?assertEqual("/foo?a=1&b=2", raw_path(R)),     
+    ?assertEqual("/foo?a=1&b=2", raw_path(R)),
     ?assertEqual([{"a", "1"}, {"b", "2"}], req_qs(R)),
     ?assertEqual({"1", "2"}, {get_qs_value("a", R), get_qs_value("b", R)}),
     ?assertEqual("3", get_qs_value("c", "3", R)),
     ?assertEqual([{"foo", "bar"}], req_cookie(R)),
     ?assertEqual("bar", get_cookie_value("foo", R)),
     ?assertEqual("127.0.0.1", peer(R)).
-    
+
 simple_dispatch_test() ->
     R0 = make_wrq('GET', "/foo?a=1&b=2", [{"Cookie", "foo=bar"}]),
-    R1 = set_peer("127.0.0.1", R0),    
-    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} = 
-        webmachine_dispatcher:dispatch("127.0.0.1", "/foo", 
+    R1 = set_peer("127.0.0.1", R0),
+    {_, _, HostTokens, Port, PathTokens, Bindings, AppRoot, StringPath} =
+        webmachine_dispatcher:dispatch("127.0.0.1", "/foo",
                                        [{["foo"], foo_resource, []}], R1),
     R = load_dispatch_data(Bindings,
                            HostTokens,
