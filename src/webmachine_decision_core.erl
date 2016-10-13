@@ -157,8 +157,6 @@ log_decision(DecisionID) ->
 
 %% "Service Available"
 decision(v3b13) ->
-    decision_test(resource_call(ping), pong, v3b13b, 503);
-decision(v3b13b) ->
     decision_test(resource_call(service_available), true, v3b12, 503);
 %% "Known method?"
 decision(v3b12) ->
