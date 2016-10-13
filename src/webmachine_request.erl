@@ -104,6 +104,9 @@
 -define(QUIP, "cafe not found").
 -define(IDLE_TIMEOUT, infinity).
 
+-type t() :: {?MODULE, #wm_reqstate{}}.
+-export_type([t/0]).
+
 new(#wm_reqstate{}=ReqState) ->
     {?MODULE, ReqState}.
 

@@ -140,7 +140,7 @@ log_error(LogMsg) ->
     gen_event:sync_notify(?EVENT_LOGGER, {log_error, LogMsg}).
 
 %% @doc Notify registered log event handler of an error event.
--spec log_error(pos_integer(), #wm_reqdata{}, term()) -> ok.
+-spec log_error(pos_integer(), webmachine_request:t(), term()) -> ok.
 log_error(Code, Req, Reason) ->
     gen_event:sync_notify(?EVENT_LOGGER, {log_error, Code, Req, Reason}).
 

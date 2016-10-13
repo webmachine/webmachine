@@ -9,8 +9,8 @@
          version,
          response_code,
          response_length,
-         end_time :: tuple(),
-         finish_time :: tuple(),
+         end_time :: undefined | tuple(),
+         finish_time :: undefined | tuple(),
          notes}).
 -type wm_log_data() :: #wm_log_data{}.
 

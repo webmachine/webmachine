@@ -4,6 +4,8 @@ language: erlang
 sudo: false
 install: "true" # don't let travis run get-deps
 otp_release:
+  - 19.1
+  - 18.3
   - 17.5
   - R16B03-1
 ## These won't work until we have checks for application:ensure_all_started

@@ -18,7 +18,32 @@
 -module(webmachine_mochiweb).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([start/1, stop/0, stop/1, loop/2]).
+-export([start/1, stop/0, stop/1, loop/2, new_webmachine_req/1]).
+
+-include("webmachine_logger.hrl").
+-include("wm_reqstate.hrl").
+-include("wm_reqdata.hrl").
+
+-type mochiweb_request() ::
+        {
+          mochiweb_request,
+          [any()]
+        }.
+%% [any()] always looks like this. Basically it should be a record,
+%% but is a list inside a tuple. There are more specific types out
+%% there I'm sure, but I have better things to do with my time than
+%% typespec a module from 2007. I might come back and make these more
+%% specific if I encounter anything worth while, but since they can't
+%% be included in the spec anyway, it's worthless().
+
+%% [
+%%  Socket :: any(),
+%%  Opts :: any(),
+%%  Method :: any(),
+%%  RawPath :: any(),
+%%  Version :: any(),
+%%  Headers :: any()
+%% ]
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -49,17 +74,19 @@ stop() ->
 stop(Name) ->
     mochiweb_http:stop(Name).
 
+-spec loop(any(),
+           mochiweb_request()) ->
+                  ok.
 loop(Name, MochiReq) ->
-    case webmachine:new_request(mochiweb, MochiReq) of
+    case new_webmachine_req(MochiReq) of
       {{error, NewRequestError}, ErrorReq} ->
         handle_error(500, {error, NewRequestError}, ErrorReq);
       Req ->
         DispatchList = webmachine_router:get_routes(Name),
         HostHeaders = host_headers(Req),
         Host = host_from_host_values(HostHeaders),
-        {Path, _} = Req:path(),
-        {RD, _} = Req:get_reqdata(),
-
+        {Path, _} = webmachine_request:path(Req),
+        {RD, _} = webmachine_request:get_reqdata(Req),
         %% Run the dispatch code, catch any errors...
         try webmachine_dispatcher:dispatch(Host, Path, DispatchList, RD) of
             {no_dispatch_match, _UnmatchedHost, _UnmatchedPathTokens} ->
@@ -67,13 +94,16 @@ loop(Name, MochiReq) ->
             {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
              AppRoot, StringPath} ->
                 BootstrapResource = webmachine_resource:new(x,x,x,x),
-                {ok,RS1} = Req:load_dispatch_data(Bindings,HostTokens,Port,
-                                                  PathTokens,AppRoot,StringPath),
-                XReq1 = {webmachine_request,RS1},
+                {ok, XReq1} = webmachine_request:load_dispatch_data(
+                             Bindings,HostTokens,Port,
+                             PathTokens,AppRoot,StringPath,Req),
                 try
-                    {ok, Resource} = BootstrapResource:wrap(Mod, ModOpts),
-                    {ok,RS2} = XReq1:set_metadata('resource_module',
-                                                  resource_module(Mod, ModOpts)),
+                    {ok, Resource} = webmachine_resource:wrap(
+                                       Mod, ModOpts, BootstrapResource),
+                    {ok, RS2} = webmachine_request:set_metadata(
+                                  'resource_module',
+                                  resource_module(Mod, ModOpts),
+                                  XReq1),
                     webmachine_decision_core:handle_request(Resource, RS2)
                 catch
                     error:Error ->
@@ -85,17 +115,81 @@ loop(Name, MochiReq) ->
         end
     end.
 
+-spec new_webmachine_req(mochiweb_request()) ->
+                                {module(),#wm_reqstate{}}
+                                    |{{error, term()}, #wm_reqstate{}}.
+new_webmachine_req(Request) ->
+    Method = mochiweb_request:get(method, Request),
+    Scheme = mochiweb_request:get(scheme, Request),
+    Version = mochiweb_request:get(version, Request),
+    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
+        {ok, RewriteMod} ->
+            do_rewrite(RewriteMod,
+                       Method,
+                       Scheme,
+                       Version,
+                       mochiweb_request:get(headers, Request),
+                       mochiweb_request:get(raw_path, Request));
+        undefined ->
+            {
+              mochiweb_request:get(headers, Request),
+              mochiweb_request:get(raw_path, Request)
+         }
+    end,
+    Socket = mochiweb_request:get(socket, Request),
+
+    InitialReqData = wrq:create(Method,Scheme,Version,RawPath,Headers),
+    InitialLogData = #wm_log_data{start_time=os:timestamp(),
+                                  method=Method,
+                                  headers=Headers,
+                                  path=RawPath,
+                                  version=Version,
+                                  response_code=404,
+                                  response_length=0},
+
+    InitState = #wm_reqstate{socket=Socket,
+                             log_data=InitialLogData,
+                             reqdata=InitialReqData},
+    InitReq = {webmachine_request,InitState},
+
+    case webmachine_request:get_peer(InitReq) of
+      {ErrorGetPeer = {error,_}, ErrorGetPeerReqState} ->
+        % failed to get peer
+        { ErrorGetPeer, webmachine_request:new (ErrorGetPeerReqState) };
+      {Peer, _ReqState} ->
+        case webmachine_request:get_sock(InitReq) of
+          {ErrorGetSock = {error,_}, ErrorGetSockReqState} ->
+            LogDataWithPeer = InitialLogData#wm_log_data {peer=Peer},
+            ReqStateWithSockErr =
+              ErrorGetSockReqState#wm_reqstate{log_data=LogDataWithPeer},
+            { ErrorGetSock, webmachine_request:new (ReqStateWithSockErr) };
+          {Sock, ReqState} ->
+            ReqData = wrq:set_sock(Sock, wrq:set_peer(Peer, InitialReqData)),
+            LogData =
+              InitialLogData#wm_log_data {peer=Peer, sock=Sock},
+            webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
+                                                        reqdata=ReqData})
+        end
+    end.
+
+do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
+    case RewriteMod:rewrite(Method, Scheme, Version, Headers, RawPath) of
+        %% only raw path has been rewritten (older style rewriting)
+        NewPath when is_list(NewPath) -> {Headers, NewPath};
+
+        %% headers and raw path rewritten (new style rewriting)
+        {NewHeaders, NewPath} -> {NewHeaders,NewPath}
+    end.
+
 handle_error(Code, Error, Req) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
-    {ErrorHTML,ReqState1} =
+    {ErrorHTML,Req1} =
         ErrorHandler:render_error(Code, Req, Error),
-    Req1 = {webmachine_request,ReqState1},
-    {ok,ReqState2} = Req1:append_to_response_body(ErrorHTML),
-    Req2 = {webmachine_request,ReqState2},
-    {ok,ReqState3} = Req2:send_response(Code),
-    Req3 = {webmachine_request,ReqState3},
-    {LogData,_ReqState4} = Req3:log_data(),
-    spawn(webmachine_log, log_access, [LogData]).
+    {ok,Req2} = webmachine_request:append_to_response_body(ErrorHTML, Req1),
+    {ok,Req3} = webmachine_request:send_response(Code, Req2),
+    {LogData,_ReqState4} = webmachine_request:log_data(Req3),
+    spawn(webmachine_log, log_access, [LogData]),
+    ok.
 
 get_wm_option(OptName, {WMOptions, OtherOptions}) ->
     {Value, UpdOtherOptions} =
@@ -163,7 +257,7 @@ host_from_host_values(HostValues) ->
     end.
 
 host_headers(Req) ->
-    [ V || {V,_ReqState} <- [Req:get_header_value(H)
+    [ V || {V,_ReqState} <- [webmachine_request:get_header_value(H, Req)
                              || H <- ["x-forwarded-host",
                                       "x-forwarded-server",
                                       "host"]],
@@ -222,5 +316,3 @@ host_from_host_values_test_() ->
     %].
 
 -endif.
-
-
