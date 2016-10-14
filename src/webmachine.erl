@@ -19,6 +19,17 @@
 -author('Andy Gross <andy@basho.com>').
 -export([start/0, stop/0, new_request/2]).
 
+-type headers() :: webmachine_headers:t().
+-type response_body() :: iodata()
+                       | {stream, StreamBody::any()}
+                       | {known_length_stream, non_neg_integer(), StreamBody::any()}
+                       | {stream, non_neg_integer(), fun()} %% TODO: type for fun()
+                       | {writer, WrtieBody::any()}
+                       | {file, IoDevice::any()}.
+
+
+-export_type([headers/0, response_body/0]).
+
 %% @spec start() -> ok
 %% @doc Start the webmachine server.
 start() ->

@@ -267,7 +267,8 @@ call(do_redirect, {?MODULE, ReqState}) ->
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
 call({send_response, Code}, Req) when is_integer(Code) ->
     call({send_response, {Code, undefined}}, Req);
-call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req) when is_integer(Code) ->
+call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req)
+  when is_integer(Code) ->
     {Reply, NewState} =
         case Code of
             200 ->
@@ -284,11 +285,11 @@ call({set_resp_body, Body}, {?MODULE, ReqState}) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_resp_body(Body,
                                        ReqState#wm_reqstate.reqdata)}};
 call(has_resp_body, {?MODULE, ReqState}) ->
-    Reply = case wrq:resp_body(ReqState#wm_reqstate.reqdata) of
-                undefined -> false;
-                <<>> -> false;
-                _ -> true
-            end,
+    Reply =
+        case wrq:resp_body(ReqState#wm_reqstate.reqdata) of
+            <<>> -> false;
+            _ -> true
+        end,
     {Reply, ReqState};
 call({get_metadata, Key}, {?MODULE, ReqState}) ->
     Reply = case orddict:find(Key, ReqState#wm_reqstate.metadata) of
