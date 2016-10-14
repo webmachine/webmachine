@@ -22,7 +22,6 @@
 -author('Andy Gross <andy@basho.com>').
 -author('Bryan Fink <bryan@basho.com>').
 -export([handle_request/2]).
--export([do_log/1]).
 -include("webmachine_logger.hrl").
 
 handle_request(Resource, ReqState) ->
@@ -45,7 +44,7 @@ wrcall(X) ->
 
 resource_call(Fun) ->
     Resource = get(resource),
-    {Reply, NewResource, NewRS} = Resource:do(Fun,get()),
+    {Reply, NewResource, NewRS} = webmachine_resource:do(Fun,get(),Resource),
     put(resource, NewResource),
     put(reqstate, NewRS),
     Reply.

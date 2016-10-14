@@ -93,13 +93,12 @@ loop(Name, MochiReq) ->
                 handle_error(404, {none, none, []}, Req);
             {Mod, ModOpts, HostTokens, Port, PathTokens, Bindings,
              AppRoot, StringPath} ->
-                BootstrapResource = webmachine_resource:new(x,x,x,x),
                 {ok, XReq1} = webmachine_request:load_dispatch_data(
                              Bindings,HostTokens,Port,
                              PathTokens,AppRoot,StringPath,Req),
                 try
                     {ok, Resource} = webmachine_resource:wrap(
-                                       Mod, ModOpts, BootstrapResource),
+                                       Mod, ModOpts),
                     {ok, RS2} = webmachine_request:set_metadata(
                                   'resource_module',
                                   resource_module(Mod, ModOpts),
