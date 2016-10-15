@@ -121,20 +121,21 @@ new_webmachine_req(Request) ->
     Method = mochiweb_request:get(method, Request),
     Scheme = mochiweb_request:get(scheme, Request),
     Version = mochiweb_request:get(version, Request),
-    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
-        {ok, RewriteMod} ->
-            do_rewrite(RewriteMod,
-                       Method,
-                       Scheme,
-                       Version,
-                       mochiweb_request:get(headers, Request),
-                       mochiweb_request:get(raw_path, Request));
-        undefined ->
-            {
+    {Headers, RawPath} =
+        case application:get_env(webmachine, rewrite_module) of
+            {ok, undefined} ->
+                {
               mochiweb_request:get(headers, Request),
               mochiweb_request:get(raw_path, Request)
-         }
-    end,
+             };
+            {ok, RewriteMod} ->
+                do_rewrite(RewriteMod,
+                           Method,
+                           Scheme,
+                           Version,
+                           mochiweb_request:get(headers, Request),
+                           mochiweb_request:get(raw_path, Request))
+            end,
     Socket = mochiweb_request:get(socket, Request),
 
     InitialReqData = wrq:create(Method,Scheme,Version,RawPath,Headers),
