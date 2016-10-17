@@ -7,3 +7,7 @@ doc/*
 /.rebar
 _build
 .DS_Store
+log
+.edts
+.rebar3
+erl_crash.dump

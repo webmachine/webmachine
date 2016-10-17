@@ -96,7 +96,6 @@
          log_data/1
         ]).
 
--include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
@@ -274,9 +273,9 @@ call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req)
             _ ->
                 send_response(CodeAndReason, Req)
         end,
-    LogData = NewState#wm_reqstate.log_data,
-    NewLogData = LogData#wm_log_data{finish_time=os:timestamp()},
-    {Reply, NewState#wm_reqstate{log_data=NewLogData}};
+    webmachine_lager:put_metadata(
+      [{wm_finish_time, os:timestamp()}]),
+    {Reply, NewState};
 call(resp_body, {?MODULE, ReqState}) ->
     {wrq:resp_body(ReqState#wm_reqstate.reqdata), ReqState};
 call({set_resp_body, Body}, {?MODULE, ReqState}) ->
@@ -424,11 +423,12 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
                     Length
             end
     end,
-    InitLogData = PassedState#wm_reqstate.log_data,
-    FinalLogData = InitLogData#wm_log_data{response_code=Code,
-                                           response_length=FinalLength},
-    {ok, PassedState#wm_reqstate{reqdata=wrq:set_response_code(Code, RD),
-                     log_data=FinalLogData}}.
+    webmachine_lager:put_metadata(
+      [
+       {wm_response_code, Code},
+       {wm_response_length, FinalLength}
+      ]),
+    {ok, PassedState#wm_reqstate{reqdata=wrq:set_response_code(Code, RD)}}.
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->

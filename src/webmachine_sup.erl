@@ -26,8 +26,6 @@
 %% supervisor callbacks
 -export([init/1]).
 
--include("webmachine_logger.hrl").
-
 %% @spec start_link() -> ServerRet
 %% @doc API for starting the supervisor.
 start_link() ->
@@ -59,11 +57,4 @@ init([]) ->
         {webmachine_router,
          {webmachine_router, start_link, []},
          permanent, 5000, worker, [webmachine_router]},
-    LogHandler =
-        [{webmachine_logger,
-          {gen_event, start_link, [{local, ?EVENT_LOGGER}]},
-          permanent, 5000, worker, [dynamic]},
-         {webmachine_logger_watcher_sup,
-          {webmachine_logger_watcher_sup, start_link, []},
-          permanent, 5000, supervisor, [webmachine_logger_watcher_sup]}],
-    {ok, {{one_for_one, 9, 10}, LogHandler ++ [Router]}}.
+    {ok, {{one_for_one, 9, 10}, [Router]}}.

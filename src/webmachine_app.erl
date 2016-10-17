@@ -25,25 +25,18 @@
 -export([start/2,
          stop/1]).
 
--include("webmachine_logger.hrl").
-
 -define(QUIP, "cafe not found").
 
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for webmachine.
 start(_Type, _StartArgs) ->
+    webmachine_lager:start(),
     webmachine_deps:ensure(),
 
     %% Populate dynamic defaults on load:
     load_default_app_config(),
 
     {ok, _Pid} = SupLinkRes = webmachine_sup:start_link(),
-    Handlers = application:get_env(webmachine, log_handlers, []),
-
-    %% handlers failing to start are handled in the handler_watcher
-    _ = [supervisor:start_child(webmachine_logger_watcher_sup,
-                                [?EVENT_LOGGER, Module, Config]) ||
-            {Module, Config} <- Handlers],
     SupLinkRes.
 
 %% @spec stop(_State) -> ServerRet

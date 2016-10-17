@@ -22,7 +22,6 @@
 -author('Andy Gross <andy@basho.com>').
 -author('Bryan Fink <bryan@basho.com>').
 -export([handle_request/2]).
--include("webmachine_logger.hrl").
 
 handle_request(Resource, ReqState) ->
     _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
@@ -91,11 +90,14 @@ finish_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
     wrcall({send_response, CodeAndPhrase}),
     RMod = wrcall({get_metadata, 'resource_module'}),
     Notes = wrcall(notes),
-    LogData0 = wrcall(log_data),
-    LogData = LogData0#wm_log_data{resource_module=RMod,
-                                   end_time=EndTime,
-                                   notes=Notes},
-    spawn(fun() -> do_log(LogData) end),
+
+    webmachine_lager:put_metadata(
+      [
+       {wm_resource_module, RMod},
+       {wm_end_time, EndTime},
+       {wm_notes, Notes}
+      ]),
+    wm_access:info(""),
     webmachine_resource:stop(Resource).
 
 error_response(Reason) ->
@@ -146,9 +148,6 @@ decision_flow(X, TestResult) when is_integer(X) ->
        true -> respond(X)
     end;
 decision_flow(X, _TestResult) when is_atom(X) -> d(X).
-
-do_log(LogData) ->
-    webmachine_log:log_access(LogData).
 
 log_decision(DecisionID) ->
     Resource = get(resource),
