@@ -21,6 +21,7 @@
     %% module that has rewrite/5
    ,{server_name, undefined}
     %% string() for the "Server" response header
+   ,{timezone, "+0000"}
    ]},
 
   {contributors,["Sean Cribbs", "Joe DeVivo" "Bryan Fink",

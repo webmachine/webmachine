@@ -53,6 +53,7 @@ load_default_app_config() ->
         _ ->
             set_default_server_name()
     end,
+    set_timezone(),
     ok.
 
 
@@ -70,3 +71,18 @@ set_default_server_name() ->
     application:set_env(
       webmachine, server_name, ServerName),
     ok.
+
+set_timezone() ->
+    Time = erlang:universaltime(),
+    LocalTime = calendar:universal_time_to_local_time(Time),
+    DiffSecs = calendar:datetime_to_gregorian_seconds(LocalTime) -
+        calendar:datetime_to_gregorian_seconds(Time),
+    Zone = lists:flatten(zone((DiffSecs/3600)*100)),
+    application:set_env(webmachine, timezone, Zone).
+
+%% Ugly reformatting code to get times like +0000 and -1300
+-spec zone(float()) -> string().
+zone(Val) when Val < 0 ->
+    io_lib:format("-~4..0w", [trunc(abs(Val))]);
+zone(Val) when Val >= 0 ->
+    io_lib:format("+~4..0w", [trunc(abs(Val))]).

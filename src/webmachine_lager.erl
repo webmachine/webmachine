@@ -71,17 +71,25 @@ build_wm_access_handlers([LogHandler|Rest], Acc) ->
 build_handler({access, Filename}) ->
     {lager_file_backend, [
                           {file, Filename}
-                         ,{formatter, webmachine_access_lager_formatter}
+                         ,{level, info}
+                         ,{date, "$D0"}
+                         ,{count, 5}
+                         ,{size, 10485760}
+                         ,{formatter, webmachine_httpd_formatter}
                          ,{formatter_config,
-                           []
+                           "%h %l %u %t \"%r\" %>s %b %{Referer}i %{User-agent}i"
                           }
                          ]};
 build_handler({perf, Filename}) ->
     {lager_file_backend, [
                           {file, Filename}
-                         ,{formatter, webmachine_perf_lager_formatter}
+                         ,{level, info}
+                         ,{date, "$D0"}
+                         ,{count, 5}
+                         ,{size, 10485760}
+                         ,{formatter, webmachine_httpd_formatter}
                          ,{formatter_config,
-                           []
+                           "%h %l %t \"%r\" %>s %b %R %{msec}T %wm-ppt"
                           }
                          ]}.
 

@@ -33,7 +33,7 @@
                      | 'Server'
                      | 'Vary'
                      | 'Warning'
-                     |'Www-Authenticate'
+                     | 'Www-Authenticate'
                      | 'Allow'
                      | 'Content-Base'
                      | 'Content-Encoding'
