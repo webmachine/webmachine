@@ -1,6 +1,10 @@
 {"1.1.0",
-[{<<"mochiweb">>,{pkg,<<"mochiweb">>,<<"2.12.2">>},0}]}.
+[{<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.2.1">>},0},
+ {<<"mochiweb">>,{pkg,<<"mochiweb">>,<<"2.12.2">>},0}]}.
 [
 {pkg_hash,[
+ {<<"goldrush">>, <<"2024BA375CEEA47E27EA70E14D2C483B2D8610101B4E852EF7F89163CDB6E649">>},
+ {<<"lager">>, <<"EEF4E18B39E4195D37606D9088EA05BF1B745986CF8EC84F01D332456FE88D17">>},
  {<<"mochiweb">>, <<"80804AD342AFA3D7F3524040D4EED66CE74B17A555DE454AC85B07C479928E46">>}]}
 ].

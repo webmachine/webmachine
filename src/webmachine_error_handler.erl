@@ -49,11 +49,11 @@ render_error_body(500, Req, Reason) ->
     ErrorIOList = [ErrorStart,STString,ErrorEnd],
     {erlang:iolist_to_binary(ErrorIOList), ReqState};
 
-render_error_body(501, Req, Reason) ->
+render_error_body(501, Req, _Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
-    {Method,_} = webmachine_request:method(Req),
-    webmachine_log:log_error(501, Req, Reason),
+    maybe_log(501, Req, undefined),
+    {Method, _} = webmachine_request:method(Req),
     ErrorStr = io_lib:format("<html><head><title>501 Not Implemented</title>"
                              "</head><body><h1>Not Implemented</h1>"
                              "The server does not support the ~p method.<br>"
@@ -62,10 +62,10 @@ render_error_body(501, Req, Reason) ->
                              [Method]),
     {erlang:iolist_to_binary(ErrorStr), ReqState};
 
-render_error_body(503, Req, Reason) ->
+render_error_body(503, Req, _Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
-    webmachine_log:log_error(503, Req, Reason),
+    maybe_log(503, Req, undefined),
     ErrorStr = "<html><head><title>503 Service Unavailable</title>"
                "</head><body><h1>Service Unavailable</h1>"
                "The server is currently unable to handle "
@@ -95,5 +95,15 @@ maybe_log(_Code, _Req, {error, {exit, normal, _Stack}}) ->
     %% message. This usually happens when a chunked upload is
     %% interrupted by network failure.
     ok;
-maybe_log(Code, Req, Reason) ->
-    webmachine_log:log_error(Code, Req, Reason).
+maybe_log(undefined, _, Msg) ->
+    lager:error(Msg);
+maybe_log(501, Req, _) ->
+    {Path, _} = webmachine_request:path(Req),
+    {Method, _} = webmachine_request:method(Req),
+    lager:error("Webmachine does not support method ~p: path=~p", [Method, Path]);
+maybe_log(503, Req, _) ->
+    {Path, _} = webmachine_request:path(Req),
+    lager:error("Webmachine cannot fulfill the request at this time: path=~p", [Path]);
+maybe_log(_Code, Req, Reason) ->
+    {Path, _} = webmachine_request:path(Req),
+    lager:error("path=~p ~p", [Path, Reason]).

@@ -20,7 +20,6 @@
 -author('Andy Gross <andy@basho.com>').
 -export([start/1, stop/0, stop/1, loop/2, new_webmachine_req/1]).
 
--include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
 
@@ -139,16 +138,19 @@ new_webmachine_req(Request) ->
     Socket = mochiweb_request:get(socket, Request),
 
     InitialReqData = wrq:create(Method,Scheme,Version,RawPath,Headers),
-    InitialLogData = #wm_log_data{start_time=os:timestamp(),
-                                  method=Method,
-                                  headers=Headers,
-                                  path=RawPath,
-                                  version=Version,
-                                  response_code=404,
-                                  response_length=0},
+    InitialLogData =
+        [
+         {wm_start_time, os:timestamp()},
+         {wm_method, Method},
+         {wm_headers, Headers},
+         {wm_path, RawPath},
+         {wm_version, Version},
+         {wm_response_code, 404},
+         {wm_response_length, 0}
+        ],
+    webmachine_lager:put_metadata(InitialLogData),
 
     InitState = #wm_reqstate{socket=Socket,
-                             log_data=InitialLogData,
                              reqdata=InitialReqData},
     InitReq = {webmachine_request,InitState},
 
@@ -159,16 +161,17 @@ new_webmachine_req(Request) ->
       {Peer, _ReqState} ->
         case webmachine_request:get_sock(InitReq) of
           {ErrorGetSock = {error,_}, ErrorGetSockReqState} ->
-            LogDataWithPeer = InitialLogData#wm_log_data {peer=Peer},
-            ReqStateWithSockErr =
-              ErrorGetSockReqState#wm_reqstate{log_data=LogDataWithPeer},
-            { ErrorGetSock, webmachine_request:new (ReqStateWithSockErr) };
+                webmachine_lager:put_metadata(
+                  [{wm_peer, Peer}]),
+                {ErrorGetSock, webmachine_request:new(ErrorGetSockReqState)};
           {Sock, ReqState} ->
-            ReqData = wrq:set_sock(Sock, wrq:set_peer(Peer, InitialReqData)),
-            LogData =
-              InitialLogData#wm_log_data {peer=Peer, sock=Sock},
-            webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
-                                                        reqdata=ReqData})
+                ReqData = wrq:set_sock(Sock, wrq:set_peer(Peer, InitialReqData)),
+                webmachine_lager:put_metadata(
+                  [
+                   {wm_peer, Peer},
+                   {wm_sock, Sock}
+                  ]),
+            webmachine_request:new(ReqState#wm_reqstate{reqdata=ReqData})
         end
     end.
 
@@ -186,9 +189,8 @@ handle_error(Code, Error, Req) ->
     {ErrorHTML,Req1} =
         ErrorHandler:render_error(Code, Req, Error),
     {ok,Req2} = webmachine_request:append_to_response_body(ErrorHTML, Req1),
-    {ok,Req3} = webmachine_request:send_response(Code, Req2),
-    {LogData,_ReqState4} = webmachine_request:log_data(Req3),
-    spawn(webmachine_log, log_access, [LogData]),
+    {ok, _Req3} = webmachine_request:send_response(Code, Req2),
+    wm_access:info(""),
     ok.
 
 get_wm_option(OptName, {WMOptions, OtherOptions}) ->
