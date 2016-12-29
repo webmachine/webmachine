@@ -46,7 +46,7 @@ and easily create a new `webmachine` application.
 
 ```
 $ mkdir -p ~/.config/rebar3/templates
-$ git clone git://github.com/webmachine/webmachine-rebar3-template.git ~/.config/rebar3/templates
+$ git clone https://github.com/webmachine/webmachine-rebar3-template.git ~/.config/rebar3/templates
 $ rebar3 new webmachine your_app_here
 ```
 
