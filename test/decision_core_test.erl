@@ -904,11 +904,13 @@ not_modified_j18_via_h12() ->
 
 %% 304 result via L17
 not_modified_l17() ->
+    FirstDayOfLastYear12AM = {{?PRESENT_YEAR - 1, 1, 1}, {12, 0, 0}},
+    FirstDayOfLastYear13AM = {{?PRESENT_YEAR - 1, 1, 1}, {13, 0, 0}},
     put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
-    put_setting(last_modified, ?FIRST_DAY_OF_LAST_YEAR),
+    put_setting(last_modified, FirstDayOfLastYear12AM),
     put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
-    RFC1123LastYear = httpd_util:rfc1123_date(?FIRST_DAY_OF_LAST_YEAR),
-    Headers = [{"If-Modified-Since", RFC1123LastYear}],
+    RFC1123LastYear13AM = httpd_util:rfc1123_date(FirstDayOfLastYear13AM),
+    Headers = [{"If-Modified-Since", RFC1123LastYear13AM}],
     {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_L17_NO_ACPTHEAD,
