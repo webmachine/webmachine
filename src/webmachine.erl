@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -17,70 +17,43 @@
 -module(webmachine).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([start/0, stop/0]).
--export([new_request/2]).
+-export([start/0, stop/0, new_request/2]).
 
--include("webmachine_logger.hrl").
--include("wm_reqstate.hrl").
--include("wm_reqdata.hrl").
+-type headers() :: webmachine_headers:t().
+-type response_body() :: iodata()
+                       | {stream, StreamBody::any()}
+                       | {known_length_stream, non_neg_integer(), StreamBody::any()}
+                       | {stream, non_neg_integer(), fun()} %% TODO: type for fun()
+                       | {writer, WrtieBody::any()}
+                       | {file, IoDevice::any()}.
+
+
+-export_type([headers/0, response_body/0]).
 
 %% @spec start() -> ok
 %% @doc Start the webmachine server.
 start() ->
     webmachine_deps:ensure(),
-    application:start(crypto),
-    application:start(webmachine).
+    ok = ensure_started(crypto),
+    ok = ensure_started(webmachine).
+
+ensure_started(App) ->
+    case application:start(App) of
+        ok ->
+            ok;
+        {error, {already_started, App}} ->
+            ok;
+        {error, _} = E ->
+            E
+    end.
 
 %% @spec stop() -> ok
 %% @doc Stop the webmachine server.
 stop() ->
     application:stop(webmachine).
 
-new_request(mochiweb, Request) ->
-    Method = Request:get(method),
-    Scheme = Request:get(scheme),
-    Version = Request:get(version),
-    {Headers, RawPath} = case application:get_env(webmachine, rewrite_module) of
-        {ok, RewriteMod} ->
-            do_rewrite(RewriteMod,
-                       Method,
-                       Scheme,
-                       Version,
-                       Request:get(headers),
-                       Request:get(raw_path));
-        undefined ->
-            {Request:get(headers), Request:get(raw_path)}
-    end,
-    Socket = Request:get(socket),
-    InitState = #wm_reqstate{socket=Socket,
-                          reqdata=wrq:create(Method,Scheme,Version,RawPath,Headers)},
-
-    InitReq = {webmachine_request,InitState},
-    {Peer, _ReqState} = InitReq:get_peer(),
-    {Sock, ReqState} = InitReq:get_sock(),
-    ReqData = wrq:set_sock(Sock,
-                           wrq:set_peer(Peer,
-                                        ReqState#wm_reqstate.reqdata)),
-    LogData = #wm_log_data{start_time=now(),
-                           method=Method,
-                           headers=Headers,
-                           peer=Peer,
-                           sock=Sock,
-                           path=RawPath,
-                           version=Version,
-                           response_code=404,
-                           response_length=0},
-    webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
-                                                reqdata=ReqData}).
-
-do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
-    case RewriteMod:rewrite(Method, Scheme, Version, Headers, RawPath) of
-        %% only raw path has been rewritten (older style rewriting)
-        NewPath when is_list(NewPath) -> {Headers, NewPath};
-
-        %% headers and raw path rewritten (new style rewriting)
-        {NewHeaders, NewPath} -> {NewHeaders,NewPath}
-    end.
+new_request(mochiweb, MochiReq) ->
+    webmachine_mochiweb:new_webmachine_req(MochiReq).
 
 %%
 %% TEST
@@ -89,13 +62,15 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
+start_mochiweb() ->
+    webmachine_util:ensure_all_started(mochiweb).
+
 start_stop_test() ->
-    application:start(inets),
-    application:start(mochiweb),
+    {Res, Apps} = start_mochiweb(),
+    ?assertEqual(ok, Res),
     ?assertEqual(ok, webmachine:start()),
     ?assertEqual(ok, webmachine:stop()),
-    application:stop(mochiweb),
-    application:stop(inets),
+    [application:stop(App) || App <- Apps],
     ok.
 
 -endif.

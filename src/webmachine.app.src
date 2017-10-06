@@ -10,5 +10,22 @@
                   crypto,
                   mochiweb]},
   {mod, {webmachine_app, []}},
-  {env, []}
+  {env,
+   %% env is THE place for expected defaults. Even if it's just
+   %% comments, it's worthwhile
+   [
+    {log_handlers, []}
+   ,{error_handler, webmachine_error_handler}
+    %% error_handler is a module that implements the function render_error/3
+   ,{rewrite_module, undefined}
+    %% module that has rewrite/5
+   ,{server_name, undefined}
+    %% string() for the "Server" response header
+   ]},
+
+  {contributors,["Sean Cribbs", "Joe DeVivo" "Bryan Fink",
+                 "Kelly McLaughlin", "Jared Morrow", "Andy Gross",
+                 "Steve Vinoski"]},
+  {licenses,["Apache"]},
+  {links,[{"Github","https://github.com/webmachine/webmachine"}]}
  ]}.

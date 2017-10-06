@@ -1,6 +1,6 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
-%% @copyright 2007-2012 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -17,23 +17,27 @@
 -module(webmachine_resource).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([new/4, wrap/2, wrap/3]).
+-export([new/4, wrap/2]).
 -export([do/3,log_d/2,stop/1]).
 
 -include("wm_resource.hrl").
 -include("wm_reqdata.hrl").
 -include("wm_reqstate.hrl").
 
-new(R_Mod, R_ModState, R_ModExports, R_Trace) ->
-    {?MODULE, R_Mod, R_ModState, R_ModExports, R_Trace}.
+-type t() :: #wm_resource{}.
+-export_type([t/0]).
 
-default(ping) ->
-    no_default;
+new(R_Mod, R_ModState, R_ModExports, R_Trace) ->
+    #wm_resource{
+       module = R_Mod,
+       modstate = R_ModState,
+       modexports = R_ModExports,
+       trace = R_Trace
+      }.
+
 default(service_available) ->
     true;
 default(resource_exists) ->
-    true;
-default(auth_required) ->
     true;
 default(is_authorized) ->
     true;
@@ -109,9 +113,8 @@ default(validate_content_checksum) ->
 default(_) ->
     no_default.
 
-wrap(Mod, Args, {?MODULE, _, _, _, _}) ->
-    wrap(Mod, Args).
-
+-spec wrap(module(), [any()]) ->
+                  {ok, t()} | {stop, bad_init_arg}.
 wrap(Mod, Args) ->
     case Mod:init(Args) of
         {ok, ModState} ->
@@ -129,10 +132,13 @@ wrap(Mod, Args) ->
     end.
 
 do(#wm_resource{}=Res, Fun, ReqProps) ->
-    #wm_resource{module=R_Mod, modstate=R_ModState,
-                 modexports=R_ModExports, trace=R_Trace} = Res,
-    do(Fun, ReqProps, {?MODULE, R_Mod, R_ModState, R_ModExports, R_Trace});
-do(Fun, ReqProps, {?MODULE, R_Mod, _, R_ModExports, R_Trace}=Req)
+    do(Fun, ReqProps, Res);
+do(Fun, ReqProps,
+   #wm_resource{
+      module=R_Mod,
+      modexports=R_ModExports,
+      trace=R_Trace
+     }=Req)
   when is_atom(Fun) andalso is_list(ReqProps) ->
     case lists:keyfind(reqstate, 1, ReqProps) of
         false -> RState0 = undefined;
@@ -152,7 +158,13 @@ do(Fun, ReqProps, {?MODULE, R_Mod, _, R_ModExports, R_Trace}=Req)
      webmachine_resource:new(R_Mod, NewModState, R_ModExports, R_Trace),
      ReqState#wm_reqstate{reqdata=TrimData}}.
 
-handle_wm_call(Fun, ReqData, {?MODULE,R_Mod,R_ModState,R_ModExports,R_Trace}=Req) ->
+handle_wm_call(Fun, ReqData,
+               #wm_resource{
+                  module=R_Mod,
+                  modstate=R_ModState,
+                  modexports=R_ModExports,
+                  trace=R_Trace
+                 }=Req) ->
     case default(Fun) of
         no_default ->
             resource_call(Fun, ReqData, Req);
@@ -171,13 +183,18 @@ handle_wm_call(Fun, ReqData, {?MODULE,R_Mod,R_ModState,R_ModExports,R_Trace}=Req
             end
     end.
 
-trim_trace([{M,F,[RD = #wm_reqdata{},S]}|STRest]) ->
+trim_trace([{M,F,[RD = #wm_reqdata{},S],_}|STRest]) ->
     TrimState = (RD#wm_reqdata.wm_state)#wm_reqstate{reqdata='REQDATA'},
     TrimRD = RD#wm_reqdata{wm_state=TrimState},
     [{M,F,[TrimRD,S]}|STRest];
 trim_trace(X) -> X.
 
-resource_call(F, ReqData, {?MODULE, R_Mod, R_ModState, _, R_Trace}) ->
+resource_call(F, ReqData,
+              #wm_resource{
+                 module=R_Mod,
+                 modstate=R_ModState,
+                 trace=R_Trace
+                }) ->
     case R_Trace of
         false -> nop;
         _ -> log_call(R_Trace, attempt, R_Mod, F, [ReqData, R_ModState])
@@ -195,17 +212,17 @@ resource_call(F, ReqData, {?MODULE, R_Mod, R_ModState, _, R_Trace}) ->
     Result.
 
 log_d(#wm_resource{}=Res, DecisionID) ->
-    #wm_resource{module=R_Mod, modstate=R_ModState,
-                 modexports=R_ModExports, trace=R_Trace} = Res,
-    log_d(DecisionID, {?MODULE, R_Mod, R_ModState, R_ModExports, R_Trace});
-log_d(DecisionID, {?MODULE, _, _, _, R_Trace}) ->
+    log_d(DecisionID, Res);
+log_d(DecisionID,
+      #wm_resource{
+         trace=R_Trace
+        }) ->
     case R_Trace of
         false -> nop;
         _ -> log_decision(R_Trace, DecisionID)
     end.
 
-stop(#wm_resource{trace=R_Trace}) -> close_log_file(R_Trace);
-stop({?MODULE, _, _, _, R_Trace}) -> close_log_file(R_Trace).
+stop(#wm_resource{trace=R_Trace}) -> close_log_file(R_Trace).
 
 log_call(File, Type, M, F, Data) ->
     io:format(File,
@@ -246,7 +263,7 @@ log_decision(File, DecisionID) ->
     io:format(File, "{decision, ~p}.~n", [DecisionID]).
 
 open_log_file(Dir, Mod) ->
-    Now = {_,_,US} = now(),
+    Now = {_,_,US} = os:timestamp(),
     {{Y,M,D},{H,I,S}} = calendar:now_to_universal_time(Now),
     Filename = io_lib:format(
                  "~s/~p-~4..0B-~2..0B-~2..0B"

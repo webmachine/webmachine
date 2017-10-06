@@ -1,7 +1,7 @@
 %% @author Justin Sheehy <justin@basho.com>
 %% @author Andy Gross <andy@basho.com>
 %% @author Bryan Fink <bryan@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -22,11 +22,10 @@
 -author('Andy Gross <andy@basho.com>').
 -author('Bryan Fink <bryan@basho.com>').
 -export([handle_request/2]).
--export([do_log/1]).
 -include("webmachine_logger.hrl").
 
 handle_request(Resource, ReqState) ->
-    [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
+    _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
     put(resource, Resource),
     put(reqstate, ReqState),
     try
@@ -39,13 +38,13 @@ handle_request(Resource, ReqState) ->
 wrcall(X) ->
     RS0 = get(reqstate),
     Req = webmachine_request:new(RS0),
-    {Response, RS1} = Req:call(X),
+    {Response, RS1} = webmachine_request:call(X, Req),
     put(reqstate, RS1),
     Response.
 
 resource_call(Fun) ->
     Resource = get(resource),
-    {Reply, NewResource, NewRS} = Resource:do(Fun,get()),
+    {Reply, NewResource, NewRS} = webmachine_resource:do(Fun,get(),Resource),
     put(resource, NewResource),
     put(reqstate, NewRS),
     Reply.
@@ -63,7 +62,7 @@ respond(Code) when is_integer(Code) ->
     respond({Code, undefined});
 respond({_, _}=CodeAndPhrase) ->
     Resource = get(resource),
-    EndTime = now(),
+    EndTime = os:timestamp(),
     respond(CodeAndPhrase, Resource, EndTime).
 
 respond({Code, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime)
@@ -97,14 +96,14 @@ finish_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
                                    end_time=EndTime,
                                    notes=Notes},
     spawn(fun() -> do_log(LogData) end),
-    Resource:stop().
+    webmachine_resource:stop(Resource).
 
 error_response(Reason) ->
     error_response(500, Reason).
 
 error_response(Code, Reason) ->
     Resource = get(resource),
-    EndTime = now(),
+    EndTime = os:timestamp(),
     error_response({Code, undefined}, Reason, Resource, EndTime).
 
 error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
@@ -118,7 +117,7 @@ error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime) ->
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
                               Code, {webmachine_request,get(reqstate)}, Reason),
     put(reqstate, ReqState),
-    wrcall({set_resp_body, ErrorHTML}),
+    wrcall({set_resp_body, encode_body(ErrorHTML)}),
     finish_response(CodeAndPhrase, Resource, EndTime).
 
 decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
@@ -153,12 +152,10 @@ do_log(LogData) ->
 
 log_decision(DecisionID) ->
     Resource = get(resource),
-    Resource:log_d(DecisionID).
+    webmachine_resource:log_d(DecisionID, Resource).
 
 %% "Service Available"
 decision(v3b13) ->
-    decision_test(resource_call(ping), pong, v3b13b, 503);
-decision(v3b13b) ->
     decision_test(resource_call(service_available), true, v3b12, 503);
 %% "Known method?"
 decision(v3b12) ->
@@ -174,8 +171,12 @@ decision(v3b10) ->
         true ->
             d(v3b9);
         false ->
+            Allowed = [case is_atom(M) of
+                           true -> atom_to_list(M);
+                           false -> M
+                       end || M <- Methods],
             wrcall({set_resp_headers, [{"Allow",
-                   string:join([atom_to_list(M) || M <- Methods], ", ")}]}),
+                   string:join(Allowed, ", ")}]}),
             respond(405)
     end;
 
@@ -631,11 +632,23 @@ encode_body(Body) ->
     Charsetter =
     case resource_call(charsets_provided) of
         no_charset -> fun(X) -> X end;
-        CP -> hd([Fun || {CSet,Fun} <- CP, ChosenCSet =:= CSet])
+        CP ->
+            case [Fun || {CSet,Fun} <- CP, ChosenCSet =:= CSet] of
+                [] ->
+                    fun(X) -> X end;
+                [F | _] ->
+                    F
+            end
     end,
     ChosenEnc = wrcall({get_metadata, 'content-encoding'}),
-    Encoder = hd([Fun || {Enc,Fun} <- resource_call(encodings_provided),
-                         ChosenEnc =:= Enc]),
+    Encoder =
+        case [Fun || {Enc,Fun} <- resource_call(encodings_provided),
+                     ChosenEnc =:= Enc] of
+            [] ->
+                fun(X) -> X end;
+            [E | _] ->
+                E
+        end,
     case Body of
         {stream, StreamBody} ->
             {stream, make_encoder_stream(Encoder, Charsetter, StreamBody)};

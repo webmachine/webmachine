@@ -1,5 +1,5 @@
 %% @author Macneil Shonle <mshonle@basho.com>
-%% @copyright 2007-2013 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -26,6 +26,14 @@
 -define(RESOURCE_PATH, "/" ++ ?RESOURCE).
 -define(HTML_CONTENT, "<html><body>Foo</body></html>").
 -define(TEXT_CONTENT, ?HTML_CONTENT).
+
+-ifndef(old_hash).
+md5(Bin) ->
+    crypto:hash(md5,Bin).
+-else.
+md5(Bin) ->
+    crypto:md5(Bin).
+-endif.
 
 -define(HTTP_1_0_METHODS, ['GET', 'POST', 'HEAD']).
 -define(HTTP_1_1_METHODS, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'TRACE',
@@ -232,8 +240,6 @@
 %%
 core_tests() ->
     [fun service_unavailable/0,
-     fun ping_invalid/0,
-     fun ping_error/0,
      fun internal_server_error_o18/0,
      fun not_implemented_b12/0,
      fun not_implemented_b6/0,
@@ -242,6 +248,8 @@ core_tests() ->
      fun request_entity_too_large_b4/0,
      fun head_method_allowed/0,
      fun head_method_not_allowed/0,
+     fun non_standard_method_501/0,
+     fun non_standard_method_200/0,
      fun bad_request_b9/0,
      fun simple_get/0,
      fun not_acceptable_c4/0,
@@ -295,7 +303,7 @@ core_tests() ->
      fun head_length_access_for_cs/0,
      fun get_known_length_for_cs/0,
      fun get_for_range_capable_stream/0
-     %% known_failure -- fun stream_content_md5/0
+     % known_failure -- fun stream_content_md5/0
     ].
 
 decision_core_test_() ->
@@ -364,24 +372,6 @@ service_unavailable() ->
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
     ok.
 
-%% 503 result via B13 (at ping)
-ping_invalid() ->
-                                                % "breakout" for "anything other than pong"
-    put_setting(ping, breakout),
-    {ok, Result} = httpc:request(head, {url(), []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 503, "Service Unavailable"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B13,
-    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.
-
-%% 500 error response result via B13 (ping raises error)
-ping_error() ->
-    put_setting(ping, ping_raise_error),
-    {ok, Result} = httpc:request(head, {url(), []}, [], []),
-    ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _}, Result),
-    ExpectedDecisionTrace = ?PATH_TO_B13,
-    ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
-    ok.
 
 %% 500 error response via O18 from a callback raising an error
 internal_server_error_o18() ->
@@ -472,6 +462,38 @@ head_method_not_allowed() ->
     ?assertMatch({{"HTTP/1.1", 405, "Method Not Allowed"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_B10,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% 501 from non-standard method
+non_standard_method_501() ->
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT']),
+    Ctx = get_context(),
+    Port = wm_integration_test_util:get_port(Ctx),
+    Url = wm_integration_test_util:url(Ctx, "foo"),
+    {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
+    ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\n",
+                             "Host: http://localhost:", integer_to_list(Port),
+                             "\r\n\r\n"]),
+    ?assertMatch({ok, <<"HTTP/1.1 501 Not Implemented", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
+    ok = gen_tcp:close(Sock),
+    ok.
+
+%% 200 from non-standard method
+non_standard_method_200() ->
+    Method = "FOO",
+    put_setting(known_methods, [Method|?HTTP_1_1_METHODS]),
+    put_setting(allowed_methods, ['GET', 'POST', 'PUT', Method]),
+    Ctx = get_context(),
+    Port = wm_integration_test_util:get_port(Ctx),
+    Url = wm_integration_test_util:url(Ctx, "foo"),
+    {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active,false}]),
+    ok = gen_tcp:send(Sock, [Method, " ", Url, " HTTP/1.1\r\n",
+                             "Host: http://localhost:", integer_to_list(Port),
+                             "\r\n\r\n"]),
+    ?assertMatch({ok, <<"HTTP/1.1 200 OK\r\n", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
+    ok = gen_tcp:close(Sock),
     ok.
 
 %% 400 result via B9
@@ -642,7 +664,7 @@ content_md5_valid_b9a() ->
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     Body = "foo",
-    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    MD5Sum = base64:encode_to_string(md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
@@ -659,7 +681,7 @@ content_md5_valid_b9a_validated() ->
     ContentType = "text/plain",
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     Body = "foo",
-    MD5Sum = base64:encode_to_string(crypto:md5(Body)),
+    MD5Sum = base64:encode_to_string(md5(Body)),
     Headers = [{"Content-MD5", MD5Sum}],
     PutRequest = {url("new"), Headers, ContentType, Body},
     {ok, Result} = httpc:request(put, PutRequest, [], []),
@@ -886,7 +908,7 @@ see_other_n11() ->
     put_setting(content_types_accepted, [{ContentType, to_html}]),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -933,7 +955,7 @@ see_other_n11_resource_calls_base_uri(Value) ->
     put_setting(create_path, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     put_setting(base_uri, Value),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_M7_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -949,7 +971,7 @@ see_other_n5() ->
     put_setting(allow_missing_post, true),
     put_setting(process_post, {set_resp_redirect, ?RESOURCE_PATH ++ "/new1"}),
     PostRequest = {url("post"), [], ContentType, "foo"},
-    {ok, Result} = httpc:request(post, PostRequest, [], []),
+    {ok, Result} = httpc:request(post, PostRequest, [{autoredirect,false}], []),
     ?assertMatch({{"HTTP/1.1", 303, "See Other"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_N11_VIA_N5_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
@@ -1237,7 +1259,7 @@ stream_content_md5() ->
     put_setting(allow_missing_post, true),
     ContentType = "text/plain",
     Content = "foo",
-    ValidMD5Sum = base64:encode_to_string(crypto:md5(Content)),
+    ValidMD5Sum = base64:encode_to_string(md5(Content)),
     ibrowse:start(),
     Url = url("post"),
     Headers = [{"Content-Type", ContentType},
@@ -1338,13 +1360,6 @@ url(Path) ->
 
 init([]) ->
     {ok, undefined}.
-
-ping(ReqData, State) ->
-    Setting = lookup_setting(ping),
-    case Setting of
-        ping_raise_error -> error(foobar);
-        _ -> {Setting, ReqData, State}
-    end.
 
 service_available(ReqData, Context) ->
     Setting = lookup_setting(service_available),

@@ -1,6 +1,6 @@
 %% @author Robert Ahrens <rahrens@basho.com>
 %% @author Justin Sheehy <justin@basho.com>
-%% @copyright 2007-2009 Basho Technologies
+%% @copyright 2007-2014 Basho Technologies
 %%
 %%    Licensed under the Apache License, Version 2.0 (the "License");
 %%    you may not use this file except in compliance with the License.
@@ -25,6 +25,12 @@
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, '*').
+
+-type pathspec() :: ['*' | atom() | string()].
+-type guard() :: fun((wrq:reqdata()) -> boolean()).
+-type route() :: {pathspec(), module(), list()} | {pathspec(), guard(), module(), list()}.
+
+-export_type([route/0]).
 
 %% @spec dispatch(Path::string(), DispatchList::[matchterm()],
 %%                wrq:reqdata()) ->
@@ -52,17 +58,74 @@ dispatch(HostAsString, PathAsString, DispatchList, RD) ->
     try_host_binding(DispatchList, Host, Port, Path, ExtraDepth, RD).
 
 split_host_port(HostAsString, Scheme) ->
-    case string:tokens(HostAsString, ":") of
-        [HostPart, PortPart] ->
-            {split_host(HostPart), list_to_integer(PortPart)};
-        [HostPart] ->
+    case parse_port_from_host(HostAsString) of
+        {HostPart, no_port} ->
             {split_host(HostPart), default_port(Scheme)};
-        [] ->
+        {HostPart, PortPart} ->
+            {split_host(HostPart), list_to_integer(PortPart)};
+        no_host ->
             %% no host header
-            {[], default_port(Scheme)};
+            {[], default_port(Scheme)}
+    end.
+
+parse_port_from_host([]) ->
+    no_host;
+parse_port_from_host(S) ->
+    parse_port_from_host(lists:reverse(S), []).
+
+parse_port_from_host([], Host) ->
+    {Host, no_port};
+parse_port_from_host([C|Rest] = Host0, Acc) when C == $: orelse C == $]->
+    Port = case Acc of
+               [] ->
+                   no_port;
+               P ->
+                   P
+           end,
+    RevHost = case C of
+                  $] ->
+                      Host0;
+                  _ ->
+                      Rest
+           end,
+    Host1 = lists:reverse(RevHost),
+    {Host2, Port2} = handle_unbracketed_ipv6(Host1, Port),
+    Host = Host2,
+    {Host, Port2};
+parse_port_from_host([C|Rest], Acc) ->
+    parse_port_from_host(Rest, [C|Acc]).
+
+%% Attempt naive normalization of degenerate unbracketed ipv6 literals
+%%
+%% IPv6 address literals in URLs (and therefore in the Host header)
+%% should be enclosed in square brackets. See
+%% http://www.ietf.org/rfc/rfc2732.txt. Some HTTP clients will
+%% incorrectly remove brackets from ipv6 address literals.
+%%
+%% An unbracketed ipv6 address literal is degenerate in URLs since you
+%% can't reliably parse it for a port. We "handle" this case by
+%% assuming default port and adding brackets.
+handle_unbracketed_ipv6("[" ++ _Rest = Host, Port) ->
+    {Host, Port};
+handle_unbracketed_ipv6(Host, Port) ->
+    case is_ipv6_addr(Host) of
+        false ->
+            {Host, Port};
+        true ->
+            %% we have an unbracketed ipv6 literal. We assume default
+            %% port and add brackets to normalize.  Port here is just
+            %% the last group, may be part of address.
+            {"[" ++ Host ++ ":" ++ Port ++ "]", no_port}
+    end.
+
+%% Return true if `Host' is an IPv6 address literal. Assumes port has
+%% been removed and simply detects precense of `:'.
+is_ipv6_addr(Host) ->
+    case string:chr(Host, $:) of
+        0 ->
+            false;
         _ ->
-            %% Invalid host header
-            {invalid_host, default_port(Scheme)}
+            true
     end.
 
 split_host(HostAsString) ->
@@ -153,8 +216,6 @@ default_port(https) -> 443.
 
 %% @type dispfail() = {no_dispatch_match, pathtokens()}.
 
-try_host_binding(_Dispatch, invalid_host, _Port, _Path, _Depth, _RD) ->
-    {error, invalid_host};
 try_host_binding(Dispatch, Host, Port, Path, Depth, RD) ->
     %% save work during each dispatch attempt by reversing Host up front
     try_host_binding1(Dispatch, lists:reverse(Host), Port, Path, Depth, RD).
@@ -210,14 +271,8 @@ try_path_binding([PathSpec|Rest], PathTokens, HostRemainder, Port, HostBindings,
             AppRoot = calculate_app_root(Depth + ExtraDepth),
             StringPath = reconstitute(Remainder),
             PathInfo = orddict:from_list(NewBindings),
-            RD1 =
-                case RD of
-                    testing_ignore_dialyzer_warning_here ->
-                        testing_ignore_dialyzer_warning_here;
-                    _ ->
-                        wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
-                                               AppRoot, StringPath, RD)
-                end,
+            RD1 = wrq:load_dispatch_data(PathInfo, HostRemainder, Port, Remainder,
+                                         AppRoot, StringPath, RD),
             case run_guard(Guard, RD1) of
                 true ->
                     {Mod, Props, Remainder, NewBindings, AppRoot, StringPath};
@@ -305,6 +360,21 @@ split_host_port_test() ->
     ?assertEqual({["foo","bar","baz"], 1234},
                  split_host_port("foo.bar.baz:1234", https)).
 
+split_host_port_ipv6_test_() ->
+    Tests = [% {Input, Expect}
+             {"[::1]", {["[::1]"], 80}},
+             {"[::1]:4321", {["[::1]"], 4321}},
+             {"[fd83:4e09:e1b6:e2a3::106]", {["[fd83:4e09:e1b6:e2a3::106]"], 80}},
+             {"[fd83:4e09:e1b6:e2a3::106]:4321", {["[fd83:4e09:e1b6:e2a3::106]"], 4321}},
+             %% degenerate case of ipv6 literals without brackets
+             {"::1", {["[::1]"], 80}},
+             {"fd83:4e09:e1b6:e2a3::106", {["[fd83:4e09:e1b6:e2a3::106]"], 80}},
+             %% unbracketed with port not supported. This documents what to expect.
+             {"::1:4321", {["[::1:4321]"], 80}}
+            ],
+    [ ?_assertEqual({Input, Expect}, {Input, split_host_port(Input, http)})
+      || {Input, Expect} <- Tests ].
+
 %% port binding
 bind_port_simple_match_test() ->
     ?assertEqual({ok, []}, bind_port(80, 80, [])),
@@ -364,7 +434,7 @@ bind_path_string_fail_test() ->
     ?assertEqual(fail, bind(["a","b"], ["a","c"], [], 0)).
 
 try_path_matching_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({bar, baz, [], [], ".", ""},
                  try_path_binding([{["foo"], bar, baz}], ["foo"], [], 80, [], 0, RD)),
     Dispatch = [{["a", x], foo, bar},
@@ -380,14 +450,14 @@ try_path_matching_test() ->
                  try_path_binding(Dispatch, ["b","c","z","v"], [], 80, [], 0, RD)).
 
 try_path_failing_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({no_dispatch_match, ["a"]},
                  try_path_binding([{["b"], x, y}], ["a"], [], 80, [], 0, RD)).
 
 %% host binding
 
 try_host_binding_nohosts_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     PathDispatches = [{["a"], foo, bar},
                       {["b"], baz, quux}],
     ?assertEqual(try_host_binding([{{['*'],'*'},PathDispatches}],
@@ -408,7 +478,7 @@ try_host_binding_nohosts_test() ->
                                   ["quux","baz"], 1234, ["b"], 0, RD)).
 
 try_host_binding_noport_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     Dispatch = [{["foo","bar"], [{["a"],x,y}]},
                 {["baz","quux"],[{["b"],z,q}]},
                 {[m,"quux"],    [{["c"],r,s}]},
@@ -432,7 +502,7 @@ try_host_binding_noport_test() ->
                                   ["quux","no"], 82, ["d"], 0, RD)).
 
 try_host_binding_fullmatch_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     Dispatch = [{{["foo","bar"],80},[{["a"],x,y}]},
                 {{[foo,"bar"],80},  [{["b"],z,q}]},
                 {{[foo,"bar"],baz}, [{["c"],r,s}]},
@@ -466,7 +536,7 @@ try_host_binding_wildcard_token_order_test() ->
                  dispatch("foo.bar.baz.quux.com","/",Dispatch,RD)).
 
 try_host_binding_fail_test() ->
-    RD = testing_ignore_dialyzer_warning_here,
+    RD = #wm_reqdata{},
     ?assertEqual({no_dispatch_match, {["bar","foo"], 1234}, ["x","y","z"]},
                  try_host_binding([], ["bar","foo"], 1234, ["x","y","z"], 0, RD)).
 

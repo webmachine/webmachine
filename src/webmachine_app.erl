@@ -27,17 +27,19 @@
 
 -include("webmachine_logger.hrl").
 
+-define(QUIP, "cafe not found").
+
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for webmachine.
 start(_Type, _StartArgs) ->
     webmachine_deps:ensure(),
+
+    %% Populate dynamic defaults on load:
+    load_default_app_config(),
+
     {ok, _Pid} = SupLinkRes = webmachine_sup:start_link(),
-    Handlers = case application:get_env(webmachine, log_handlers) of
-        undefined ->
-            [];
-        {ok, Val} ->
-            Val
-    end,
+    Handlers = application:get_env(webmachine, log_handlers, []),
+
     %% handlers failing to start are handled in the handler_watcher
     _ = [supervisor:start_child(webmachine_logger_watcher_sup,
                                 [?EVENT_LOGGER, Module, Config]) ||
@@ -47,4 +49,31 @@ start(_Type, _StartArgs) ->
 %% @spec stop(_State) -> ServerRet
 %% @doc application stop callback for webmachine.
 stop(_State) ->
+    ok.
+
+-spec load_default_app_config() -> ok.
+load_default_app_config() ->
+
+    case application:get_env(webmachine, server_name, undefined) of
+        Name when is_list(Name) ->
+            ok;
+        _ ->
+            set_default_server_name()
+    end,
+    ok.
+
+
+set_default_server_name() ->
+    {mochiweb, _, MochiVersion} =
+        lists:keyfind(mochiweb, 1, application:loaded_applications()),
+
+    {webmachine, _, WMVersion} =
+        lists:keyfind(webmachine, 1, application:loaded_applications()),
+    ServerName =
+        lists:flatten(
+          io_lib:format(
+            "MochiWeb/~s WebMachine/~s (~s)",
+            [MochiVersion, WMVersion, ?QUIP])),
+    application:set_env(
+      webmachine, server_name, ServerName),
     ok.
