@@ -724,24 +724,27 @@ make_version({1, 0}) ->
 make_version(_) ->
     <<"HTTP/1.1 ">>.
 
+-spec update_header_with_content_length(number(), atom(), term()) -> term().
+update_header_with_content_length(Code, _Length, RD) when (Code >= 100 andalso Code < 200) orelse
+                                                           Code =:= 204 orelse
+                                                           Code =:= 304 ->
+    mochiweb_headers:make(wrq:resp_headers(RD));
+update_header_with_content_length(_Code, Length, RD) ->
+    case Length of
+        chunked ->
+            mochiweb_headers:enter(
+              "Transfer-Encoding","chunked",
+              mochiweb_headers:make(wrq:resp_headers(RD)));
+        _ ->
+            mochiweb_headers:enter(
+              "Content-Length",integer_to_list(Length),
+              mochiweb_headers:make(wrq:resp_headers(RD)))
+    end.
+
 make_headers({Code, _ReasonPhrase}, Length, RD) ->
     make_headers(Code, Length, RD);
 make_headers(Code, Length, RD) when is_integer(Code) ->
-    Hdrs0 = case Code of
-        304 ->
-            mochiweb_headers:make(wrq:resp_headers(RD));
-        _ ->
-            case Length of
-                chunked ->
-                    mochiweb_headers:enter(
-                      "Transfer-Encoding","chunked",
-                      mochiweb_headers:make(wrq:resp_headers(RD)));
-                _ ->
-                    mochiweb_headers:enter(
-                      "Content-Length",integer_to_list(Length),
-                      mochiweb_headers:make(wrq:resp_headers(RD)))
-            end
-    end,
+    Hdrs0 = update_header_with_content_length(Code, Length, RD),
     %% server_name is guaranteed to be set by
     %% webmachine_app:load_default_app_config/0
     {ok, ServerHeader} = application:get_env(webmachine, server_name),
@@ -941,6 +944,12 @@ header_test() ->
     {ok, ReqState} = set_reqdata(ReqData, #wm_reqstate{}),
     ?assertEqual({HdrValue, ReqState}, get_header_value(HdrName, ReqState)),
     ?assertEqual({HdrValue, ReqState}, get_req_header(HdrName, ReqState)).
+
+no_content_length_test() ->
+    ReqData = #wm_reqdata{req_headers = mochiweb_headers:make([])},
+    ?assertEqual(nomatch, re:run(make_headers(100, 56, ReqData), "content-length", [caseless])),
+    ?assertEqual(nomatch, re:run(make_headers(204, 56, ReqData), "content-length", [caseless])),
+    ?assertMatch({match, _}, re:run(make_headers(200, 56, ReqData), "content-length", [caseless])).
 
 metadata_test() ->
     Key = "webmachine",
