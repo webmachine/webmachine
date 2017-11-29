@@ -63,7 +63,7 @@ start(Options) ->
     webmachine_router:init_routes(DGroup, DispatchList),
     _ = [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
     MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
-    LoopFun = fun(X) -> loop(DGroup, X) end,
+    LoopFun = fun(X) -> ?MODULE:loop(DGroup, X) end,
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
 
 stop() ->
