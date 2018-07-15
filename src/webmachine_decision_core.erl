@@ -24,6 +24,12 @@
 -export([handle_request/2]).
 -include("webmachine_logger.hrl").
 
+%% Suppress Erlang/OTP 21 warnings about the new method to retrieve
+%% stacktraces.
+-ifdef(OTP_RELEASE).
+-compile({nowarn_deprecated_function, [{erlang, get_stacktrace, 0}]}).
+-endif.
+
 handle_request(Resource, ReqState) ->
     _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
     put(resource, Resource),

@@ -29,6 +29,12 @@
 
 -define(CALLBACK_ARITY, 2).
 
+%% Suppress Erlang/OTP 21 warnings about the new method to retrieve
+%% stacktraces.
+-ifdef(OTP_RELEASE).
+-compile({nowarn_deprecated_function, [{erlang, get_stacktrace, 0}]}).
+-endif.
+
 new(R_Mod, R_ModState, R_Trace) ->
     case erlang:module_loaded(R_Mod) of
         false -> code:ensure_loaded(R_Mod);
