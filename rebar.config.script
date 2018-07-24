@@ -11,4 +11,15 @@ Config1 = case hd(OtpVersion) =:= $R andalso OtpVersion < "R15B02" of
                           CONFIG ++ [{erl_opts, HashDefine}]
                   end;
               false -> CONFIG
-          end.
+          end,
+if
+    OtpVersion >= "21" ->
+        case lists:keysearch(erl_opts, 1, Config1) of
+            {value, {erl_opts, Opts2}} ->
+                lists:keyreplace(erl_opts, 1, Config1, {erl_opts, [{d, deprecate_stacktrace}|Opts2]});
+            false ->
+                [{erl_opts, [{d, deprecate_stacktrace}]}|Config1]
+        end;
+    true ->
+        Config1
+end.
