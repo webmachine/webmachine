@@ -27,7 +27,7 @@
 
 -include("webmachine_logger.hrl").
 
--define(QUIP, "cafe not found").
+-define(QUIP, "greased slide to failure").
 
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for webmachine.
