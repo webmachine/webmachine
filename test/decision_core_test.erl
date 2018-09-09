@@ -17,6 +17,7 @@
 
 -ifdef(TEST).
 
+-include("wm_compat.hrl").
 -include("wm_reqdata.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
@@ -335,8 +336,8 @@ setup() ->
         meck:new(webmachine_resource, MeckOpts),
         Ctx
     catch
-        T:E ->
-            io:format(user, "~n~p : ~p : ~p", [T, E, erlang:get_stacktrace()]),
+        ?STPATTERN(T:E) ->
+            io:format(user, "~n~p : ~p : ~p", [T, E, ?STACKTRACE]),
             error(setup_failed)
     end.
 
