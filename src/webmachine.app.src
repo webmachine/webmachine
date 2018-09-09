@@ -23,7 +23,7 @@
     %% string() for the "Server" response header
    ]},
 
-  {contributors,["Sean Cribbs", "Joe DeVivo" "Bryan Fink",
+  {maintainers,["Sean Cribbs", "Joe DeVivo", "Bryan Fink",
                  "Kelly McLaughlin", "Jared Morrow", "Andy Gross",
                  "Steve Vinoski"]},
   {licenses,["Apache"]},
