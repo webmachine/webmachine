@@ -184,8 +184,10 @@ resource_call(F, ReqData, {?MODULE, R_Mod, R_ModState, _, R_Trace}) ->
     end,
     Result = try
         apply(R_Mod, F, [ReqData, R_ModState])
-    catch C:R ->
-            Reason = {C, R, trim_trace(erlang:get_stacktrace())},
+    catch C:R:Stacktrace ->
+        %% _build/default/lib/webmachine/src/webmachine_resource.erl:188: 
+        %% erlang:get_stacktrace/0: deprecated; use the new try/catch syntax for retrieving the stack backtrace
+            Reason = {C, R, trim_trace(Stacktrace)},
             {{error, Reason}, ReqData, R_ModState}
     end,
         case R_Trace of
