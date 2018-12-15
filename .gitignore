@@ -5,5 +5,6 @@ ebin
 doc/*
 .local_dialyzer_plt
 /.rebar
+/.rebar3
 _build
 .DS_Store
