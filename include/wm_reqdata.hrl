@@ -33,10 +33,10 @@
                                      | defined_in_create,
      req_qs = defined_in_create :: [{string(), string()}]
                                  | defined_in_create,
-     req_headers :: webmachine_headers:headers(),
+     req_headers :: webmachine:headers(),
      req_body=not_fetched_yet,
      resp_redirect = false :: boolean(),
-     resp_headers = webmachine_headers:empty() :: webmachine_headers:headers(),
+     resp_headers = webmachine_headers:empty() :: webmachine:headers(),
      resp_body = <<>> :: webmachine:response_body(),
      %% follow_request : range responce for range request, normal responce for non-range one
      %% ignore_request : normal resopnse for either range reuqest or non-range one
