@@ -904,10 +904,15 @@ not_modified_j18_via_h12() ->
 
 %% 304 result via L17
 not_modified_l17() ->
-    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
-    put_setting(last_modified, ?FIRST_DAY_OF_LAST_YEAR),
-    put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
+    % Because httpd_util:rfc1123_date converts the date to GMT, it is offset by
+    % the local time zone. To get a Last-Modified date equal to the
+    % If-Modified-Since date we must convert it back from the RFC 1123 format.
+    % This avoids the test case failing in any time zone "east" of GMT :-P
     RFC1123LastYear = httpd_util:rfc1123_date(?FIRST_DAY_OF_LAST_YEAR),
+    DateTimeLastYear = httpd_util:convert_request_date(RFC1123LastYear),
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(last_modified, DateTimeLastYear),
+    put_setting(expires, ?FIRST_DAY_OF_NEXT_YEAR),
     Headers = [{"If-Modified-Since", RFC1123LastYear}],
     {ok, Result} = httpc:request(get, {url(), Headers}, [], []),
     ?assertMatch({{"HTTP/1.1", 304, "Not Modified"}, _, _}, Result),
