@@ -1,6 +1,4 @@
-{"1.1.0",
-[{<<"mochiweb">>,{pkg,<<"mochiweb">>,<<"2.18.0">>},0}]}.
-[
-{pkg_hash,[
- {<<"mochiweb">>, <<"EB55F1DB3E6E960FAC4E6DB4E2DB9EC3602CC9F30B86CD1481D56545C3145D2E">>}]}
-].
+[{<<"mochiweb">>,
+  {git,"git://github.com/mochi/mochiweb.git",
+       {ref,"cedc22f66a8e3f3885fb06babc0c0582418508f8"}},
+  0}].
