@@ -94,7 +94,8 @@ add_port(Ctx, Host) ->
 
 verify_host_header(Ctx, Host, ExpectHostHeader, ExpectHostTokens) ->
     URL = url(Ctx, Host, "wm_echo_host_header"),
-    {ok, Status, _Headers, Body} = ibrowse:send_req(URL, [], get, [], []),
+    {ok, Status, Headers, Body} = ibrowse:send_req(URL, [], get, [], []),
+    io:format("URL: ~p~nStatus: ~p~nHeaders: ~p~nBody: ~p~n", [URL, Status, Headers, Body]),
     ?assertEqual("200", Status),
     Got = wm_echo_host_header:parse_body(Body),
     ?assertEqual(ExpectHostHeader, proplists:get_value(<<"Host">>, Got)),
