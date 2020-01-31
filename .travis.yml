@@ -4,9 +4,10 @@ language: erlang
 sudo: false
 install: "true" # don't let travis run get-deps
 otp_release:
-  - 21.0
-  - 20.0
-  - 19.1
+  - 22.1
+  - 21.3
+  - 20.3
+  - 19.3
   - 18.3
   - 17.5
   - R16B03-1
