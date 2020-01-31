@@ -21,7 +21,7 @@
 
 -ifdef(TEST).
 -export([start/3, stop/1]).
--export([get_port/1, url/1, url/2]).
+-export([get_port/1, get_addr/1, url/1, url/2]).
 
 -export([init/1, service_available/2]).
 
@@ -35,13 +35,17 @@
           mochi_serv,
           port,
           resource_name,
-          base_url = "http://localhost"
+          base_url = "http://localhost",
+          listen_address
          }).
 
 %% Returns an integration_state record that should be passed to get_port/1 and
 %% stop/1. Starts up webmachine and the mochiweb server with the given name,
 %% ip, and dispatch list. Communication is set up on an ephemeral port, which
 %% can be accessed via get_port/1.
+start(Name, IP, DispatchList) when is_list(IP) ->
+    {ok, ParsedIP} = inet:parse_address(IP),
+    start(Name, ParsedIP, DispatchList);
 start(Name, IP, DispatchList) ->
     cleanup_previous_runs(),
     error_logger:tty(false),
@@ -55,7 +59,8 @@ start(Name, IP, DispatchList) ->
     #integration_state{webmachine_sup=WebmachineSup,
                        mochi_serv=MochiServ,
                        port=Port,
-                       resource_name=Name}.
+                       resource_name=Name,
+                       listen_address=IP}.
 
 %% Receives the integration_state record returned by start/3
 stop(Context) ->
@@ -65,6 +70,11 @@ stop(Context) ->
     webmachine_mochiweb:stop(MochiName),
     stop_supervisor(MochiServ),
     application:stop(inets).
+
+%% Receives the integration_state record returned by start_webmachine, returns
+%% the address to use to communicate with Webmachine over HTTP.
+get_addr(Context) ->
+    Context#integration_state.listen_address.
 
 %% Receives the integration_state record returned by start_webmachine, returns
 %% the port to use to communicate with Webmachine over HTTP.
@@ -126,8 +136,7 @@ integration_test_() ->
      %% Setup
      fun() ->
              DL = [{[atom_to_list(?MODULE), '*'], ?MODULE, []}],
-             Ctx = wm_integration_test_util:start(?MODULE, "0.0.0.0", DL),
-             Ctx
+             wm_integration_test_util:start(?MODULE, "0.0.0.0", DL)
      end,
      %% Cleanup
      fun(Ctx) ->
