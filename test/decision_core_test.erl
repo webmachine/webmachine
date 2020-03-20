@@ -29,7 +29,7 @@
 
 -ifndef(old_hash).
 md5(Bin) ->
-    crypto:hash(md5,Bin).
+    erlang:md5(Bin).
 -else.
 md5(Bin) ->
     crypto:md5(Bin).

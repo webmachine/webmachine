@@ -737,7 +737,7 @@ variances() ->
 
 -ifndef(old_hash).
 md5(Bin) ->
-    crypto:hash(md5, Bin).
+    erlang:md5(Bin).
 
 md5_init() ->
     crypto:hash_init(md5).
