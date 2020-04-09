@@ -18,7 +18,7 @@
 -module(webmachine_mochiweb).
 -author('Justin Sheehy <justin@basho.com>').
 -author('Andy Gross <andy@basho.com>').
--export([start/1, stop/0, stop/1, loop/2, loop2/2, new_webmachine_req/1]).
+-export([start/1, stop/0, stop/1, loop/2, new_webmachine_req/1]).
 
 -include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
@@ -63,7 +63,7 @@ start(Options) ->
     webmachine_router:init_routes(DGroup, DispatchList),
     _ = [application_set_unless_env_or_undef(K, V) || {K, V} <- WMOptions],
     MochiName = list_to_atom(to_list(PName) ++ "_mochiweb"),
-    LoopFun = {?MODULE, loop2, [DGroup]},
+    LoopFun = {?MODULE, loop, [DGroup]},
     mochiweb_http:start([{name, MochiName}, {loop, LoopFun} | OtherOptions]).
 
 stop() ->
@@ -74,14 +74,8 @@ stop() ->
 stop(Name) ->
     mochiweb_http:stop(Name).
 
--spec loop2(mochiweb_request(), any()) -> ok.
-loop2(MochiReq, DGroup) ->
-    loop(DGroup, MochiReq).
-
--spec loop(any(),
-           mochiweb_request()) ->
-                  ok.
-loop(Name, MochiReq) ->
+-spec loop(mochiweb_request(), any()) -> ok.
+loop(MochiReq, Name) ->
     case new_webmachine_req(MochiReq) of
       {{error, NewRequestError}, ErrorReq} ->
         handle_error(500, {error, NewRequestError}, ErrorReq);
