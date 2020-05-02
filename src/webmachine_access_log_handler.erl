@@ -136,33 +136,38 @@ format_req(#wm_log_data{method=Method,
             undefined -> "";
             U -> U
         end,
-    case RequestTiming of
+    XForwardedFor =
+        case mochiweb_headers:get_value("X-Forwarded-For", Headers) of
+            undefined -> "";
+            X -> X
+        end,    
+case RequestTiming of
         true ->
-            fmt_alog(Time, Peer, User, Method, Path, Version,
+            fmt_alog(Time, Peer, XForwardedFor, User, Method, Path, Version,
                      Status, Length, Referer, UserAgent, timer:now_diff(EndTime, StartTime));
         false ->
-            fmt_alog(Time, Peer, User, Method, Path, Version,
+            fmt_alog(Time, Peer, XForwardedFor, User, Method, Path, Version,
                      Status, Length, Referer, UserAgent)
     end.
 
-fmt_alog(Time, Ip, User, Method, Path, Version,
+fmt_alog(Time, Ip, XForwardedFor, User, Method, Path, Version,
          Status,  Length, Referer, UserAgent) when is_atom(Method) ->
-    fmt_alog(Time, Ip, User, atom_to_list(Method), Path, Version,
+    fmt_alog(Time, Ip, XForwardedFor, User, atom_to_list(Method), Path, Version,
              Status, Length, Referer, UserAgent);
-fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
+fmt_alog(Time, Ip, XForwardedFor, User, Method, Path, {VM,Vm},
          Status,  Length, Referer, UserAgent) ->
-    [webmachine_log:fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
+    [webmachine_log:fmt_ip(Ip), " - ", webmachine_log:fmt_ip(XForwardedFor), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, [$\s,$"], Referer,
      [$",$\s,$"], UserAgent, [$",$\n]].
 
-fmt_alog(Time, Ip, User, Method, Path, Version,
+fmt_alog(Time, Ip, XForwardedFor, User, Method, Path, Version,
          Status,  Length, Referer, UserAgent, ReqDuration) when is_atom(Method) ->
-    fmt_alog(Time, Ip, User, atom_to_list(Method), Path, Version,
+    fmt_alog(Time, Ip, XForwardedFor, User, atom_to_list(Method), Path, Version,
              Status, Length, Referer, UserAgent, ReqDuration);
-fmt_alog(Time, Ip, User, Method, Path, {VM,Vm},
+fmt_alog(Time, Ip, XForwardedFor, User, Method, Path, {VM,Vm},
          Status,  Length, Referer, UserAgent, ReqDuration) ->
-    [webmachine_log:fmt_ip(Ip), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
+    [webmachine_log:fmt_ip(Ip), " - ", webmachine_log:fmt_ip(XForwardedFor), " - ", User, [$\s], Time, [$\s, $"], Method, " ", Path,
      " HTTP/", integer_to_list(VM), ".", integer_to_list(Vm), [$",$\s],
      Status, [$\s], Length, [$\s,$"], Referer,
      [$",$\s,$"], UserAgent, [$",$\s], integer_to_list(ReqDuration), [$\n]].
