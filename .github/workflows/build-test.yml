@@ -1,0 +1,25 @@
+name: Build/Test
+
+on: [push]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        otp_version: [22, 21, 20, 19, 18]
+      fail-fast: false
+      max-parallel: 2
+    
+    container:
+      image: erlang:${{ matrix.otp_version }}
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Compile
+      run: rebar3 compile
+    - name: Run tests
+      run: rebar3 eunit
