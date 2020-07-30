@@ -315,8 +315,8 @@ setup() ->
         meck:new(webmachine_resource, MeckOpts),
         Ctx
     catch
-        T:E ->
-            io:format(user, "~n~p : ~p : ~p", [T, E, erlang:get_stacktrace()]),
+        T:E:Stacktrace ->
+            io:format(user, "~n~p : ~p : ~p", [T, E, Stacktrace]),
             error(setup_failed)
     end.
 
