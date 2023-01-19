@@ -510,10 +510,10 @@ rfc1123_date_test() ->
                  rfc1123_date({{2013, 7, 11}, {4, 33, 19}})).
 
 guess_mime_test() ->
-    TextTypes = [".html",".css",".htc",".manifest",".txt"],
-    AppTypes = [".xhtml",".xml",".js",".swf",".zip",".bz2",
-                ".gz",".tar",".tgz"],
-    ImgTypes = [".jpg",".jpeg",".gif",".png",".ico",".svg"],
+    TextTypes = ["f.html","f.css","f.htc","f.manifest","f.txt"],
+    AppTypes = ["f.xhtml","f.xml","f.js","f.swf","f.zip","f.bz2",
+                "f.gz","f.tar","f.tgz"],
+    ImgTypes = ["f.jpg","f.jpeg","f.gif","f.png","f.ico","f.svg"],
     ?assertEqual([], [ T || T <- TextTypes,
                             1 /= string:str(guess_mime(T),"text/") ]),
     ?assertEqual([], [ T || T <- AppTypes,
