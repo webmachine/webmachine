@@ -1,7 +1,10 @@
+%% method will be an atom only for valid HTTP methods and a string otherwise,
+%% see erlang:decode_packet documentation
 -record(wm_log_data,
         {resource_module :: atom(),
          start_time :: tuple(),
-         method :: atom(),
+         method :: atom() | string() | binary(),
+
          headers,
          peer,
          sock,
