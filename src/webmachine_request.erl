@@ -167,7 +167,14 @@ x_peername(Default, Req) ->
     {undefined, _} ->
         Default;
     {Hosts, _} ->
-        string:strip(lists:last(string:tokens(Hosts, ",")))
+        case string:tokens(Hosts, ",") of
+            [] ->
+                %% both Hosts="" and Hosts=",,," cause this, so check
+                %% here instead of before tokenization
+                Default;
+            HostList ->
+                string:strip(lists:last(HostList))
+        end
     end.
 
 call(base_uri, {?MODULE, ReqState}) ->
