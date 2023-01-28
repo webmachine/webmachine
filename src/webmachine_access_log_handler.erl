@@ -138,8 +138,17 @@ format_req(#wm_log_data{method=Method,
         end,
     case RequestTiming of
         true ->
+            % EndTime will be undefined in some error conditions,
+            % including if the request did not match any dispatch rule
+            RealEndTime = case EndTime of
+                              undefined ->
+                                  os:timestamp();
+                              _ ->
+                                  EndTime
+                          end,
             fmt_alog(Time, Peer, User, Method, Path, Version,
-                     Status, Length, Referer, UserAgent, timer:now_diff(EndTime, StartTime));
+                     Status, Length, Referer, UserAgent,
+                     timer:now_diff(RealEndTime, StartTime));
         false ->
             fmt_alog(Time, Peer, User, Method, Path, Version,
                      Status, Length, Referer, UserAgent)
