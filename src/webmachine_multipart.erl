@@ -212,6 +212,19 @@ riak_test() ->
           [{<<"Content-Type">>,
             <<"multipart/mixed; boundary=a6y3iiUBGN7BsyUTrtKWtSGc75X">>}]},
          <<"--a6y3iiUBGN7BsyUTrtKWtSGc75X\r\nX-Riak-Vclock: a85hYGBgzGDKBVIcR4M2cgdcaPTNYEpkzGNlKP7rcoovCwA=\r\nLocation: /riak/test_bucket/2\r\nContent-Type: application/octet-stream\r\nLink: </riak/test_bucket/3>; riaktag=\"next\", </riak/test_bucket>; rel=\"up\"\r\nEtag: 3GS7hwS5DlD2J2W2qkSITC\r\nLast-Modified: Tue, 18 Dec 2012 14:45:07 GMT\r\n\r\nv2\r\n--a6y3iiUBGN7BsyUTrtKWtSGc75X--\r\n">>}],
-      get_all_parts(Body,Boundary)).
+      get_all_parts(Body,Boundary)),
+    [{_, _, InnerBody}] = get_all_parts(Body, Boundary),
+    InnerBoundary = "a6y3iiUBGN7BsyUTrtKWtSGc75X",
+    ?assertEqual(
+       [{name_undefined,
+         {params_undefined,
+          [{<<"Last-Modified">>, <<"Tue, 18 Dec 2012 14:45:07 GMT">>},
+           {<<"Etag">>, <<"3GS7hwS5DlD2J2W2qkSITC">>},
+           {<<"Link">>, <<"</riak/test_bucket/3>; riaktag=\"next\", </riak/test_bucket>; rel=\"up\"">>},
+           {<<"Content-Type">>, <<"application/octet-stream">>},
+           {<<"Location">>, <<"/riak/test_bucket/2">>},
+           {<<"X-Riak-Vclock">>,<<"a85hYGBgzGDKBVIcR4M2cgdcaPTNYEpkzGNlKP7rcoovCwA=">>}]},
+         <<"v2">>}],
+       get_all_parts(InnerBody, InnerBoundary)).
 
 -endif.
