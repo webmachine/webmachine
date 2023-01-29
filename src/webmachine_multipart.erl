@@ -46,7 +46,7 @@
 % @spec find_boundary(wrq:wm_reqdata()) -> boundary()
 find_boundary(ReqData) ->
     ContentType = wrq:get_req_header("content-type", ReqData),
-    string:substr(ContentType, string:str(ContentType, "boundary=") 
+    string:substr(ContentType, string:str(ContentType, "boundary=")
                   + length("boundary=")).
 
 % @doc Turn a multipart form into component parts.
@@ -96,7 +96,7 @@ stream_parts([H|T]) -> {make_part(H), fun() -> stream_parts(T) end}.
 
 get_more_data(done) -> {<<"--\n">>, really_done};
 get_more_data(Fun) -> Fun().
-   
+
 make_part(PartData) ->
     %% Remove the trailing \r\n
     [HeadData, BodyWithCRLF] = re:split(PartData, "\\r\\n\\r\\n", [{parts,2}]),
@@ -108,7 +108,7 @@ make_part(PartData) ->
     {Name, Params, Headers} = make_headers(HeadList),
     {Name, {Params,Headers}, Body}.
 
-make_headers(X) -> 
+make_headers(X) ->
     make_headers(X, name_undefined, params_undefined, []).
 make_headers([], Name, Params, Headers) -> {Name, Params, Headers};
 make_headers([<<>>|HL], Name, Params, Headers) ->
@@ -140,7 +140,7 @@ getparts1({Part, Streamer}, Acc) ->
 
 send_streamed_body(Body, Max) ->
     HunkLen=8*Max,
-    case Body of        
+    case Body of
         <<A:HunkLen,Rest/binary>> ->
             {<<A:HunkLen>>, fun() -> send_streamed_body(Rest,Max) end};
         _ ->
@@ -168,7 +168,7 @@ body_test() ->
         {"Upload",{[{<<"name">>,<<"Upload">>}],[]},
          <<"Submit Query">>}],
        get_all_parts(Body, Boundary)).
-    
+
 body2_test() ->
     Body = <<"-----------------------------89205314411538515011004844897\r\nContent-Disposition: form-data; name=\"Filedata\"; filename=\"akamai.txt\"\r\nContent-Type: text/plain\r\n\r\nCAMBRIDGE, MA - February 18, 2009 - Akamai Technologies, Inc. (NASDAQ: AKAM), the leader in powering rich media, dynamic transactions and enterprise applications online, today announced that its Service & Support organization was awarded top honors for Innovation in Customer Service at the 3rd Annual Stevie Awards for Sales & Customer Service, an international competition recognizing excellence in disciplines that are crucial to business success.\n\n\"We have always set incredibly high standards with respect to the service and support we provide our customers,\" said Sanjay Singh, vice president of Global Service & Support at Akamai. \"Our support team provides highly responsive service around the clock to our global customer base and, as a result, has become an extension of our customers' online businesses. This prestigious award is validation of Akamai's commitment to customer service and technical support.\"\n\nAkamai Service & Support professionals are dedicated to working with customers on a daily basis to fine tune, optimize, and support their Internet initiatives. Akamai's winning submission highlighted the key pillars of its service and support offering, as well as the initiatives established to meet customer requirements for proactive communication, simplification, and faster response times.\n\n\"This year's honorees demonstrate that even in challenging economic times, it's possible for organizations to continue to shine in sales and customer service, the two most important functions in business: acquiring and keeping customers,\" said Michael Gallagher, president of the Stevie Awards.\n\nThe awards are presented by the Stevie Awards, which organizes several of the world's leading business awards shows, including the prestigious American Business Awards. Nicknamed the Stevies for the Greek word \"crowned,\" winners were announced during a gala banquet on Monday, February 9 at Caesars Palace in Las Vegas. Nominated customer service and sales executives from the U.S.A. and several other countries attended. More than 500 entries from companies of all sizes and in virtually every industry were submitted to this year's competition. There are 27 categories for customer service professionals, as well as 41 categories for sales professionals.\n\nDetails about the Stevie Awards for Sales & Customer Service and the list of honorees in all categories are available at www.stevieawards.com/sales. \n\r\n-----------------------------89205314411538515011004844897--\r\n">>,
     Boundary = "---------------------------89205314411538515011004844897",
