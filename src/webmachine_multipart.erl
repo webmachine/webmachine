@@ -71,6 +71,8 @@ stream_form({Hunk, Next}, Boundary, []) ->
     stream_form(get_more_data(Next), Boundary, re:split(Hunk, Boundary,[]));
 stream_form({Hunk, Next}, Boundary, [<<>>|DQ]) ->
     stream_form({Hunk, Next}, Boundary, DQ);
+stream_form({Hunk, Next}, Boundary, [<<"\r\n">>|DQ]) ->
+    stream_form({Hunk, Next}, Boundary, DQ);
 stream_form({Hunk, Next}, Boundary, [H|[T1|T2]]) ->
     {make_part(H), fun() ->
                     stream_form({Hunk, Next}, Boundary, [T1|T2]) end};
@@ -200,5 +202,16 @@ chrome_test() ->
           [{<<"Content-Type">>,<<"text/plain">>}]},
          <<"01234567890123456789012345678901234567890123456789">>}],
        get_all_parts(Body,Boundary)).
+
+riak_test() ->
+    Body = <<"\r\n--UvEgscOlsihVbv6inze7HSj0PLe\r\nContent-Type: multipart/mixed; boundary=a6y3iiUBGN7BsyUTrtKWtSGc75X\r\n\r\n--a6y3iiUBGN7BsyUTrtKWtSGc75X\r\nX-Riak-Vclock: a85hYGBgzGDKBVIcR4M2cgdcaPTNYEpkzGNlKP7rcoovCwA=\r\nLocation: /riak/test_bucket/2\r\nContent-Type: application/octet-stream\r\nLink: </riak/test_bucket/3>; riaktag=\"next\", </riak/test_bucket>; rel=\"up\"\r\nEtag: 3GS7hwS5DlD2J2W2qkSITC\r\nLast-Modified: Tue, 18 Dec 2012 14:45:07 GMT\r\n\r\nv2\r\n--a6y3iiUBGN7BsyUTrtKWtSGc75X--\r\n\r\n--UvEgscOlsihVbv6inze7HSj0PLe--\r\n">>,
+    Boundary = "UvEgscOlsihVbv6inze7HSj0PLe",
+    ?assertEqual(
+       [{name_undefined,
+         {params_undefined,
+          [{<<"Content-Type">>,
+            <<"multipart/mixed; boundary=a6y3iiUBGN7BsyUTrtKWtSGc75X">>}]},
+         <<"--a6y3iiUBGN7BsyUTrtKWtSGc75X\r\nX-Riak-Vclock: a85hYGBgzGDKBVIcR4M2cgdcaPTNYEpkzGNlKP7rcoovCwA=\r\nLocation: /riak/test_bucket/2\r\nContent-Type: application/octet-stream\r\nLink: </riak/test_bucket/3>; riaktag=\"next\", </riak/test_bucket>; rel=\"up\"\r\nEtag: 3GS7hwS5DlD2J2W2qkSITC\r\nLast-Modified: Tue, 18 Dec 2012 14:45:07 GMT\r\n\r\nv2\r\n--a6y3iiUBGN7BsyUTrtKWtSGc75X--\r\n">>}],
+      get_all_parts(Body,Boundary)).
 
 -endif.
