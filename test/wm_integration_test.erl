@@ -13,7 +13,6 @@
 %%    limitations under the License.
 -module(wm_integration_test).
 -ifdef(TEST).
-
 -include_lib("eunit/include/eunit.hrl").
 -include("webmachine.hrl").
 
@@ -23,9 +22,14 @@ integration_test_() ->
      fun() ->
              ibrowse:start(),
              DL = [{["wm_echo_host_header", '*'], wm_echo_host_header, []}],
-             %% Listen on both ipv4 and ipv6 so we can test both.
-             Ctx = wm_integration_test_util:start(?MODULE, "::0", DL),
-             Ctx
+             case inet:getaddrs("localhost", inet6) of
+                 {ok, [_|_]} ->
+                     %% Listen on both ipv4 and ipv6 so we can test both.
+                     wm_integration_test_util:start(?MODULE, "::0", DL);
+                 {ok, []} ->
+                     ?debugMsg("IPv6 unavailable, tests covering v6 addresses will be skipped"),
+                     wm_integration_test_util:start(?MODULE, "0.0.0.0", DL)
+             end
      end,
      %% Cleanup
      fun(Ctx) ->
@@ -33,14 +37,17 @@ integration_test_() ->
      end,
      %% Test functions provided with context from setup
      [fun(Ctx) ->
-              {spawn, {with, Ctx, integration_tests()}}
-      end]}.
+              {Title, {spawn, {with, Ctx, [fun(C) -> ?debugFmt("~s: ~p~n", [Title, self()]), T(C) end]}}}
+      end
+      || {Title, T} <- integration_tests()
+     ]
+    }.
 
 integration_tests() ->
-    [fun test_host_header_localhost/1,
-     fun test_host_header_127/1,
-     fun test_host_header_ipv6/1,
-     fun test_host_header_ipv6_curl/1].
+    [{"test_host_header_localhost", fun test_host_header_localhost/1},
+     {"test_host_header_127", fun test_host_header_127/1},
+     {"test_host_header_ipv6", fun test_host_header_ipv6/1},
+     {"test_host_header_ipv6_curl", fun test_host_header_ipv6_curl/1}].
 
 test_host_header_localhost(Ctx) ->
     ExpectHost = add_port(Ctx, "localhost"),
@@ -59,22 +66,34 @@ test_host_header_ipv6(Ctx) ->
     %% It is likely there are other HTTP clients that will make send
     %% such a Host header, it is worth testing that we handle it
     %% reasonably.
-    ExpectHost = add_port(Ctx, "::1"),
-    ExpectTokens = <<"[", ExpectHost/binary, "]">>,
-    verify_host_header(Ctx, "[::1]", ExpectHost, ExpectTokens).
+    ListenAddr = wm_integration_test_util:get_addr(Ctx),
+    if
+        is_tuple(ListenAddr) andalso tuple_size(ListenAddr) == 8 ->
+            ExpectHost = add_port(Ctx, "::1"),
+            ExpectTokens = <<"[", ExpectHost/binary, "]">>,
+            verify_host_header(Ctx, "[::1]", ExpectHost, ExpectTokens);
+        true ->
+            ?debugMsg("Skipping test_host_header_ipv6, not listening on v6 address")
+    end.
 
 test_host_header_ipv6_curl(Ctx) ->
-    %% curl has the desired client behavior for ipv6
-    case os:find_executable("curl") of
-        false ->
-            ?debugMsg("curl not found: skipping test_host_header_ipv6_curl");
-        _ ->
-            Port = wm_integration_test_util:get_port(Ctx),
-            P = erlang:integer_to_list(Port),
-            Cmd = "curl -gs http://[::1]:" ++ P ++ "/wm_echo_host_header",
-            Got = wm_echo_host_header:parse_body(erlang:list_to_binary(os:cmd(Cmd))),
-            ?assertEqual(add_port(Ctx, "[::1]"), proplists:get_value(<<"Host">>, Got)),
-            ?assertEqual(<<"[::1]">>, proplists:get_value(<<"HostTokens">>, Got))
+    ListenAddr = wm_integration_test_util:get_addr(Ctx),
+    if
+        is_tuple(ListenAddr) andalso tuple_size(ListenAddr) == 8 ->
+            %% curl has the desired client behavior for ipv6
+            case os:find_executable("curl") of
+                false ->
+                    ?debugMsg("curl not found: skipping test_host_header_ipv6_curl");
+                _ ->
+                    Port = wm_integration_test_util:get_port(Ctx),
+                    P = erlang:integer_to_list(Port),
+                    Cmd = "curl -gs http://[::1]:" ++ P ++ "/wm_echo_host_header",
+                    Got = wm_echo_host_header:parse_body(erlang:list_to_binary(os:cmd(Cmd))),
+                    ?assertEqual(add_port(Ctx, "[::1]"), proplists:get_value(<<"Host">>, Got)),
+                    ?assertEqual(<<"[::1]">>, proplists:get_value(<<"HostTokens">>, Got))
+            end;
+        true ->
+            ?debugMsg("Skipping test_host_header_ipv6_curl, not listening on v6 address")
     end.
 
 url(Ctx, Host, Path) ->
@@ -97,6 +116,7 @@ verify_host_header(Ctx, Host, ExpectHostHeader, ExpectHostTokens) ->
     {ok, Status, _Headers, Body} = ibrowse:send_req(URL, [], get, [], []),
     ?assertEqual("200", Status),
     Got = wm_echo_host_header:parse_body(Body),
+    ?debugVal(Got),
     ?assertEqual(ExpectHostHeader, proplists:get_value(<<"Host">>, Got)),
     ?assertEqual(ExpectHostTokens, proplists:get_value(<<"HostTokens">>, Got)).
 
