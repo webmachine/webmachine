@@ -8,7 +8,7 @@ contact [@seancribbs](http://github.com/seancribbs) to get involved.
 
 ### Overview
 
-[![Build Status](https://travis-ci.org/webmachine/webmachine.svg?branch=develop)](https://travis-ci.org/webmachine/webmachine)
+[![Build Status](https://github.com/webmachine/webmachine/actions/workflows/build-test.yml/badge.svg?branch=main)](https://github.com/webmachine/webmachine/actions/workflows/build-test.yml?query=branch%3Amain)
 
 Webmachine is an application layer that adds HTTP semantic awareness
 on top of the excellent bit-pushing and HTTP syntax-management
