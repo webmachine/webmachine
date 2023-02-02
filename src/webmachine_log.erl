@@ -41,7 +41,9 @@
          log_write/2,
          maybe_rotate/5,
          month/1,
+         post_processing_time/1,
          refresh/2,
+         request_processing_time/1,
          suffix/1,
          zeropad/2,
          zone/0]).
@@ -257,3 +259,31 @@ zone(Val) when Val < 0 ->
     io_lib:format("-~4..0w", [trunc(abs(Val))]);
 zone(Val) when Val >= 0 ->
     io_lib:format("+~4..0w", [trunc(abs(Val))]).
+
+%% @doc Compute the time to process the request and send the response,
+%% in native time units. Convert to logger's preference with
+%% erlang:convert_time_unit/3.
+-spec request_processing_time(wm_log_data()) -> integer().
+request_processing_time(#wm_log_data{start_time=StartTime,
+                                     end_time=EndTime}) ->
+    performance_time_diff(EndTime, StartTime).
+
+%% @doc Compute the time to handle any post-request processing, in
+%% native time units. Convert to logger's preference with
+%% erlang:convert_time_unit/3.
+-spec post_processing_time(wm_log_data()) -> integer().
+post_processing_time(#wm_log_data{end_time=EndTime,
+                                  finish_time=FinishTime}) ->
+    performance_time_diff(FinishTime, EndTime).
+
+%% @doc Compute the difference between two monotonic times. This is a
+%% wrapper around simple subtraction to handle the few cases where one
+%% of the timestamps didn't get set.
+-spec performance_time_diff(undefined|integer(), undefined|integer())
+                           -> integer().
+performance_time_diff(undefined, undefined) ->
+    0;
+performance_time_diff(undefined, T1) ->
+    performance_time_diff(erlang:monotonic_time(), T1);
+performance_time_diff(T2, T1) ->
+    T2 - T1.

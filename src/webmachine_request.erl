@@ -282,7 +282,7 @@ call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req)
                 send_response(CodeAndReason, Req)
         end,
     LogData = NewState#wm_reqstate.log_data,
-    NewLogData = LogData#wm_log_data{finish_time=os:timestamp()},
+    NewLogData = LogData#wm_log_data{finish_time=erlang:monotonic_time()},
     {Reply, NewState#wm_reqstate{log_data=NewLogData}};
 call(resp_body, {?MODULE, ReqState}) ->
     {wrq:resp_body(ReqState#wm_reqstate.reqdata), ReqState};
