@@ -2,7 +2,7 @@
 %% see erlang:decode_packet documentation
 -record(wm_log_data,
         {resource_module :: atom(),
-         start_time :: tuple(),
+         start_time :: integer(), % erlang monotonic time, native units
          method :: atom() | string() | binary(),
 
          headers,
@@ -12,8 +12,8 @@
          version,
          response_code,
          response_length,
-         end_time :: undefined | tuple(),
-         finish_time :: undefined | tuple(),
+         end_time :: undefined | integer(), % monotonic time, native units
+         finish_time :: undefined | integer(), % monotonic time, native units
          notes}).
 -type wm_log_data() :: #wm_log_data{}.
 

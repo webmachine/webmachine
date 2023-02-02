@@ -137,7 +137,7 @@ new_webmachine_req(Request) ->
     Socket = mochiweb_request:get(socket, Request),
 
     InitialReqData = wrq:create(Method,Scheme,Version,RawPath,Headers),
-    InitialLogData = #wm_log_data{start_time=os:timestamp(),
+    InitialLogData = #wm_log_data{start_time=erlang:monotonic_time(),
                                   method=Method,
                                   headers=Headers,
                                   path=RawPath,

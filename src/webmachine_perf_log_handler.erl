@@ -93,15 +93,12 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 
 format_req(#wm_log_data{resource_module=Mod,
-                        start_time=StartTime,
                         method=Method,
                         peer=Peer,
                         path=Path,
                         version=Version,
                         response_code=ResponseCode,
-                        response_length=ResponseLength,
-                        end_time=EndTime,
-                        finish_time=FinishTime}) ->
+                        response_length=ResponseLength}=LogData) ->
     Time = webmachine_log:fmtnow(),
     Status = case ResponseCode of
                  {Code, _ReasonPhrase} when is_integer(Code)  ->
@@ -112,8 +109,14 @@ format_req(#wm_log_data{resource_module=Mod,
                      ResponseCode
              end,
     Length = integer_to_list(ResponseLength),
-    TTPD = webmachine_util:now_diff_milliseconds(EndTime, StartTime),
-    TTPS = webmachine_util:now_diff_milliseconds(FinishTime, EndTime),
+    TTPD = erlang:convert_time_unit(
+             webmachine_log:request_processing_time(LogData),
+             native,
+             millisecond),
+    TTPS = erlang:convert_time_unit(
+             webmachine_log:post_processing_time(LogData),
+             native,
+             millisecond),
     fmt_plog(Time, Peer, Method, Path, Version,
              Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
              integer_to_list(TTPS)).
@@ -132,15 +135,15 @@ fmt_plog(Time, Ip,  Method, Path, {VM,Vm}, Status, Length, Mod, TTPD, TTPS) ->
 
 non_standard_method_test() ->
     LogData = #wm_log_data{resource_module=foo,
-                           start_time=os:timestamp(),
+                           start_time=erlang:monotonic_time(),
                            method="FOO",
                            peer={127,0,0,1},
                            path="/",
                            version={1,1},
                            response_code=501,
                            response_length=1234,
-                           end_time=os:timestamp(),
-                           finish_time=os:timestamp()},
+                           end_time=erlang:monotonic_time(),
+                           finish_time=erlang:monotonic_time()},
     LogEntry = format_req(LogData),
     ?assert(is_list(LogEntry)),
     ok.

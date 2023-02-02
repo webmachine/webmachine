@@ -111,9 +111,7 @@ format_req(#wm_log_data{method=Method,
                         path=Path,
                         version=Version,
                         response_code=ResponseCode,
-                        response_length=ResponseLength,
-                        start_time=StartTime,
-                        end_time=EndTime},
+                        response_length=ResponseLength}=LogData,
           RequestTiming) ->
     User = "-",
     Time = webmachine_log:fmtnow(),
@@ -138,17 +136,12 @@ format_req(#wm_log_data{method=Method,
         end,
     case RequestTiming of
         true ->
-            % EndTime will be undefined in some error conditions,
-            % including if the request did not match any dispatch rule
-            RealEndTime = case EndTime of
-                              undefined ->
-                                  os:timestamp();
-                              _ ->
-                                  EndTime
-                          end,
+            Timing = erlang:convert_time_unit(
+                       webmachine_log:request_processing_time(LogData),
+                       native,
+                       microsecond),
             fmt_alog(Time, Peer, User, Method, Path, Version,
-                     Status, Length, Referer, UserAgent,
-                     timer:now_diff(RealEndTime, StartTime));
+                     Status, Length, Referer, UserAgent, Timing);
         false ->
             fmt_alog(Time, Peer, User, Method, Path, Version,
                      Status, Length, Referer, UserAgent)
