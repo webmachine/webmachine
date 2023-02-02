@@ -478,12 +478,12 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
         {undefined, _} ->
             ok;
         {Continue, _} ->
-            case string:equal(Continue, "100-continue", true) of
-                true ->
+            case string:to_lower(Continue) of
+                "100-continue" ->
                     send(PassedState#wm_reqstate.socket,
                          [make_version(wrq:version(RD)),
                           make_code(100), <<"\r\n\r\n">>]);
-                false ->
+                _ ->
                     ok
             end
     end,
