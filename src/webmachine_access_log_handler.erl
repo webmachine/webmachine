@@ -139,7 +139,7 @@ format_req(#wm_log_data{method=Method,
             Timing = erlang:convert_time_unit(
                        webmachine_log:request_processing_time(LogData),
                        native,
-                       microsecond),
+                       micro_seconds),
             fmt_alog(Time, Peer, User, Method, Path, Version,
                      Status, Length, Referer, UserAgent, Timing);
         false ->

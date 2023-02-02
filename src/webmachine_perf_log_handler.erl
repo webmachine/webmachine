@@ -112,11 +112,11 @@ format_req(#wm_log_data{resource_module=Mod,
     TTPD = erlang:convert_time_unit(
              webmachine_log:request_processing_time(LogData),
              native,
-             millisecond),
+             milli_seconds),
     TTPS = erlang:convert_time_unit(
              webmachine_log:post_processing_time(LogData),
              native,
-             millisecond),
+             milli_seconds),
     fmt_plog(Time, Peer, Method, Path, Version,
              Status, Length, atom_to_list(Mod), integer_to_list(TTPD),
              integer_to_list(TTPS)).
