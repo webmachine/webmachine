@@ -475,12 +475,17 @@ read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
 recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
     put(mochiweb_request_recv, true),
     case get_header_value("expect", PassedState) of
-        {"100-continue", _} ->
-            send(PassedState#wm_reqstate.socket,
-                 [make_version(wrq:version(RD)),
-                  make_code(100), <<"\r\n\r\n">>]);
-        _Else ->
-            ok
+        {undefined, _} ->
+            ok;
+        {Continue, _} ->
+            case string:to_lower(Continue) of
+                "100-continue" ->
+                    send(PassedState#wm_reqstate.socket,
+                         [make_version(wrq:version(RD)),
+                          make_code(100), <<"\r\n\r\n">>]);
+                _ ->
+                    ok
+            end
     end,
     case body_length(PassedState) of
         {unknown_transfer_encoding, X} -> exit({unknown_transfer_encoding, X});

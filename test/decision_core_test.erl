@@ -307,6 +307,7 @@ core_tests() ->
      fun not_found_m7/0,
      fun created_p11_post/0,
      fun created_p11_put/0,
+     fun expect_100_continue/0,
      fun conflict_p3/0,
      fun conflict_o14/0,
      fun gone_m5/0,
@@ -1048,6 +1049,45 @@ created_p11_put() ->
     ?assertMatch({{"HTTP/1.1", 201, "Created"}, _, _}, Result),
     ExpectedDecisionTrace = ?PATH_TO_P11_VIA_P3_NO_ACPTHEAD,
     ?assertEqual(ExpectedDecisionTrace, get_decision_ids()),
+    ok.
+
+%% Expect: 100-continue should get 100 Continue response
+expect_100_continue() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    ContentType = "text/plain",
+    Content = "Hello, expect_100_continue!",
+    ContentType = "text/plain",
+    put_setting(content_types_accepted, [{ContentType, accept_text}]),
+
+    %% Expect header should be case insensitive. This capitalizes a
+    %% random letter. All-lower case is never tested, because it seems
+    %% unlikely that an implementation would handle any random capital
+    %% without handling no capitals, and the implementation not
+    %% handling any capitals was the bug that caused this test to be
+    %% written.
+    ContinueLower = "continue",
+    {ContinueBefore, [ToCap|ContinueAfter]} =
+        lists:split(rand:uniform(length(ContinueLower))-1, ContinueLower),
+    ContinueTest = ContinueBefore ++ [ToCap-32 | ContinueAfter],
+
+    Ctx = get_context(),
+    Port = wm_integration_test_util:get_port(Ctx),
+    Url = wm_integration_test_util:url(Ctx, "excont"),
+    ExpReq = ["PUT ", Url, " HTTP/1.1\r\n",
+                             "Host: http://localhost:", integer_to_list(Port),
+                             "\r\nContent-type: ", ContentType,
+                             "\r\nContent-length: ",
+                             integer_to_list(length(Content)),
+                             "\r\nExpect: 100-", ContinueTest,
+                             "\r\n\r\n",
+                             Content],
+
+    {ok, Sock} = gen_tcp:connect("localhost", Port, [binary, {active, false}]),
+    ok = gen_tcp:send(Sock, ExpReq),
+    ?assertMatch({ok, <<"HTTP/1.1 100 Continue", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
+    ok = gen_tcp:close(Sock),
     ok.
 
 %% 409 result via P3 (must be a PUT)
