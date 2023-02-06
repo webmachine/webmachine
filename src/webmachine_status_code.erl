@@ -24,6 +24,16 @@ reason_phrase({Code, Phrase}) when is_integer(Code), is_list(Phrase) ->
     Phrase;
 reason_phrase({Code, undefined}) ->
     reason_phrase(Code);
+reason_phrase(418) -> % RFC 2324
+    "I'm a teapot";
+reason_phrase(428) -> % RFC 6585
+    "Precondition Required";
+reason_phrase(429) -> % RFC 6585
+    "Too Many Requests";
+reason_phrase(431) -> % RFC 6585
+    "Request Header Fields Too Large";
+reason_phrase(511) -> % RFC 6585
+    "Network Authentication Required";
 reason_phrase(Code) when is_integer(Code), Code >= 100, Code =< 599 ->
     case httpd_util:reason_phrase(Code) of
         "Internal Server Error" when Code =/= 500 ->
