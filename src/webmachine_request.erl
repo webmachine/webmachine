@@ -723,11 +723,11 @@ stream_multipart_part_helper(Fun, Rest, CType, Boundary, Size) ->
     end.
 
 make_code({Code, undefined}) when is_integer(Code) ->
-    make_code({Code, httpd_util:reason_phrase(Code)});
+    make_code({Code, webmachine_status_code:reason_phrase(Code)});
 make_code({Code, ReasonPhrase}) when is_integer(Code) ->
     [integer_to_list(Code), [" ", ReasonPhrase]];
 make_code(Code) when is_integer(Code) ->
-    make_code({Code, httpd_util:reason_phrase(Code)});
+    make_code({Code, webmachine_status_code:reason_phrase(Code)});
 make_code(Io) when is_list(Io); is_binary(Io) ->
     Io.
 

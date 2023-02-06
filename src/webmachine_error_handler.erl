@@ -76,15 +76,10 @@ render_error_body({503, _}, Req, Reason) ->
                "</ADDRESS></body></html>",
     {list_to_binary(ErrorStr), ReqState};
 
-render_error_body(CodeAndPhrase, Req, Reason) ->
+render_error_body({Code, _}=CodeAndPhrase, Req, Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
-    case CodeAndPhrase of
-        {Code, undefined} ->
-            ReasonPhrase = httpd_util:reason_phrase(Code);
-        {Code, ReasonPhrase} ->
-            ok
-    end,
+    ReasonPhrase = webmachine_status_code:reason_phrase(CodeAndPhrase),
     Body = ["<html><head><title>",
             integer_to_list(Code),
             " ",

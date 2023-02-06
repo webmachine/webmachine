@@ -114,10 +114,11 @@ error_response(Code, Reason) ->
     error_response({Code, undefined}, Reason, Resource, EndTime).
 
 error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
-    error_response({Code, _}=CodeAndPhrase,
-                   webmachine_error:reason(Code),
-                   Resource,
-                   EndTime).
+    %% Reason is the paragraph under the heading, but we have nothing
+    %% to add in this case. The heading will already be the status
+    %% phrase.
+    Reason = "",
+    error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime).
 
 error_response(CodeAndPhrase, Reason, Resource, EndTime) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),

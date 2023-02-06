@@ -320,7 +320,8 @@ core_tests() ->
      fun head_length_access_for_cs/0,
      fun get_known_length_for_cs/0,
      fun get_for_range_capable_stream/0,
-     fun extension_status_code_with_phrase/0
+     fun extension_status_code_with_phrase/0,
+     fun extension_status_code_default_phrase/0
      % known_failure -- fun stream_content_md5/0
     ].
 
@@ -1316,6 +1317,17 @@ extension_status_code_with_phrase() ->
     ?assertMatch({"HTTP/1.1", 418, "I'm a teapot"}, Status),
     %% did the error handler render the phrase too?
     ?assertMatch({match, _}, re:run(Body, "418 I'm a teapot")),
+    ok.
+
+%% Do we get a class-appropriate phrase for a status code not defined
+%% in RFC 2616?
+extension_status_code_default_phrase() ->
+    put_setting(service_available, {halt, 428}),
+    {ok, {Status, _Headers2, Body}} =
+        httpc:request(get, {url("foo"), []}, [], []),
+    ?assertMatch({"HTTP/1.1", 428, "Bad Request"}, Status),
+    %% did the error handler render the phrase too?
+    ?assertMatch({match, _}, re:run(Body, "428 Bad Request")),
     ok.
 
 
