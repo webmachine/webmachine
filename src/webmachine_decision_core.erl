@@ -119,10 +119,12 @@ error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
                    Resource,
                    EndTime).
 
-error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime) ->
+error_response(CodeAndPhrase, Reason, Resource, EndTime) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
-                              Code, {webmachine_request,get(reqstate)}, Reason),
+                              CodeAndPhrase,
+                              {webmachine_request,get(reqstate)},
+                              Reason),
     put(reqstate, ReqState),
     wrcall({set_resp_body, encode_body(ErrorHTML)}),
     finish_response(CodeAndPhrase, Resource, EndTime).

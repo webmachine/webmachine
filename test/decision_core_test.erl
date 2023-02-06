@@ -319,7 +319,8 @@ core_tests() ->
      fun writer_callback/0,
      fun head_length_access_for_cs/0,
      fun get_known_length_for_cs/0,
-     fun get_for_range_capable_stream/0
+     fun get_for_range_capable_stream/0,
+     fun extension_status_code_with_phrase/0
      % known_failure -- fun stream_content_md5/0
     ].
 
@@ -491,8 +492,10 @@ non_standard_method_501() ->
     ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\n",
                              "Host: http://localhost:", integer_to_list(Port),
                              "\r\n\r\n"]),
-    ?assertMatch({ok, <<"HTTP/1.1 501 Not Implemented", _/binary>>},
-                 gen_tcp:recv(Sock, 0, 2000)),
+    {ok, Bytes} = gen_tcp:recv(Sock, 0, 2000),
+    ?assertMatch(<<"HTTP/1.1 501 Not Implemented", _/binary>>, Bytes),
+    ?assertMatch({match, _},
+                 re:run(Bytes, "The server does not support the \"FOO\" method.")),
     ok = gen_tcp:close(Sock),
     ok.
 
@@ -1304,6 +1307,17 @@ range_response(ReqData, Context) ->
                   {Result, done}
           end,
     {{stream, Size, Fun}, ReqData, Context}.
+
+%% Can we get status+phrase for a code not defined in RFC 2616?
+extension_status_code_with_phrase() ->
+    put_setting(service_available, {halt, {418, "I'm a teapot"}}),
+    {ok, {Status, _Headers, Body}} =
+        httpc:request(get, {url("foo"), []}, [], []),
+    ?assertMatch({"HTTP/1.1", 418, "I'm a teapot"}, Status),
+    %% did the error handler render the phrase too?
+    ?assertMatch({match, _}, re:run(Body, "418 I'm a teapot")),
+    ok.
+
 
 %% 201 result via P11 from a POST with a streaming/chunked body and an MD5-sum
 %%

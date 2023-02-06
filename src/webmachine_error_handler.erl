@@ -25,21 +25,22 @@
 
 -export([render_error/3]).
 
-render_error(Code, Req, Reason) ->
+render_error({Code, _}=CodeAndPhrase, Req, Reason) ->
     case webmachine_request:has_response_body(Req) of
         {true,_} ->
             maybe_log(Code, Req, Reason),
             webmachine_request:response_body(Req);
         {false,_} ->
-            render_error_body(Code, webmachine_request:trim_state(Req), Reason)
+            render_error_body(
+              CodeAndPhrase, webmachine_request:trim_state(Req), Reason)
     end.
 
-render_error_body(404, Req, _Reason) ->
+render_error_body({404, _}, Req, _Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
     {<<"<HTML><HEAD><TITLE>404 Not Found</TITLE></HEAD><BODY><H1>Not Found</H1>The requested document was not found on this server.<P><HR><ADDRESS>mochiweb+webmachine web server</ADDRESS></BODY></HTML>">>, ReqState};
 
-render_error_body(500, Req, Reason) ->
+render_error_body({500, _}, Req, Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
     maybe_log(500, Req, Reason),
@@ -49,7 +50,7 @@ render_error_body(500, Req, Reason) ->
     ErrorIOList = [ErrorStart,STString,ErrorEnd],
     {erlang:iolist_to_binary(ErrorIOList), ReqState};
 
-render_error_body(501, Req, Reason) ->
+render_error_body({501, _}, Req, Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
     {Method,_} = webmachine_request:method(Req),
@@ -62,7 +63,7 @@ render_error_body(501, Req, Reason) ->
                              [Method]),
     {erlang:iolist_to_binary(ErrorStr), ReqState};
 
-render_error_body(503, Req, Reason) ->
+render_error_body({503, _}, Req, Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
     webmachine_log:log_error(503, Req, Reason),
@@ -75,10 +76,15 @@ render_error_body(503, Req, Reason) ->
                "</ADDRESS></body></html>",
     {list_to_binary(ErrorStr), ReqState};
 
-render_error_body(Code, Req, Reason) ->
+render_error_body(CodeAndPhrase, Req, Reason) ->
     {ok, ReqState} =
         webmachine_request:add_response_header("Content-Type", "text/html", Req),
-    ReasonPhrase = httpd_util:reason_phrase(Code),
+    case CodeAndPhrase of
+        {Code, undefined} ->
+            ReasonPhrase = httpd_util:reason_phrase(Code);
+        {Code, ReasonPhrase} ->
+            ok
+    end,
     Body = ["<html><head><title>",
             integer_to_list(Code),
             " ",
