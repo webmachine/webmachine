@@ -22,12 +22,6 @@ jobs:
           - otp_version: 20
             rebar3_version: "3.15"
             os: "ubuntu-20.04"
-          - otp_version: 19
-            rebar3_version: "3.15"
-            os: "ubuntu-18.04"
-          - otp_version: 18
-            rebar3_version: "3.13"
-            os: "ubuntu-18.04"
       fail-fast: false
       max-parallel: 2
 
