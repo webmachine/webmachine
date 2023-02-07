@@ -119,15 +119,27 @@ format_req(info, undefined, _, Msg) ->
 format_req(error, undefined, _, Msg) ->
     ["[error] ", Msg];
 format_req(error, 501, Req, _) ->
-    {Path, _} = Req:path(),
-    {Method, _} = Req:method(),
+    {Path, _} = webmachine_request:path(Req),
+    {Method, _} = webmachine_request:method(Req),
     Reason = "Webmachine does not support method ",
     ["[error] ", Reason, Method, ": path=", Path, $\n];
 format_req(error, 503, Req, _) ->
-    {Path, _} = Req:path(),
+    {Path, _} = webmachine_request:path(Req),
     Reason = "Webmachine cannot fulfill the request at this time",
     ["[error] ", Reason, ": path=", Path, $\n];
 format_req(error, _Code, Req, Reason) ->
-    {Path, _} = Req:path(),
+    {Path, _} = webmachine_request:path(Req),
     Str = io_lib:format("~p", [Reason]),
     ["[error] path=", Path, $\x20, Str, $\n].
+
+-ifdef(TEST).
+
+-include("wm_reqstate.hrl").
+
+format_req_test() ->
+    Headers = webmachine_headers:empty(),
+    Wrq = wrq:create('GET', {1,1}, "/test/path", Headers),
+    Req = #wm_reqstate{reqdata=Wrq},
+    ?assertMatch("[error] path=/test/path {error,test}\n",
+                 lists:flatten(format_req(error, 500, Req, {error, test}))).
+-endif.
