@@ -15,11 +15,15 @@
 %%    See the License for the specific language governing permissions and
 %%    limitations under the License.
 
-%% @doc Webmachine HTTP Request Abstraction. The functions in this module
-%% can be invoked using either parameterized module syntax or regular
-%% invocation syntax. Since the Ericsson OTP team is removing the
-%% parameterized module syntax in version R16, we encourage you to write
-%% your applications using regular function syntax.
+%% @doc Webmachine HTTP Request Abstraction.
+%%
+%% If you are using OTP20 or earlier, the functions in this module can
+%% be invoked using either parameterized module syntax or regular
+%% invocation syntax. Parameterized module syntax has been removed in
+%% OTP21 and later. The parameterized module framework has been left
+%% in place here while we continue to support earlier OTP versions,
+%% but we encourage you to write your applications using regular
+%% function syntax, to prepare for future upgrades.
 %%
 %% To use parameterized module syntax, you create an instance and then
 %% invoke functions on that instance, like this:
