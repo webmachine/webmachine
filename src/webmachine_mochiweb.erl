@@ -182,7 +182,7 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
 handle_error(Code, Error, Req) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML,Req1} =
-        ErrorHandler:render_error({Code, undefined}, Req, Error),
+        ErrorHandler:render_error(Code, Req, Error),
     {ok,Req2} = webmachine_request:append_to_response_body(ErrorHTML, Req1),
     {ok,Req3} = webmachine_request:send_response(Code, Req2),
     {LogData,_ReqState4} = webmachine_request:log_data(Req3),

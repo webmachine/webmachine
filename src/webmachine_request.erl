@@ -270,16 +270,14 @@ call({set_disp_path, P}, {?MODULE, ReqState}) ->
 call(do_redirect, {?MODULE, ReqState}) ->
     {ok, ReqState#wm_reqstate{
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
-call({send_response, Code}, Req) when is_integer(Code) ->
-    call({send_response, {Code, undefined}}, Req);
-call({send_response, {Code, ReasonPhrase}=CodeAndReason}, Req)
-  when is_integer(Code) ->
+call({send_response, CodeAndPhrase}, Req) ->
     {Reply, NewState} =
-        case Code of
+        case webmachine_status_code:status_code(CodeAndPhrase) of
             200 ->
-                send_ok_response(ReasonPhrase, Req);
+                send_ok_response(
+                  webmachine_status_code:reason_phrase(CodeAndPhrase), Req);
             _ ->
-                send_response(CodeAndReason, Req)
+                send_response(CodeAndPhrase, Req)
         end,
     LogData = NewState#wm_reqstate.log_data,
     NewLogData = LogData#wm_log_data{finish_time=erlang:monotonic_time()},
@@ -402,7 +400,7 @@ send_ok_response(ReasonPhrase, {?MODULE, ReqState}=Req) ->
 
 send_response(Code, #wm_reqstate{}=ReqState) -> send_response(Code,ReqState,{?MODULE,ReqState});
 send_response(Code, {?MODULE, ReqState}=Req) -> send_response(Code,ReqState,Req).
-send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
+send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
         {stream, StreamBody} -> {{stream, StreamBody}, chunked};
@@ -413,8 +411,9 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
     end,
     send(PassedState#wm_reqstate.socket,
          [make_version(wrq:version(RD)),
-          make_code(Code), <<"\r\n">> |
-         make_headers(Code, Length, RD)]),
+          make_code(CodeAndPhrase), <<"\r\n">> |
+         make_headers(
+           webmachine_status_code:status_code(CodeAndPhrase), Length, RD)]),
     FinalLength = case wrq:method(RD) of
          'HEAD' -> Length;
          _ ->
@@ -432,10 +431,11 @@ send_response(Code, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
             end
     end,
     InitLogData = PassedState#wm_reqstate.log_data,
-    FinalLogData = InitLogData#wm_log_data{response_code=Code,
+    FinalLogData = InitLogData#wm_log_data{response_code=CodeAndPhrase,
                                            response_length=FinalLength},
-    {ok, PassedState#wm_reqstate{reqdata=wrq:set_response_code(Code, RD),
-                     log_data=FinalLogData}}.
+    {ok, PassedState#wm_reqstate{
+           reqdata=wrq:set_response_code(CodeAndPhrase, RD),
+           log_data=FinalLogData}}.
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->
@@ -722,14 +722,11 @@ stream_multipart_part_helper(Fun, Rest, CType, Boundary, Size) ->
             end
     end.
 
-make_code({Code, undefined}) when is_integer(Code) ->
-    make_code({Code, webmachine_status_code:reason_phrase(Code)});
-make_code({Code, ReasonPhrase}) when is_integer(Code) ->
-    [integer_to_list(Code), [" ", ReasonPhrase]];
-make_code(Code) when is_integer(Code) ->
-    make_code({Code, webmachine_status_code:reason_phrase(Code)});
-make_code(Io) when is_list(Io); is_binary(Io) ->
-    Io.
+-spec make_code(webmachine_status_code:status_code_optional_phrase()) ->
+          iolist().
+make_code(CodeAndPhrase) ->
+    [integer_to_list(webmachine_status_code:status_code(CodeAndPhrase)),
+     " ", webmachine_status_code:reason_phrase(CodeAndPhrase)].
 
 make_version({1, 0}) ->
     <<"HTTP/1.0 ">>;
@@ -753,8 +750,6 @@ update_header_with_content_length(_Code, Length, RD) ->
               mochiweb_headers:make(wrq:resp_headers(RD)))
     end.
 
-make_headers({Code, _ReasonPhrase}, Length, RD) ->
-    make_headers(Code, Length, RD);
 make_headers(Code, Length, RD) when is_integer(Code) ->
     Hdrs0 = update_header_with_content_length(Code, Length, RD),
     %% server_name is guaranteed to be set by

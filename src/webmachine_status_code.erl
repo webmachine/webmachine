@@ -5,7 +5,7 @@
 
 -module(webmachine_status_code).
 
--export([reason_phrase/1]).
+-export([status_code/1, reason_phrase/1]).
 
 -type status_code() :: pos_integer().
 -type reason_phrase() :: string().
@@ -13,6 +13,13 @@
         {pos_integer(), reason_phrase() | undefined}.
 -type status_code_optional_phrase() ::
         status_code() | status_code_with_phrase().
+
+%% Extract just the numerical code of the status.
+-spec status_code(status_code_optional_phrase()) -> status_code().
+status_code({Code, _}) when is_integer(Code) ->
+    Code;
+status_code(Code) when is_integer(Code) ->
+    Code.
 
 %% Get the phrase to be included with the status code.
 %%
