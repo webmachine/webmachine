@@ -65,34 +65,39 @@ d(DecisionID) ->
     log_decision(DecisionID),
     decision(DecisionID).
 
-respond(Code) when is_integer(Code) ->
-    respond({Code, undefined});
-respond({_, _}=CodeAndPhrase) ->
-    Resource = get(resource),
-    EndTime = erlang:monotonic_time(),
-    respond(CodeAndPhrase, Resource, EndTime).
+-spec respond(webmachine_status_code:status_code_optional_phrase()) -> ok.
+respond(CodeAndPhrase) ->
+    case webmachine_status_code:status_code(CodeAndPhrase) of
+        Code when Code >= 400, Code < 600 ->
+            %% Reason is the paragraph under the heading, but we have
+            %% nothing to add in this case. The heading will already
+            %% be the status phrase.
+            Reason = "",
+            error_response(CodeAndPhrase, Reason);
+        304 ->
+            EndTime = erlang:monotonic_time(),
+            wrcall({remove_resp_header, "Content-Type"}),
+            case resource_call(generate_etag) of
+                undefined -> nop;
+                ETag -> wrcall({set_resp_header, "ETag",
+                                webmachine_util:quoted_string(ETag)})
+            end,
+            case resource_call(expires) of
+                undefined -> nop;
+                Exp ->
+                    wrcall({set_resp_header, "Expires",
+                            webmachine_util:rfc1123_date(Exp)})
+            end,
+            finish_response(CodeAndPhrase, EndTime);
+        _ ->
+            EndTime = erlang:monotonic_time(),
+            finish_response(CodeAndPhrase, EndTime)
+    end.
 
-respond({Code, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime)
-  when Code >= 400, Code < 600 ->
-    error_response(CodeAndPhrase, Resource, EndTime);
-respond({304, _ReasonPhrase}=CodeAndPhrase, Resource, EndTime) ->
-    wrcall({remove_resp_header, "Content-Type"}),
-    case resource_call(generate_etag) of
-        undefined -> nop;
-        ETag -> wrcall({set_resp_header, "ETag", webmachine_util:quoted_string(ETag)})
-    end,
-    case resource_call(expires) of
-        undefined -> nop;
-        Exp ->
-            wrcall({set_resp_header, "Expires",
-                    webmachine_util:rfc1123_date(Exp)})
-    end,
-    finish_response(CodeAndPhrase, Resource, EndTime);
-respond(CodeAndPhrase, Resource, EndTime) ->
-    finish_response(CodeAndPhrase, Resource, EndTime).
-
-finish_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
-    put(code, Code),
+-spec finish_response(webmachine_status_code:status_code_optional_phrase(),
+                      integer()) -> ok.
+finish_response(CodeAndPhrase, EndTime) ->
+    put(code, CodeAndPhrase),
     wrcall({set_response_code, CodeAndPhrase}),
     resource_call(finish_request),
     wrcall({send_response, CodeAndPhrase}),
@@ -103,29 +108,24 @@ finish_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
                                    end_time=EndTime,
                                    notes=Notes},
     spawn(fun() -> do_log(LogData) end),
+    Resource = get(resource),
     webmachine_resource:stop(Resource).
 
+-spec error_response(any()) -> ok.
 error_response(Reason) ->
     error_response(500, Reason).
 
-error_response(Code, Reason) ->
-    Resource = get(resource),
+-spec error_response(webmachine_status:status_code_with_phrase(), any()) -> ok.
+error_response(CodeAndPhrase, Reason) ->
     EndTime = erlang:monotonic_time(),
-    error_response({Code, undefined}, Reason, Resource, EndTime).
-
-error_response({Code, _}=CodeAndPhrase, Resource, EndTime) ->
-    error_response({Code, _}=CodeAndPhrase,
-                   webmachine_error:reason(Code),
-                   Resource,
-                   EndTime).
-
-error_response({Code, _}=CodeAndPhrase, Reason, Resource, EndTime) ->
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
-                              Code, {webmachine_request,get(reqstate)}, Reason),
+                              CodeAndPhrase,
+                              {webmachine_request,get(reqstate)},
+                              Reason),
     put(reqstate, ReqState),
     wrcall({set_resp_body, encode_body(ErrorHTML)}),
-    finish_response(CodeAndPhrase, Resource, EndTime).
+    finish_response(CodeAndPhrase, EndTime).
 
 decision_test(Test,TestVal,TrueFlow,FalseFlow) ->
     case Test of
@@ -506,7 +506,7 @@ decision(v3n11) ->
                     case wrcall({get_resp_header, "Location"}) of
                         undefined ->
                             Reason = "Response had do_redirect but no Location",
-                            error_response(500, Reason);
+                            error_response(Reason);
                         _ ->
                             respond(303)
                     end;

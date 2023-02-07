@@ -10,7 +10,7 @@
          sock,
          path :: string(),
          version,
-         response_code,
+         response_code :: webmachine_status_code:status_code_optional_phrase(),
          response_length,
          end_time :: undefined | integer(), % monotonic time, native units
          finish_time :: undefined | integer(), % monotonic time, native units

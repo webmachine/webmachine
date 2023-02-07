@@ -24,8 +24,8 @@
      path_info = orddict:new() :: orddict:orddict(),
      path_tokens=defined_in_load_dispatch_data,
      app_root="defined_in_load_dispatch_data",
-     response_code = 500 :: non_neg_integer()
-                          | {non_neg_integer(), string()},
+     response_code = 500 ::
+       webmachine_status_code:status_code_optional_phrase(),
      max_recv_body = (1024*(1024*1024)) :: non_neg_integer(),
      % Stolen from R13B03 inet_drv.c's TCP_MAX_PACKET_SIZE definition
      max_recv_hunk = (64*(1024*1024)) :: non_neg_integer(),

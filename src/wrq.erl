@@ -128,11 +128,9 @@ host_tokens(_RD = #wm_reqdata{host_tokens=HostT}) -> HostT. % list of strings
 -spec port(t()) -> inet:port_number().
 port(_RD = #wm_reqdata{port=Port}) -> Port.
 
--spec response_code(t()) -> non_neg_integer().
-response_code(#wm_reqdata{response_code={C,_ReasonPhrase}})
-  when is_integer(C) -> C;
-response_code(_RD = #wm_reqdata{response_code=C})
-  when is_integer(C) -> C.
+-spec response_code(t()) -> webmachine_status_code:status_code().
+response_code(#wm_reqdata{response_code=CodeAndPhrase}) ->
+    webmachine_status_code:status_code(CodeAndPhrase).
 
 -spec req_cookie(t()) -> [{string(), string()}].
 req_cookie(_RD = #wm_reqdata{req_cookie=C}) when is_list(C) -> C.
@@ -211,8 +209,13 @@ set_req_body(Body, RD) -> RD#wm_reqdata{req_body=Body}.
 
 set_resp_body(Body, RD) -> RD#wm_reqdata{resp_body=Body}.
 
-set_response_code({Code, _ReasonPhrase}=CodeAndReason, RD) when is_integer(Code) ->
-    RD#wm_reqdata{response_code=CodeAndReason};
+-spec set_response_code(
+        webmachine_status_code:status_code_optional_phrase(),
+        t()) -> t().
+set_response_code({Code, ReasonPhrase}=CodeAndPhrase, RD)
+  when is_integer(Code),
+       (ReasonPhrase == undefined orelse is_list(ReasonPhrase)) ->
+    RD#wm_reqdata{response_code=CodeAndPhrase};
 set_response_code(Code, RD) when is_integer(Code) ->
     RD#wm_reqdata{response_code=Code}.
 
