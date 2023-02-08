@@ -322,7 +322,8 @@ core_tests() ->
      fun get_for_range_capable_stream/0,
      fun extension_status_code/0,
      fun extension_status_code_with_phrase/0,
-     fun extension_status_code_default_phrase/0
+     fun extension_status_code_default_phrase/0,
+     fun code_specific_error_bodies/0
      % known_failure -- fun stream_content_md5/0
     ].
 
@@ -494,10 +495,8 @@ non_standard_method_501() ->
     ok = gen_tcp:send(Sock, ["FOO ", Url, " HTTP/1.1\r\n",
                              "Host: http://localhost:", integer_to_list(Port),
                              "\r\n\r\n"]),
-    {ok, Bytes} = gen_tcp:recv(Sock, 0, 2000),
-    ?assertMatch(<<"HTTP/1.1 501 Not Implemented", _/binary>>, Bytes),
-    ?assertMatch({match, _},
-                 re:run(Bytes, "The server does not support the \"FOO\" method.")),
+    ?assertMatch({ok, <<"HTTP/1.1 501 Not Implemented", _/binary>>},
+                 gen_tcp:recv(Sock, 0, 2000)),
     ok = gen_tcp:close(Sock),
     ok.
 
@@ -1339,6 +1338,45 @@ extension_status_code_default_phrase() ->
     ?assertMatch({"HTTP/1.1", 498, "Bad Request"}, Status),
     %% did the error handler render the phrase too?
     ?assertMatch({match, _}, re:run(Body, "498 Bad Request")),
+    ok.
+
+%% Do we get the code-specific messages that webmachine_error_handler
+%% renders? Testing one of these would be enough, but let's be thorough.
+code_specific_error_bodies() ->
+    put_setting(allowed_methods, ?DEFAULT_ALLOWED_METHODS),
+    put_setting(resource_exists, false),
+    {ok, {Status404, _Headers404, Body404}} =
+        httpc:request(get, {url(), []}, [], []),
+    ?assertMatch({_, 404, "Object Not Found"}, Status404),
+    ?assertMatch({{match, _}, _},
+                 {re:run(Body404, "The requested document was not found"),
+                  Body404}),
+
+    put_setting(service_available, false),
+    {ok, {Status503, _Headers503, Body503}} =
+        httpc:request(get, {url(), []}, [], []),
+    ?assertMatch({_, 503, "Service Unavailable"}, Status503),
+    ?assertMatch({{match, _}, _},
+                 {re:run(Body503, "The server is currently unable to handle"),
+                  %% include Body so failure logs the mismatched data
+                  Body503}),
+
+    put_setting(service_available, true),
+    put_setting(known_methods, ['GET', 'HEAD', 'OPTIONS']),
+    {ok, {Status501, _Headers501, Body501}} =
+        httpc:request(delete, {url(), []}, [], []),
+    ?assertMatch({_, 501, "Not Implemented"}, Status501),
+    ?assertMatch({{match, _}, _},
+                 {re:run(Body501, "The server does not support the 'DELETE'"),
+                  Body501}),
+
+    put_setting(known_methods, bonk),
+    {ok, {Status500, _Headers500, Body500}} =
+        httpc:request(delete, {url(), []}, [], []),
+    ?assertMatch({_, 500, "Internal Server Error"}, Status500),
+    ?assertMatch({{match, _}, _},
+                 {re:run(Body500, "The server encountered an error while"),
+                  Body500}),
     ok.
 
 
