@@ -23,6 +23,7 @@
 -include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
+-include("wm_compat.hrl").
 
 -type mochiweb_request() ::
         {
@@ -103,12 +104,12 @@ loop(MochiReq, Name) ->
                                   XReq1),
                     webmachine_decision_core:handle_request(Resource, RS2)
                 catch
-                    error:Error ->
-                        handle_error(500, {error, Error}, Req)
+                    ?STPATTERN(error:Error) ->
+                        handle_error(500, {error, Error, ?STACKTRACE}, Req)
                 end
         catch
-            Type : Error ->
-                handle_error(500, {Type, Error}, Req)
+            ?STPATTERN(Type : Error) ->
+                handle_error(500, {Type, Error, ?STACKTRACE}, Req)
         end
     end.
 
