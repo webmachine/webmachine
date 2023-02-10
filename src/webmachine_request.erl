@@ -419,7 +419,7 @@ send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
          make_headers(
            webmachine_status_code:status_code(CodeAndPhrase), Length, RD)]),
     FinalLength = case wrq:method(RD) of
-         'HEAD' -> Length;
+         'HEAD' -> 0; % no body sent
          _ ->
             case Body of
                 {stream, Body2} ->
