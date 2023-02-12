@@ -185,7 +185,7 @@ handle_error(Code, Error, Req) ->
     {ErrorHTML,Req1} =
         ErrorHandler:render_error(Code, Req, Error),
     {ok,Req2} = webmachine_request:append_to_response_body(ErrorHTML, Req1),
-    {ok,Req3} = webmachine_request:send_response(Code, Req2),
+    {_Result,Req3} = webmachine_request:send_response(Code, Req2),
     {LogData,_ReqState4} = webmachine_request:log_data(Req3),
     spawn(webmachine_log, log_access, [LogData]),
     ok.

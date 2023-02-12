@@ -333,50 +333,59 @@ get_outheader_value(K, {?MODULE, ReqState}) ->
     {mochiweb_headers:get_value(K,
                                 wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
 
+-type mochiweb_socket() :: gen_tcp:socket() | {ssl, gen_tcp:socket()}.
+-spec send(mochiweb_socket(), iolist() | binary()) -> ok | {error, any()}.
 send(Socket, Data) ->
-    case mochiweb_socket:send(Socket, iolist_to_binary(Data)) of
-        ok -> ok;
-        {error,closed} -> ok;
-        _ -> exit(normal)
-    end.
+    mochiweb_socket:send(Socket, iolist_to_binary(Data)).
 
+-spec send_stream_body(mochiweb_socket(),
+                       {iolist() | binary(), fun() | done}) ->
+          {ok | {error, any()}, integer()}.
 send_stream_body(Socket, X) -> send_stream_body(Socket, X, 0).
 send_stream_body(Socket, {<<>>, done}, SoFar) ->
-    send_chunk(Socket, <<>>),
-    SoFar;
+    {Result, _} = send_chunk(Socket, <<>>),
+    {Result, SoFar};
 send_stream_body(Socket, {Data, done}, SoFar) ->
-    Size = send_chunk(Socket, Data),
+    {Result, Size} = send_chunk(Socket, Data),
     send_chunk(Socket, <<>>),
-    Size + SoFar;
+    {Result, Size + SoFar};
 send_stream_body(Socket, {<<>>, Next}, SoFar) ->
     send_stream_body(Socket, Next(), SoFar);
 send_stream_body(Socket, {[], Next}, SoFar) ->
     send_stream_body(Socket, Next(), SoFar);
 send_stream_body(Socket, {Data, Next}, SoFar) ->
-    Size = send_chunk(Socket, Data),
-    send_stream_body(Socket, Next(), Size + SoFar).
+    case send_chunk(Socket, Data) of
+        {ok, Size} ->
+            send_stream_body(Socket, Next(), Size + SoFar);
+        {Error, Size} ->
+            {Error, Size + SoFar}
+    end.
 
 send_stream_body_no_chunk(Socket, {Data, done}) ->
     send(Socket, Data);
 send_stream_body_no_chunk(Socket, {Data, Next}) ->
-    send(Socket, Data),
-    send_stream_body_no_chunk(Socket, Next()).
+    case send(Socket, Data) of
+        ok ->
+            send_stream_body_no_chunk(Socket, Next());
+        {error, _}=Error ->
+            Error
+    end.
 
 send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
     put(bytes_written, 0),
     Writer = fun(Data) ->
-        Size = send_chunk(Socket, Encoder(Charsetter(Data))),
+        {_Result, Size} = send_chunk(Socket, Encoder(Charsetter(Data))),
         put(bytes_written, get(bytes_written) + Size),
         Size
     end,
     BodyFun(Writer),
-    send_chunk(Socket, <<>>),
-    get(bytes_written).
+    {Result, _} = send_chunk(Socket, <<>>),
+    {Result, get(bytes_written)}.
 
 send_chunk(Socket, Data) ->
     Size = iolist_size(Data),
-    send(Socket, [mochihex:to_hex(Size), <<"\r\n">>, Data, <<"\r\n">>]),
-    Size.
+    {send(Socket, [mochihex:to_hex(Size), <<"\r\n">>, Data, <<"\r\n">>]),
+     Size}.
 
 send_ok_response(ReasonPhrase, {?MODULE, ReqState}=Req) ->
     RD0 = ReqState#wm_reqstate.reqdata,
@@ -413,33 +422,41 @@ send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
         {writer, WriteBody} -> {{writer, WriteBody}, chunked};
         _ -> {Body0, iolist_size([Body0])}
     end,
-    send(PassedState#wm_reqstate.socket,
-         [make_version(wrq:version(RD)),
-          make_code(CodeAndPhrase), <<"\r\n">> |
-         make_headers(
-           webmachine_status_code:status_code(CodeAndPhrase), Length, RD)]),
-    FinalLength = case wrq:method(RD) of
-         'HEAD' -> 0; % no body sent
-         _ ->
-            case Body of
-                {stream, Body2} ->
-                    send_stream_body(PassedState#wm_reqstate.socket, Body2);
-                {known_length_stream, Body2} ->
-                    send_stream_body_no_chunk(PassedState#wm_reqstate.socket, Body2),
-                    Length;
-                {writer, Body2} ->
-                    send_writer_body(PassedState#wm_reqstate.socket, Body2);
-                _ ->
-                    send(PassedState#wm_reqstate.socket, Body),
-                    Length
-            end
-    end,
+    {Result, FinalLength} =
+        case send_head(CodeAndPhrase, PassedState, Length) of
+            ok ->
+                case wrq:method(RD) of
+                    'HEAD' ->
+                        {ok, 0}; % no body sent
+                    _ ->
+                        send_body(Body, PassedState, Length)
+                end;
+            {error, _}=Error ->
+                {Error, 0}
+        end,
     InitLogData = PassedState#wm_reqstate.log_data,
     FinalLogData = InitLogData#wm_log_data{response_code=CodeAndPhrase,
                                            response_length=FinalLength},
-    {ok, PassedState#wm_reqstate{
-           reqdata=wrq:set_response_code(CodeAndPhrase, RD),
-           log_data=FinalLogData}}.
+    {Result, PassedState#wm_reqstate{
+               reqdata=wrq:set_response_code(CodeAndPhrase, RD),
+               log_data=FinalLogData}}.
+
+send_head(CodeAndPhrase, #wm_reqstate{socket=Socket, reqdata=RD}, Length) ->
+    send(Socket,
+         [make_version(wrq:version(RD)),
+          make_code(CodeAndPhrase), <<"\r\n">> |
+          make_headers(
+            webmachine_status_code:status_code(CodeAndPhrase), Length, RD)]).
+
+send_body({stream, Body}, PassedState, _Length) ->
+    send_stream_body(PassedState#wm_reqstate.socket, Body);
+send_body({known_length_stream, Body}, PassedState, Length) ->
+    {send_stream_body_no_chunk(PassedState#wm_reqstate.socket, Body),
+     Length};
+send_body({writer, Body}, PassedState, _Length) ->
+    send_writer_body(PassedState#wm_reqstate.socket, Body);
+send_body(Body, PassedState, Length) ->
+    {send(PassedState#wm_reqstate.socket, Body), Length}.
 
 %% @doc  Infer body length from transfer-encoding and content-length headers.
 body_length(Req) ->
