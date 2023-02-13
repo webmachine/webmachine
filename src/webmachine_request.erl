@@ -521,13 +521,23 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
 recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
     case MaxHunk >= DataLeft of
         true ->
-            {ok,Data1} = mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT),
-            {Data1, done};
+            case mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT) of
+                {ok,Data1} ->
+                    {Data1, done};
+                {error, Error} ->
+                    throw({webmachine_recv_error, Error})
+            end;
         false ->
-            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
-            {Data2,
-             fun() -> recv_unchunked_body(Socket, MaxHunk, DataLeft-MaxHunk)
-             end}
+            case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
+                {ok,Data2} ->
+                    {Data2,
+                     fun() ->
+                             recv_unchunked_body(
+                               Socket, MaxHunk, DataLeft-MaxHunk)
+                     end};
+                {error, Error} ->
+                    throw({webmachine_recv_error, Error})
+            end
     end.
 
 recv_chunked_body(Socket, MaxHunk) ->
@@ -538,15 +548,24 @@ recv_chunked_body(Socket, MaxHunk) ->
 recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
     case MaxHunk >= LeftInChunk of
         true ->
-            {ok,Data1} = mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT),
-            {Data1,
-             fun() -> recv_chunked_body(Socket, MaxHunk)
-             end};
+            case mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT) of
+                {ok,Data1} ->
+                    {Data1,
+                     fun() -> recv_chunked_body(Socket, MaxHunk) end};
+                {error, Error} ->
+                    throw({webmachine_recv_error, Error})
+            end;
         false ->
-            {ok,Data2} = mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT),
-            {Data2,
-             fun() -> recv_chunked_body(Socket, MaxHunk, LeftInChunk-MaxHunk)
-             end}
+            case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
+                {ok,Data2} ->
+                    {Data2,
+                     fun() ->
+                             recv_chunked_body(
+                               Socket, MaxHunk, LeftInChunk-MaxHunk)
+                     end};
+                {error, Error} ->
+                    throw({webmachine_recv_error, Error})
+            end
     end.
 
 read_chunk_length(Socket, MaybeLastChunk) ->
@@ -570,8 +589,8 @@ read_chunk_length(Socket, MaybeLastChunk) ->
                 _ ->
                     erlang:list_to_integer(Hex, 16)
             end;
-        _ ->
-            exit(normal)
+        {error, Error} ->
+            throw({webmachine_recv_error, Error})
     end.
 
 get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
