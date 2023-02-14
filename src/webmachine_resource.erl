@@ -204,7 +204,11 @@ resource_call(F, ReqData,
     Result = try
         %% Note: the argument list must match the definition of CALLBACK_ARITY
         apply(R_Mod, F, [ReqData, R_ModState])
-    catch ?STPATTERN(C:R) ->
+    catch
+        ?STPATTERN(throw:{webmachine_recv_error,_}=Error) ->
+            Location = find_call(R_Mod, F, ?STACKTRACE),
+            {{error, {throw, Error, Location}}, ReqData, R_ModState};
+        ?STPATTERN(C:R) ->
             Reason = {C, R, trim_trace(?STACKTRACE)},
             {{error, Reason}, ReqData, R_ModState}
     end,
@@ -213,6 +217,13 @@ resource_call(F, ReqData,
         _ -> log_call(R_Trace, result, R_Mod, F, Result)
     end,
     Result.
+
+find_call(Mod, Fun, [{Mod, Fun, ?CALLBACK_ARITY, _}=Call|_]) ->
+    Call;
+find_call(Mod, Fun, [_|Rest]) ->
+    find_call(Mod, Fun, Rest);
+find_call(Mod, Fun, []) ->
+    {Mod, Fun, ?CALLBACK_ARITY, []}.
 
 log_d(#wm_resource{}=Res, DecisionID) ->
     log_d(DecisionID, Res);
@@ -256,15 +267,15 @@ escape_trace_data(Other) ->
             case is_map(Other) of
                 true ->
                     %% TODO: replace with maps comprehension when implemented
-                    %% #{escape_trace_data(K), escape_trace_data(V) || K := V <- Other} 
+                    %% #{escape_trace_data(K), escape_trace_data(V) || K := V <- Other}
                     Fun = fun(K, V, Acc) -> maps:put(escape_trace_data(K), escape_trace_data(V), Acc) end,
                     maps:fold(Fun, maps:new(), Other);
                 _ ->
                     Other
-            end;                       
+            end;
         {error, _What} ->
             Other
-    end. 
+    end.
 
 escape_trace_list([Head|Tail], Acc) ->
     escape_trace_list(Tail, [escape_trace_data(Head)|Acc]);
