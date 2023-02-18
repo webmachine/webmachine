@@ -640,23 +640,49 @@ maybe_flush_req_body(Req) ->
                     put(mochiweb_request_recv, true),
                     true;
                 false ->
-                    %% There might be a body sitting out there we
-                    %% haven't read - give it a try.
-                    flush_req_body(catch recv_stream_body(Req, 65535))
+                    MaxFlush = max_flush_bytes(),
+                    case MaxFlush of
+                        0 ->
+                            %% this server has been configured to
+                            %% close connections on clients who send
+                            %% requests whose bodies are ignored
+                            false;
+                        _ ->
+                            %% There might be a body sitting out there we
+                            %% haven't read - give it a try.
+                            flush_req_body(catch recv_stream_body(Req, 65535),
+                                           MaxFlush)
+                    end
             end;
         Next ->
-            %% request processing stopped in the middle of a stream -
-            %% can we finish it?
-            flush_req_body(catch Next())
+            MaxFlush = max_flush_bytes(),
+            case MaxFlush of
+                0 ->
+                    false;
+                _ ->
+                    %% request processing stopped in the middle of a stream -
+                    %% can we finish it?
+                    flush_req_body(catch Next(), MaxFlush)
+            end
     end.
 
-flush_req_body({webmachine_recv_error, _}) ->
+max_flush_bytes() ->
+    application:get_env(webmachine, max_flush_bytes, 67108864).
+
+flush_req_body({webmachine_recv_error, _}, _) ->
     false;
-flush_req_body({_Bytes, done}) when is_binary(_Bytes) ->
+flush_req_body({_Bytes, done}, _) when is_binary(_Bytes) ->
     put(mochiweb_request_recv, true),
     true;
-flush_req_body({_Bytes, Next}) when is_binary(_Bytes), is_function(Next) ->
-    flush_req_body(catch Next()).
+flush_req_body({Bytes, Next}, MaxFlush) when is_binary(Bytes),
+                                             is_function(Next) ->
+    Remaining = MaxFlush - size(Bytes),
+    case Remaining > 0 of
+        true ->
+            flush_req_body(catch Next(), Remaining);
+        false ->
+            false
+    end.
 
 
 get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
