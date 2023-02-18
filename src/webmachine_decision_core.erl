@@ -26,7 +26,7 @@
 -include("wm_compat.hrl").
 
 handle_request(Resource, ReqState) ->
-    _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate]],
+    _ = [erase(X) || X <- [decision, code, req_body, bytes_written, tmp_reqstate, webmachine_stream_progress, webmachine_sent_continue]],
     put(resource, Resource),
     put(reqstate, ReqState),
     try
@@ -94,6 +94,15 @@ finish_response(CodeAndPhrase, EndTime) ->
     put(code, CodeAndPhrase),
     wrcall({set_response_code, CodeAndPhrase}),
     resource_call(finish_request),
+    case wrcall(maybe_flush_req_body) of
+        false ->
+            %% mochiweb is going to close this socket (see
+            %% mochiweb_request:should_close) - let's help the client
+            %% expect it
+            wrcall({set_resp_header, "Connection", "close"});
+        true ->
+            ok
+    end,
     wrcall({send_response, CodeAndPhrase}),
     RMod = wrcall({get_metadata, 'resource_module'}),
     Notes = wrcall(notes),
@@ -439,11 +448,7 @@ decision(v3m16) ->
 %% DELETE enacted immediately?
 %% Also where DELETE is forced.
 decision(v3m20) ->
-    Result = resource_call(delete_resource),
-    %% DELETE may have body and TCP connection will be closed unless body is read.
-    %% See mochiweb_request:should_close.
-    maybe_flush_body_stream(),
-    decision_test(Result, true, v3m20b, 500);
+    decision_test(resource_call(delete_resource), true, v3m20b, 500);
 decision(v3m20b) ->
     decision_test(resource_call(delete_completed), true, v3o20, 202);
 %% "Server allows POST to missing resource?"
@@ -781,13 +786,3 @@ compute_body_md5_stream(MD5, {Hunk, done}, Body) ->
     md5_final(md5_update(MD5, Hunk));
 compute_body_md5_stream(MD5, {Hunk, Next}, Body) ->
     compute_body_md5_stream(md5_update(MD5, Hunk), Next(), <<Body/binary, Hunk/binary>>).
-
-maybe_flush_body_stream() ->
-    maybe_flush_body_stream(wrcall({stream_req_body, 8192})).
-
-maybe_flush_body_stream(stream_conflict) ->
-    ok;
-maybe_flush_body_stream({_Hunk, done}) ->
-    ok;
-maybe_flush_body_stream({_Hunk, Next}) ->
-    maybe_flush_body_stream(Next()).
