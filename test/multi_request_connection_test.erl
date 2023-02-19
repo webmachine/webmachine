@@ -31,7 +31,9 @@ multi_req_tests() ->
      fun too_large_unauthorized_post_then_get/1,
      fun half_chunk_then_get/1,
      fun half_unchunk_then_get/1,
-     fun delete_with_body_then_get/1
+     fun delete_with_body_then_get/1,
+     fun expect_100_not_sent/1,
+     fun expect_100_sent/1
     ].
 
 %% Two GETs is the simplest happy-path, because there are no bodies to
@@ -154,6 +156,48 @@ delete_with_body_then_get(Ctx) ->
     ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
     ok.
 
+%% This PUT "waits" for "100 Continue", but is going to be told the
+%% PUT is not authorized instead. It should never receive the
+%% continue, but should receive the response for the second request.
+expect_100_not_sent(Ctx) ->
+    DispPath1 = "unauth",
+    DispPath2 = "get9",
+    PutBody = "This is a PUT body longer than twelve characters.",
+    Req1 = lists:flatten(
+             build_request("PUT", DispPath1,
+                           [{"content-type", "text/plain"},
+                            {"expect", "100-continue"}],
+                           PutBody)),
+    %% don't sent the body, to simulate never receiving 100 Continue
+    Req1NoBody = lists:reverse(string:sub_string(lists:reverse(Req1),
+                                                 length(PutBody)+1)),
+    Req2 = build_request("GET", DispPath2, [], []),
+    Responses = send_requests(Ctx, [Req1NoBody, Req2]),
+    ?assertEqual(2, length(Responses)),
+    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, hd(Responses)),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    ok.
+
+%% This PUT "waits" for "100 Continue". The resource will send it when
+%% it starts reading the response. The flush should happen afterward,
+%% and the response to the second request should still arrive.
+expect_100_sent(Ctx) ->
+    DispPath1 = "put3",
+    DispPath2 = "get10",
+    PutBody = "This is a PUT body longer than twelve characters.",
+    Req1 = lists:flatten(
+             build_request("PUT", DispPath1,
+                           [{"content-type", "text/plain"},
+                            {"expect", "100-continue"}],
+                           PutBody)),
+    Req2 = build_request("GET", DispPath2, [], []),
+    Responses = send_requests(Ctx, [Req1, Req2]),
+    ?assertEqual(3, length(Responses)),
+    ?assertMatch({ok, "HTTP/1.1 100"++_, [], []}, hd(Responses)),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, hd(tl(Responses))),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(tl(Responses)))),
+    ok.
+
 %%% SUPPORT/UTIL
 
 build_request(Method, Path, Headers, Body) ->
@@ -190,13 +234,21 @@ send_requests(Ctx, RequestList) ->
 receive_responses(Socket, ResponseCount) ->
     lists:reverse(
       element(3,
-              lists:foldl(fun(_, {Buffer, Sock, Resps}) ->
-                                  {Resp, NewBuffer} =
-                                      receive_response(Buffer, Sock),
-                                  {NewBuffer, Sock, [Resp|Resps]}
-                          end,
-                          {[], Socket, []},
-                          lists:seq(1, ResponseCount)))).
+              lists:foldl(
+                fun(_, {Buffer, Sock, Resps}) ->
+                        {Resp, NewBuffer} =
+                            receive_response(Buffer, Sock),
+                        case Resp of
+                            {ok, "HTTP/1.1 100"++_,_,_} ->
+                                {Resp2, NewBuffer2} =
+                                    receive_response(NewBuffer, Sock),
+                                {NewBuffer2, Sock, [Resp2,Resp|Resps]};
+                            _ ->
+                                {NewBuffer, Sock, [Resp|Resps]}
+                        end
+                end,
+                {[], Socket, []},
+                lists:seq(1, ResponseCount)))).
 
 receive_response(Buffer, Sock) ->
     case string:split(Buffer, "\r\n\r\n") of
