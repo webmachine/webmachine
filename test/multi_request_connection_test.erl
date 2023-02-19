@@ -187,15 +187,20 @@ send_requests(Ctx, RequestList) ->
     gen_tcp:close(Sock),
     Responses.
 
-receive_responses(Sock, ResponseCount) ->
-    [ receive_response(Sock) || _ <- lists:seq(1, ResponseCount) ].
+receive_responses(Socket, ResponseCount) ->
+    lists:reverse(
+      element(3,
+              lists:foldl(fun(_, {Buffer, Sock, Resps}) ->
+                                  {Resp, NewBuffer} =
+                                      receive_response(Buffer, Sock),
+                                  {NewBuffer, Sock, [Resp|Resps]}
+                          end,
+                          {[], Socket, []},
+                          lists:seq(1, ResponseCount)))).
 
-receive_response(Sock) ->
-    case gen_tcp:recv(Sock, 0, 2000) of
-        {error, _} = Error ->
-            Error;
-        {ok, Data} ->
-            [Head|MaybeBody] = string:split(Data, "\r\n\r\n"),
+receive_response(Buffer, Sock) ->
+    case string:split(Buffer, "\r\n\r\n") of
+        [Head,MaybeBody] ->
             [Code|RawHeaders] = string:tokens(Head, "\r\n"),
             Headers = [ list_to_tuple(string:tokens(H, ": "))
                         || H <- RawHeaders ],
@@ -206,10 +211,28 @@ receive_response(Sock) ->
                                  0
                          end,
             StartBody = lists:flatten(MaybeBody),
-            Body = receive_body(Sock,
-                                BodyLength-length(StartBody),
-                                [StartBody]),
-            {ok, Code, Headers, Body}
+            {Body, NewBuffer} =
+                case length(StartBody) > BodyLength of
+                    true ->
+                        %% responses to the two test requests almost
+                        %% always come in separate packets, but
+                        %% occasionally everything comes in one
+                        %% packet, so we need to buffer unused bytes
+                        lists:split(BodyLength, StartBody);
+                    false ->
+                        {receive_body(Sock,
+                                      BodyLength-length(StartBody),
+                                      [StartBody]),
+                         []}
+                end,
+            {{ok, Code, Headers, Body}, NewBuffer};
+        _IncompleteHead ->
+            case gen_tcp:recv(Sock, 0, 2000) of
+                {error, _} = Error ->
+                    {Error, Buffer};
+                {ok, Data} ->
+                    receive_response(Buffer++Data, Sock)
+            end
     end.
 
 receive_body(_Sock, 0, Acc) ->
