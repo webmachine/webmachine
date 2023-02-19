@@ -650,8 +650,9 @@ maybe_flush_req_body(Req) ->
                         _ ->
                             %% There might be a body sitting out there we
                             %% haven't read - give it a try.
-                            flush_req_body(catch recv_stream_body(Req, 65535),
-                                           MaxFlush)
+                            ReadSize = erlang:min(65535, MaxFlush),
+                            flush_req_body(
+                              catch recv_stream_body(Req, ReadSize), MaxFlush)
                     end
             end;
         Next ->

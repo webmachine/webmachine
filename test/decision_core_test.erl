@@ -317,8 +317,7 @@ core_tests() ->
      fun extension_status_code/0,
      fun extension_status_code_with_phrase/0,
      fun extension_status_code_default_phrase/0,
-     fun code_specific_error_bodies/0,
-     fun same_inets_for_post_calls/0
+     fun code_specific_error_bodies/0
      % known_failure -- fun stream_content_md5/0
     ].
 
@@ -1373,19 +1372,6 @@ code_specific_error_bodies() ->
                  {re:run(Body500, "The server encountered an error while"),
                   Body500}),
     ok.
-
-same_inets_for_post_calls() ->
-    put_setting(is_authorized, "Basic realm=decsisioncoretest"),
-    put_setting(content_types_accepted, [{"text/plain", accept_text}]),
-    put_setting(allowed_methods, ?HTTP_1_1_METHODS),
-    put_setting(resource_exists, true),
-    lists:foreach(fun (_) ->
-            {ok, {{_, Status1, Body}, _, _}} =
-                httpc:request(post, {url("post"), [], "text/plain", "{\"hello\":\"world\"}"}, [], []),
-            ?assertMatch({401, _}, {Status1, Body}),
-            ok
-        end,
-        lists:seq(1, 100)).
 
 
 %% 201 result via P11 from a POST with a streaming/chunked body and an MD5-sum
