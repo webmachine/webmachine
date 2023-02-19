@@ -43,10 +43,9 @@ double_get(Ctx) ->
     DispPath2 = "get2",
     Req1 = build_request("GET", DispPath1, [], []),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath1}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath1}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% Successful POST then GET is the next simplest happy-path, because
@@ -57,10 +56,9 @@ post_then_get(Ctx) ->
     Req1 = build_request("POST", DispPath1,
                          [{"content-type", "text/plain"}], "check"),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 204"++_, _, []}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 204"++_, _, []}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% First real body-skipping test. The POST is unauthorized, so the
@@ -71,10 +69,9 @@ unauthorized_post_then_get(Ctx) ->
     Req1 = build_request("POST", DispPath1,
                          [{"content-type", "text/plain"}], "check"),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% This time the unread body is larger than we are prepared to skip,
@@ -88,17 +85,16 @@ too_large_unauthorized_post_then_get(Ctx) ->
     Req2 = build_request("GET", DispPath2, [], []),
     {ok, RestoreMaxFlush} = application:get_env(webmachine, max_flush_bytes),
     application:set_env(webmachine, max_flush_bytes, length(ReqBody)-3),
-    Responses = try send_requests(Ctx, [Req1, Req2])
-                after
-                    application:set_env(
-                      webmachine, max_flush_bytes, RestoreMaxFlush)
-                end,
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, hd(Responses)),
-    {ok, _, Headers, _} = hd(Responses),
+    [Resp1, Resp2] = try send_requests(Ctx, [Req1, Req2])
+                     after
+                         application:set_env(
+                           webmachine, max_flush_bytes, RestoreMaxFlush)
+                     end,
+    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, Resp1),
+    {ok, _, Headers, _} = Resp1,
     ?assertEqual({"Connection", "close"},
                  lists:keyfind("Connection", 1, Headers)),
-    ?assertMatch({error, closed}, hd(tl(Responses))),
+    ?assertMatch({error, closed}, Resp2),
     ok.
 
 %% Here PUT processing begins to stream an unchunked body, but does
@@ -110,15 +106,14 @@ half_unchunk_then_get(Ctx) ->
     Req1 = build_request("PUT", DispPath1,
                          [{"content-type", "text/plain"}], ReqBody),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, hd(Responses)),
-    {ok, _, _, RespBody} = hd(Responses),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, Resp1),
+    {ok, _, _, RespBody} = Resp1,
     %% if these RespBody asserts fail, the test is invalid because the
     %% whole request body was read by the resource
     ?assertEqual(1, string:str(ReqBody, RespBody)),
     ?assert(length(RespBody) < length(ReqBody)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% Here PUT processing begins to stream a chunked body, but does not
@@ -131,15 +126,14 @@ half_chunk_then_get(Ctx) ->
     Req1 = build_request("PUT", DispPath1,
                          [{"content-type", "text/plain"}], {chunked, ReqBody}),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, hd(Responses)),
-    {ok, _, _, RespBody} = hd(Responses),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, Resp1),
+    {ok, _, _, RespBody} = Resp1,
     %% if these RespBody asserts fail, the test is invalid because the
     %% whole request body was read by the resource
     ?assertEqual(1, string:str(lists:flatten(ReqBody), RespBody)),
     ?assert(length(RespBody) < length(lists:flatten(ReqBody))),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% DELETE with a body was specifically handled before the introduction
@@ -150,10 +144,9 @@ delete_with_body_then_get(Ctx) ->
     Req1 = build_request("DELETE", DispPath1,
                          [{"content-type", "text/plain"}], "check"),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 204"++_, _, []}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 204"++_, _, []}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% This PUT "waits" for "100 Continue", but is going to be told the
@@ -172,10 +165,9 @@ expect_100_not_sent(Ctx) ->
     Req1NoBody = lists:reverse(string:sub_string(lists:reverse(Req1),
                                                  length(PutBody)+1)),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1NoBody, Req2]),
-    ?assertEqual(2, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(Responses))),
+    [Resp1, Resp2] = send_requests(Ctx, [Req1NoBody, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 401"++_, _, _}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %% This PUT "waits" for "100 Continue". The resource will send it when
@@ -191,11 +183,10 @@ expect_100_sent(Ctx) ->
                             {"expect", "100-continue"}],
                            PutBody)),
     Req2 = build_request("GET", DispPath2, [], []),
-    Responses = send_requests(Ctx, [Req1, Req2]),
-    ?assertEqual(3, length(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 100"++_, [], []}, hd(Responses)),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, hd(tl(Responses))),
-    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, hd(tl(tl(Responses)))),
+    [Continue, Resp1, Resp2] = send_requests(Ctx, [Req1, Req2]),
+    ?assertMatch({ok, "HTTP/1.1 100"++_, [], []}, Continue),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, _}, Resp1),
+    ?assertMatch({ok, "HTTP/1.1 200"++_, _, DispPath2}, Resp2),
     ok.
 
 %%% SUPPORT/UTIL
