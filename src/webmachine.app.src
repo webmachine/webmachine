@@ -21,6 +21,9 @@
     %% module that has rewrite/5
    ,{server_name, undefined}
     %% string() for the "Server" response header
+   ,{max_flush_bytes, 67108864}
+    %% maximum number of bytes to read from a request body that was
+    %% ignored before giving up and closing the connection (64MB default)
    ]},
 
   {maintainers,["Sean Cribbs", "Joe DeVivo", "Bryan Fink",

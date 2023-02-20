@@ -224,6 +224,8 @@ call({stream_req_body, MaxHunk}, {?MODULE, ReqState}) ->
             {recv_stream_body(ReqState, MaxHunk),
              ReqState#wm_reqstate{bodyfetch=stream}}
     end;
+call(maybe_flush_req_body, {?MODULE, ReqState}) ->
+    {maybe_flush_req_body(ReqState), ReqState};
 call(resp_headers, {?MODULE, ReqState}) ->
     {wrq:resp_headers(ReqState#wm_reqstate.reqdata), ReqState};
 call(resp_redirect, {?MODULE, ReqState}) ->
@@ -493,29 +495,41 @@ read_whole_stream({Hunk,Next}, Acc0, MaxRecvBody, SizeAcc) ->
             end
     end.
 
-recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
-    put(mochiweb_request_recv, true),
+expects_continue(PassedState) ->
     case get_header_value("expect", PassedState) of
         {undefined, _} ->
-            ok;
+            false;
         {Continue, _} ->
-            case string:to_lower(Continue) of
-                "100-continue" ->
-                    send(PassedState#wm_reqstate.socket,
-                         [make_version(wrq:version(RD)),
-                          make_code(100), <<"\r\n\r\n">>]);
-                _ ->
-                    ok
-            end
+            string:to_lower(Continue) =:= "100-continue"
+    end.
+
+sent_continue() ->
+    get(webmachine_sent_continue) =:= true.
+
+recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
+    case expects_continue(PassedState) and (not sent_continue()) of
+        true ->
+            put(webmachine_sent_continue, true),
+            send(PassedState#wm_reqstate.socket,
+                 [make_version(wrq:version(RD)),
+                  make_code(100), <<"\r\n\r\n">>]);
+        _ ->
+            ok
     end,
     case body_length(PassedState) of
         {unknown_transfer_encoding, X} -> exit({unknown_transfer_encoding, X});
-        undefined -> {<<>>, done};
-        0 -> {<<>>, done};
-        chunked -> recv_chunked_body(PassedState#wm_reqstate.socket,
-                                     MaxHunkSize);
-        Length -> recv_unchunked_body(PassedState#wm_reqstate.socket,
-                                      MaxHunkSize, Length)
+        undefined ->
+            record_stream_progress(done),
+            {<<>>, done};
+        0 ->
+            record_stream_progress(done),
+            {<<>>, done};
+        chunked ->
+            start_recv_chunked_body(PassedState#wm_reqstate.socket,
+                                    MaxHunkSize);
+        Length ->
+            recv_unchunked_body(PassedState#wm_reqstate.socket,
+                                MaxHunkSize, Length)
     end.
 
 recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
@@ -523,6 +537,7 @@ recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
         true ->
             case mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT) of
                 {ok,Data1} ->
+                    record_stream_progress(done),
                     {Data1, done};
                 {error, Error} ->
                     throw({webmachine_recv_error, Error})
@@ -530,39 +545,47 @@ recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
         false ->
             case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
                 {ok,Data2} ->
-                    {Data2,
-                     fun() ->
-                             recv_unchunked_body(
-                               Socket, MaxHunk, DataLeft-MaxHunk)
-                     end};
+                    Next = fun() ->
+                                   recv_unchunked_body(Socket, MaxHunk,
+                                                       DataLeft-MaxHunk)
+                           end,
+                    record_stream_progress(Next),
+                    {Data2, Next};
                 {error, Error} ->
                     throw({webmachine_recv_error, Error})
             end
     end.
 
-recv_chunked_body(Socket, MaxHunk) ->
+start_recv_chunked_body(Socket, MaxHunk) ->
     case read_chunk_length(Socket, false) of
-        0 -> {<<>>, done};
-        ChunkLength -> recv_chunked_body(Socket,MaxHunk,ChunkLength)
+        0 ->
+            record_stream_progress(done),
+            {<<>>, done};
+        ChunkLength ->
+            recv_chunked_body(Socket,MaxHunk, ChunkLength)
     end.
 recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
     case MaxHunk >= LeftInChunk of
         true ->
             case mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT) of
                 {ok,Data1} ->
-                    {Data1,
-                     fun() -> recv_chunked_body(Socket, MaxHunk) end};
+                    Next = fun() ->
+                                   start_recv_chunked_body(Socket, MaxHunk)
+                           end,
+                    record_stream_progress(Next),
+                    {Data1, Next};
                 {error, Error} ->
                     throw({webmachine_recv_error, Error})
             end;
         false ->
             case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
                 {ok,Data2} ->
-                    {Data2,
-                     fun() ->
-                             recv_chunked_body(
-                               Socket, MaxHunk, LeftInChunk-MaxHunk)
-                     end};
+                    Next = fun() ->
+                                   recv_chunked_body(Socket, MaxHunk,
+                                                     LeftInChunk-MaxHunk)
+                           end,
+                    record_stream_progress(Next),
+                    {Data2, Next};
                 {error, Error} ->
                     throw({webmachine_recv_error, Error})
             end
@@ -592,6 +615,76 @@ read_chunk_length(Socket, MaybeLastChunk) ->
         {error, Error} ->
             throw({webmachine_recv_error, Error})
     end.
+
+record_stream_progress(Remaining) ->
+    put(webmachine_stream_progress, Remaining).
+
+get_stream_progress() ->
+    get(webmachine_stream_progress).
+
+maybe_flush_req_body(Req) ->
+    case get_stream_progress() of
+        done ->
+            %% Let mochiweb know that we completed reading the body
+            %% that came with the request, or it will close the
+            %% socket.
+            put(mochiweb_request_recv, true),
+            true;
+        undefined ->
+            case expects_continue(Req) and (not sent_continue()) of
+                true ->
+                    %% If the request expected continue, but we didn't
+                    %% send it, then tell mochiweb to ignore what the
+                    %% content length or transfer encoding says about
+                    %% a body.
+                    put(mochiweb_request_recv, true),
+                    true;
+                false ->
+                    MaxFlush = max_flush_bytes(),
+                    case MaxFlush of
+                        0 ->
+                            %% this server has been configured to
+                            %% close connections on clients who send
+                            %% requests whose bodies are ignored
+                            false;
+                        _ ->
+                            %% There might be a body sitting out there we
+                            %% haven't read - give it a try.
+                            ReadSize = erlang:min(65535, MaxFlush),
+                            flush_req_body(
+                              catch recv_stream_body(Req, ReadSize), MaxFlush)
+                    end
+            end;
+        Next ->
+            MaxFlush = max_flush_bytes(),
+            case MaxFlush of
+                0 ->
+                    false;
+                _ ->
+                    %% request processing stopped in the middle of a stream -
+                    %% can we finish it?
+                    flush_req_body(catch Next(), MaxFlush)
+            end
+    end.
+
+max_flush_bytes() ->
+    application:get_env(webmachine, max_flush_bytes, 67108864).
+
+flush_req_body({webmachine_recv_error, _}, _) ->
+    false;
+flush_req_body({_Bytes, done}, _) when is_binary(_Bytes) ->
+    put(mochiweb_request_recv, true),
+    true;
+flush_req_body({Bytes, Next}, MaxFlush) when is_binary(Bytes),
+                                             is_function(Next) ->
+    Remaining = MaxFlush - size(Bytes),
+    case Remaining > 0 of
+        true ->
+            flush_req_body(catch Next(), Remaining);
+        false ->
+            false
+    end.
+
 
 get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
     case RD#wm_reqdata.resp_range of
