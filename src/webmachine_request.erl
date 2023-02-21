@@ -103,6 +103,7 @@
 -include("webmachine_logger.hrl").
 -include("wm_reqstate.hrl").
 -include("wm_reqdata.hrl").
+-include("wm_compat.hrl").
 
 -define(IDLE_TIMEOUT, infinity).
 
@@ -340,38 +341,61 @@ get_outheader_value(K, {?MODULE, ReqState}) ->
 send(Socket, Data) ->
     mochiweb_socket:send(Socket, iolist_to_binary(Data)).
 
+%% For use with the stream_body functions.
+-spec catch_next(fun()) ->
+          {iolist() | binary(), fun() | done} | {stream_error, any()}.
+catch_next(NextFun) ->
+    try NextFun()
+    catch ?STPATTERN(Class:Reason) ->
+        {error, {Class, Reason, ?STACKTRACE}}
+    end.
+
 -spec send_stream_body(mochiweb_socket(),
                        {iolist() | binary(), fun() | done}) ->
           {ok | {error, any()}, integer()}.
 send_stream_body(Socket, X) -> send_stream_body(Socket, X, 0).
+
 send_stream_body(Socket, {<<>>, done}, SoFar) ->
     {Result, _} = send_chunk(Socket, <<>>),
     {Result, SoFar};
-send_stream_body(Socket, {Data, done}, SoFar) ->
+send_stream_body(Socket, {Data, done}, SoFar) when is_list(Data);
+                                                   is_binary(Data) ->
     {Result, Size} = send_chunk(Socket, Data),
     send_chunk(Socket, <<>>),
     {Result, Size + SoFar};
 send_stream_body(Socket, {<<>>, Next}, SoFar) ->
-    send_stream_body(Socket, Next(), SoFar);
+    send_stream_body(Socket, catch_next(Next), SoFar);
 send_stream_body(Socket, {[], Next}, SoFar) ->
-    send_stream_body(Socket, Next(), SoFar);
-send_stream_body(Socket, {Data, Next}, SoFar) ->
+    send_stream_body(Socket, catch_next(Next), SoFar);
+send_stream_body(Socket, {Data, Next}, SoFar) when is_list(Data);
+                                                   is_binary(Data) ->
     case send_chunk(Socket, Data) of
         {ok, Size} ->
-            send_stream_body(Socket, Next(), Size + SoFar);
+            send_stream_body(Socket, catch_next(Next), Size + SoFar);
         {Error, Size} ->
             {Error, Size + SoFar}
-    end.
+    end;
+send_stream_body(_Socket, {error, _}=Error, SoFar) ->
+    {Error, SoFar};
+send_stream_body(_Socket, Other, SoFar) ->
+    {{error, {bad_chunk, Other}}, SoFar}.
 
-send_stream_body_no_chunk(Socket, {Data, done}) ->
+
+send_stream_body_no_chunk(Socket, {Data, done}) when is_list(Data);
+                                                     is_binary(Data) ->
     send(Socket, Data);
-send_stream_body_no_chunk(Socket, {Data, Next}) ->
+send_stream_body_no_chunk(Socket, {Data, Next}) when is_list(Data);
+                                                     is_binary(Data) ->
     case send(Socket, Data) of
         ok ->
-            send_stream_body_no_chunk(Socket, Next());
+            send_stream_body_no_chunk(Socket, catch_next(Next));
         {error, _}=Error ->
             Error
-    end.
+    end;
+send_stream_body_no_chunk(_Socket, {error, _}=Error) ->
+    Error;
+send_stream_body_no_chunk(_Socket, Other) ->
+    {error, {bad_chunk, Other}}.
 
 send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
     put(bytes_written, 0),
@@ -380,8 +404,13 @@ send_writer_body(Socket, {Encoder, Charsetter, BodyFun}) ->
         put(bytes_written, get(bytes_written) + Size),
         Size
     end,
-    BodyFun(Writer),
-    {Result, _} = send_chunk(Socket, <<>>),
+    Result = try
+                 BodyFun(Writer),
+                 {SendResult, _} = send_chunk(Socket, <<>>),
+                 SendResult
+             catch ?STPATTERN(Class:Reason) ->
+                 {error, {Class, Reason, ?STACKTRACE}}
+             end,
     {Result, get(bytes_written)}.
 
 send_chunk(Socket, Data) ->
@@ -436,12 +465,27 @@ send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
             {error, _}=Error ->
                 {Error, 0}
         end,
+    maybe_log_stream_error(Result, PassedState),
     InitLogData = PassedState#wm_reqstate.log_data,
     FinalLogData = InitLogData#wm_log_data{response_code=CodeAndPhrase,
                                            response_length=FinalLength},
     {Result, PassedState#wm_reqstate{
                reqdata=wrq:set_response_code(CodeAndPhrase, RD),
                log_data=FinalLogData}}.
+
+maybe_log_stream_error(ok, _State) ->
+    %% no error to log
+    ok;
+maybe_log_stream_error({error, Inets}, _State) when is_atom(Inets) ->
+    %% A network problem occurred. We don't actually need to log this,
+    %% because it's likely just that the client disconnected before we
+    %% were done sending.
+    ok;
+maybe_log_stream_error({error, Reason}, State) ->
+    webmachine_log:log_error(500, {?MODULE, State}, {stream_error, Reason}),
+    %% Close the connection, because we don't know if we left it in a
+    %% state where the client would understand a new response.
+    put(mochiweb_request_force_close, true).
 
 send_head(CodeAndPhrase, #wm_reqstate{socket=Socket, reqdata=RD}, Length) ->
     send(Socket,
