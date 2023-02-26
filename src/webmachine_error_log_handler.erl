@@ -53,48 +53,19 @@ init([BaseDir]) ->
 handle_call({_Label, MRef, get_modules}, State) ->
     {ok, {MRef, [?MODULE]}, State};
 handle_call({refresh, Time}, State) ->
-    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
-                                                       State#state.filename,
-                                                       State#state.handle,
-                                                       Time,
-                                                       State#state.hourstamp),
-    {ok, ok, State#state{hourstamp=NewHour, handle=NewHandle}};
+    {ok, ok, maybe_rotate(State, Time)};
 handle_call(_Request, State) ->
     {ok, ok, State}.
 
 %% @private
 handle_event({log_error, Msg}, State) ->
-    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
-                                                       State#state.filename,
-                                                       State#state.handle,
-                                                       os:timestamp(),
-                                                       State#state.hourstamp),
-    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
-    FormattedMsg = format_req(error, undefined, undefined, Msg),
-    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
-    {ok, NewState};
+    {ok, write_log(format_log(error, Msg), State)};
 handle_event({log_error, Code, _Req, _Reason}, State) when Code < 500 ->
     {ok, State};
 handle_event({log_error, Code, Req, Reason}, State) ->
-    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
-                                                       State#state.filename,
-                                                       State#state.handle,
-                                                       os:timestamp(),
-                                                       State#state.hourstamp),
-    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
-    Msg = format_req(error, Code, Req, Reason),
-    _ = webmachine_log:log_write(NewState#state.handle, Msg),
-    {ok, NewState};
+    {ok, write_log(format_log(error, format_req(Code, Req, Reason)), State)};
 handle_event({log_info, Msg}, State) ->
-    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
-                                                       State#state.filename,
-                                                       State#state.handle,
-                                                       os:timestamp(),
-                                                       State#state.hourstamp),
-    NewState = State#state{hourstamp=NewHour, handle=NewHandle},
-    FormattedMsg = format_req(info, undefined, undefined, Msg),
-    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
-    {ok, NewState};
+    {ok, write_log(format_log(info, Msg), State)};
 handle_event(_Event, State) ->
     {ok, State}.
 
@@ -114,29 +85,46 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal functions
 %% ===================================================================
 
-format_req(info, undefined, _, Msg) ->
+maybe_rotate(State) ->
+    maybe_rotate(State, os:timestamp()).
+
+maybe_rotate(State, Time) ->
+    {NewHour, NewHandle} = webmachine_log:maybe_rotate(?MODULE,
+                                                       State#state.filename,
+                                                       State#state.handle,
+                                                       Time,
+                                                       State#state.hourstamp),
+    State#state{hourstamp=NewHour, handle=NewHandle}.
+
+write_log(FormattedMsg, State) ->
+    NewState = maybe_rotate(State),
+    _ = webmachine_log:log_write(NewState#state.handle, FormattedMsg),
+    NewState.
+
+format_log(info, Msg) ->
     ["[info] ", Msg];
-format_req(error, undefined, _, Msg) ->
-    ["[error] ", Msg];
-format_req(error, 501, Req, _) ->
+format_log(error, Msg) ->
+    ["[error] ", Msg].
+
+format_req(501, Req, _) ->
     {Path, _} = webmachine_request:path(Req),
     {Method, _} = webmachine_request:method(Req),
     Reason = "Webmachine does not support method ",
-    ["[error] ", Reason, Method, ": path=", Path, $\n];
-format_req(error, 503, Req, _) ->
+    [Reason, Method, ": path=", Path, $\n];
+format_req(503, Req, _) ->
     {Path, _} = webmachine_request:path(Req),
     Reason = "Webmachine cannot fulfill the request at this time",
-    ["[error] ", Reason, ": path=", Path, $\n];
-format_req(error, 500, Req, {stream_error, Reason}) ->
+    [Reason, ": path=", Path, $\n];
+format_req(500, Req, {stream_error, Reason}) ->
     {Path, _} = webmachine_request:path(Req),
     Str = io_lib:format("~p", [Reason]),
-    ["[error] Webmachine encountered an error while streaming the response."
+    ["Webmachine encountered an error while streaming the response."
      " path=", Path, $\n,
      "        ", Str, $\n];
-format_req(error, _Code, Req, Reason) ->
+format_req(_Code, Req, Reason) ->
     {Path, _} = webmachine_request:path(Req),
     Str = io_lib:format("~p", [Reason]),
-    ["[error] path=", Path, $\x20, Str, $\n].
+    ["path=", Path, $\x20, Str, $\n].
 
 -ifdef(TEST).
 
@@ -147,5 +135,6 @@ format_req_test() ->
     Wrq = wrq:create('GET', {1,1}, "/test/path", Headers),
     Req = #wm_reqstate{reqdata=Wrq},
     ?assertMatch("[error] path=/test/path {error,test}\n",
-                 lists:flatten(format_req(error, 500, Req, {error, test}))).
+                 lists:flatten(
+                   format_log(error, format_req(500, Req, {error, test})))).
 -endif.
