@@ -127,6 +127,12 @@ format_req(error, 503, Req, _) ->
     {Path, _} = webmachine_request:path(Req),
     Reason = "Webmachine cannot fulfill the request at this time",
     ["[error] ", Reason, ": path=", Path, $\n];
+format_req(error, 500, Req, {stream_error, Reason}) ->
+    {Path, _} = webmachine_request:path(Req),
+    Str = io_lib:format("~p", [Reason]),
+    ["[error] Webmachine encountered an error while streaming the response."
+     " path=", Path, $\n,
+     "        ", Str, $\n];
 format_req(error, _Code, Req, Reason) ->
     {Path, _} = webmachine_request:path(Req),
     Str = io_lib:format("~p", [Reason]),
