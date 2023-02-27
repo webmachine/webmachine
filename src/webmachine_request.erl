@@ -325,6 +325,8 @@ call({load_dispatch_data, PathProps, HostTokens, Port,
     {ok, NewState};
 call(log_data, {?MODULE, ReqState}) -> {ReqState#wm_reqstate.log_data, ReqState};
 call(notes, {?MODULE, ReqState}) -> {wrq:get_notes(ReqState#wm_reqstate.reqdata), ReqState};
+call({add_note, Key, Value}, {?MODULE, ReqState}) ->
+    {ok, ReqState#wm_reqstate{reqdata=wrq:add_note(Key, Value, ReqState#wm_reqstate.reqdata)}};
 call(Arg, #wm_reqstate{}=ReqState) -> call(Arg, {?MODULE, ReqState}).
 
 get_header_value(K, {?MODULE, ReqState}) ->
@@ -465,27 +467,27 @@ send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
             {error, _}=Error ->
                 {Error, 0}
         end,
-    maybe_log_stream_error(Result, PassedState),
+    RDNotes = maybe_log_stream_error(Result, RD),
     InitLogData = PassedState#wm_reqstate.log_data,
     FinalLogData = InitLogData#wm_log_data{response_code=CodeAndPhrase,
                                            response_length=FinalLength},
     {Result, PassedState#wm_reqstate{
-               reqdata=wrq:set_response_code(CodeAndPhrase, RD),
+               reqdata=wrq:set_response_code(CodeAndPhrase, RDNotes),
                log_data=FinalLogData}}.
 
-maybe_log_stream_error(ok, _State) ->
+maybe_log_stream_error(ok, ReqData) ->
     %% no error to log
-    ok;
-maybe_log_stream_error({error, Inets}, _State) when is_atom(Inets) ->
+    ReqData;
+maybe_log_stream_error({error, Inets}, ReqData) when is_atom(Inets) ->
     %% A network problem occurred. We don't actually need to log this,
     %% because it's likely just that the client disconnected before we
     %% were done sending.
-    ok;
-maybe_log_stream_error({error, Reason}, State) ->
-    webmachine_log:log_error(500, {?MODULE, State}, {stream_error, Reason}),
+    ReqData;
+maybe_log_stream_error({error, Reason}, ReqData) ->
     %% Close the connection, because we don't know if we left it in a
     %% state where the client would understand a new response.
-    put(mochiweb_request_force_close, true).
+    put(mochiweb_request_force_close, true),
+    wrq:add_note(error, {stream_error, Reason}, ReqData).
 
 send_head(CodeAndPhrase, #wm_reqstate{socket=Socket, reqdata=RD}, Length) ->
     send(Socket,

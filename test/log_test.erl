@@ -39,7 +39,9 @@ simple_success(Ctx) ->
     ?assertEqual(200, webmachine_status_code:status_code(Code)),
     assert_no_error_logs(Logs).
 
-%% 404 is also just an access log.
+%% 404 is also just an access log. It does have an error note
+%% attached, but it's just {error, ""}, to send Reason="" to the error
+%% handler for response message rendering.
 not_found(Ctx) ->
     {{ok, Response}, Logs} = request(Ctx,
                                      "?exists=false",
@@ -49,65 +51,62 @@ not_found(Ctx) ->
     AccessLog = lists:keyfind(log_access, 1, Logs),
     ?assertMatch({log_access, #wm_log_data{}}, AccessLog),
     {log_access, #wm_log_data{response_code=Code}} = AccessLog,
-    ?assertEqual(404, webmachine_status_code:status_code(Code)),
-    assert_no_error_logs(Logs).
+    ?assertEqual(404, webmachine_status_code:status_code(Code)).
 
 %% content_types_provided is expect to return a list of
 %% 2-tuples. Decision core catches an internal error if it doesn't.
 invalid_callback_result(Ctx) ->
     {{ok, Response}, Logs} = request(Ctx,
                                      "?types=nonlist",
-                                     #{log_error => 1, log_access => 1}),
+                                     #{log_access => 1}),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _},
                  Response),
-    ErrorLog = lists:keyfind(log_error, 1, Logs),
-    ?assertMatch({log_error, 500, _, _}, ErrorLog),
-    {log_access, #wm_log_data{response_code=Code}}
+    {log_access, #wm_log_data{response_code=Code, notes=Notes}}
         = lists:keyfind(log_access, 1, Logs),
-    ?assertEqual(500, webmachine_status_code:status_code(Code)).
+    ?assertEqual(500, webmachine_status_code:status_code(Code)),
+    ?assertEqual(true, lists:keymember(error, 1, Notes)).
 
 
 %% An error in resource code.
 case_clause_error(Ctx) ->
     {{ok, Response}, Logs} = request(Ctx,
                                      "?available=breakme",
-                                     #{log_error => 1, log_access => 1}),
+                                     #{log_access => 1}),
     ?assertMatch({{"HTTP/1.1", 500, "Internal Server Error"}, _, _},
                  Response),
-    ErrorLog = lists:keyfind(log_error, 1, Logs),
-    ?assertMatch({log_error, 500, _, {error, {case_clause, "breakme"}, _}},
-                 ErrorLog),
-    {log_access, #wm_log_data{response_code=Code}}
+    {log_access, #wm_log_data{response_code=Code, notes=Notes}}
         = lists:keyfind(log_access, 1, Logs),
-    ?assertEqual(500, webmachine_status_code:status_code(Code)).
+    ?assertEqual(500, webmachine_status_code:status_code(Code)),
+    ?assertMatch({error, {error, {case_clause, "breakme"}, _}},
+                 lists:keyfind(error, 1, Notes)).
 
 %% Resource code uses {halt, 500}
 halt_500(Ctx) ->
     {{ok, Response}, Logs} = request(Ctx,
                                      "?available=halt",
-                                     #{log_error => 1, log_access => 1}),
+                                     #{log_access => 1}),
     ?assertMatch({{"HTTP/1.1", 500, _}, _, _}, Response),
-    ErrorLog = lists:keyfind(log_error, 1, Logs),
-    %% halting 4xx,5xx current sets the reason to an empty string
-    ?assertMatch({log_error, 500, _, ""}, ErrorLog),
-    {log_access, #wm_log_data{response_code=Code}}
+    {log_access, #wm_log_data{response_code=Code, notes=Notes}}
         = lists:keyfind(log_access, 1, Logs),
-    ?assertEqual(500, webmachine_status_code:status_code(Code)).
+    ?assertEqual(500, webmachine_status_code:status_code(Code)),
+    %% halting 4xx,5xx current sets the reason to an empty string
+    ?assertEqual({error, ""},
+                 lists:keyfind(error, 1, Notes)).
 
 %% Force both a 5xx and a stream error to see that both notes are included.
 both_500_and_stream_error(Ctx) ->
     {Response, Logs} = request(Ctx,
                                "?available=streamhalt",
-                               #{log_error => 2, log_access => 1}),
+                               #{log_access => 1}),
     ?assertEqual({error, socket_closed_remotely}, Response),
-    %% the 'false' from service available is the error reason
-    ?assertMatch([{log_error, 503, _, false}],
-                 [ E || E={log_error, 503, _, _} <- Logs ]),
-    ?assertMatch([{log_error, 500, _, {stream_error, _}}],
-                 [ E || E={log_error, 500, _, _} <- Logs]),
-    {log_access, #wm_log_data{response_code=Code}} =
+    {log_access, #wm_log_data{response_code=Code, notes=Notes}} =
         lists:keyfind(log_access, 1, Logs),
-    ?assertEqual(503, webmachine_status_code:status_code(Code)).
+    ?assertEqual(503, webmachine_status_code:status_code(Code)),
+    ErrorNotes = [ N || N={error, _} <- Notes ],
+    ?assertEqual(2, length(ErrorNotes)),
+    %% the 'false' from service available is the error reason for 503
+    ?assertMatch([{error, false}, {error, {stream_error, _}}],
+                 lists:sort(ErrorNotes)).
 
 %% SUPPORT / UTIL
 
@@ -118,17 +117,21 @@ request(Ctx, URLAddition, LogCounts) ->
     Logs = test_log_handler:wait_for_logs(WaitRef, LogCounts),
     {Response, Logs}.
 
-%% This is a best-effort assertion for the non-error tests. It really
-%% only works if an offending log_error is delivered either before the
-%% log_access, or before we check in with the log handler one more
-%% time. But doing something that might catch something, instead of
-%% doing nothing, seems like a good idea.
 assert_no_error_logs(Logs) ->
-    %% This is only a real test if log_error is always delivered
-    %% before log_access, but adding it as a general cover.
     ?assertEqual(
-       [], lists:filter(fun(L) -> element(1, L) == log_error end, Logs)),
-    ?assertMatch({wait, _}, test_log_handler:get_logs()).
+       [], lists:filter(fun({log_access, #wm_log_data{notes=Notes}}) ->
+                                %% this is the new mode of error
+                                %% logging, and is a strong assertion
+                                lists:keymember(error, 1, Notes);
+                           ({log_info, _}) ->
+                                false;
+                           ({log_error, _}) ->
+                                %% this is the old mode of error
+                                %% logging, and is a weak assertion
+                                %% because of timing dependent
+                                true
+                        end,
+                        Logs)).
 
 %%% REQUEST MODULE
 

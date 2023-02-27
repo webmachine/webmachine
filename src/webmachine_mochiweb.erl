@@ -181,13 +181,15 @@ do_rewrite(RewriteMod, Method, Scheme, Version, Headers, RawPath) ->
     end.
 
 handle_error(Code, Error, Req) ->
+    {ok, Req0} = webmachine_request:call({add_note, error, Error}, Req),
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML,Req1} =
-        ErrorHandler:render_error(Code, Req, Error),
+        ErrorHandler:render_error(Code, Req0, Error),
     {ok,Req2} = webmachine_request:append_to_response_body(ErrorHTML, Req1),
     {_Result,Req3} = webmachine_request:send_response(Code, Req2),
-    {LogData,_ReqState4} = webmachine_request:log_data(Req3),
-    spawn(webmachine_log, log_access, [LogData]),
+    {Notes,Req4} = webmachine_request:call(notes, Req3),
+    {LogData,_ReqState5} = webmachine_request:log_data(Req4),
+    spawn(webmachine_log, log_access, [LogData#wm_log_data{notes=Notes}]),
     ok.
 
 get_wm_option(OptName, {WMOptions, OtherOptions}) ->

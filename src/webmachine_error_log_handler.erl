@@ -60,10 +60,16 @@ handle_call(_Request, State) ->
 %% @private
 handle_event({log_error, Msg}, State) ->
     {ok, write_log(format_log(error, Msg), State)};
-handle_event({log_error, Code, _Req, _Reason}, State) when Code < 500 ->
-    {ok, State};
-handle_event({log_error, Code, Req, Reason}, State) ->
-    {ok, write_log(format_log(error, format_req(Code, Req, Reason)), State)};
+handle_event({log_access,
+              #wm_log_data{response_code=RespCode, notes=Notes}=LogData},
+             State) ->
+    Code = webmachine_status_code:status_code(RespCode),
+    {ok, lists:foldl(fun(ErrorNote, AccState) ->
+                         maybe_log_error_note(
+                           Code, ErrorNote, LogData, AccState)
+                     end,
+                     State,
+                     [Note || {error, Note} <- Notes])};
 handle_event({log_info, Msg}, State) ->
     {ok, write_log(format_log(info, Msg), State)};
 handle_event(_Event, State) ->
@@ -106,25 +112,27 @@ format_log(info, Msg) ->
 format_log(error, Msg) ->
     ["[error] ", Msg].
 
-format_req(501, Req, _) ->
-    {Path, _} = webmachine_request:path(Req),
-    {Method, _} = webmachine_request:method(Req),
+format_req(501, #wm_log_data{path=Path, method=Method}, _) ->
     Reason = "Webmachine does not support method ",
     [Reason, Method, ": path=", Path, $\n];
-format_req(503, Req, _) ->
-    {Path, _} = webmachine_request:path(Req),
+format_req(503, #wm_log_data{path=Path}, _) ->
     Reason = "Webmachine cannot fulfill the request at this time",
     [Reason, ": path=", Path, $\n];
-format_req(500, Req, {stream_error, Reason}) ->
-    {Path, _} = webmachine_request:path(Req),
+format_req(_, #wm_log_data{path=Path}, {stream_error, Reason}) ->
     Str = io_lib:format("~p", [Reason]),
     ["Webmachine encountered an error while streaming the response."
      " path=", Path, $\n,
      "        ", Str, $\n];
-format_req(_Code, Req, Reason) ->
-    {Path, _} = webmachine_request:path(Req),
+format_req(_Code, #wm_log_data{path=Path}, Reason) ->
     Str = io_lib:format("~p", [Reason]),
     ["path=", Path, $\x20, Str, $\n].
+
+maybe_log_error_note(Code, Note, LogData, State) when Code >= 500 ->
+    write_log(format_log(error, format_req(Code, LogData, Note)), State);
+maybe_log_error_note(_Code, {stream_error, _}=Note, LogData, State) ->
+    write_log(format_log(error, format_req(500, LogData, Note)), State);
+maybe_log_error_note(_Code, _Note, _LogData, State) ->
+    State.
 
 -ifdef(TEST).
 
@@ -132,9 +140,13 @@ format_req(_Code, Req, Reason) ->
 
 format_req_test() ->
     Headers = webmachine_headers:empty(),
-    Wrq = wrq:create('GET', {1,1}, "/test/path", Headers),
-    Req = #wm_reqstate{reqdata=Wrq},
+    LogData = #wm_log_data{method='GET',
+                           version={1,1},
+                           path="/test/path",
+                           headers=Headers,
+                           response_code=500,
+                           notes=[{error, {error, test}}]},
     ?assertMatch("[error] path=/test/path {error,test}\n",
                  lists:flatten(
-                   format_log(error, format_req(500, Req, {error, test})))).
+                   format_log(error, format_req(500, LogData, {error, test})))).
 -endif.

@@ -35,8 +35,6 @@ handle_call({get_logs, Waiter}, State) ->
 
 handle_event({log_error, _}=Log, #state{logs=OldLogs}=State) ->
     {ok, maybe_send_logs(State#state{logs=[Log|OldLogs]})};
-handle_event({log_error, _, _, _}=Log, #state{logs=OldLogs}=State) ->
-    {ok, maybe_send_logs(State#state{logs=[Log|OldLogs]})};
 handle_event({log_access, _}=Log, #state{logs=OldLogs}=State) ->
     {ok, maybe_send_logs(State#state{logs=[Log|OldLogs]})};
 handle_event({log_info, _}=Log, #state{logs=OldLogs}=State) ->

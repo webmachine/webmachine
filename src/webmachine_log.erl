@@ -34,7 +34,6 @@
          log_access/1,
          log_close/3,
          log_error/1,
-         log_error/3,
          log_info/1,
          log_open/1,
          log_open/2,
@@ -140,11 +139,6 @@ log_close(Mod, Name, FD) ->
 -spec log_error(iolist()) -> ok.
 log_error(LogMsg) ->
     gen_event:sync_notify(?EVENT_LOGGER, {log_error, LogMsg}).
-
-%% @doc Notify registered log event handler of an error event.
--spec log_error(pos_integer(), webmachine_request:t(), term()) -> ok.
-log_error(Code, Req, Reason) ->
-    gen_event:sync_notify(?EVENT_LOGGER, {log_error, Code, Req, Reason}).
 
 %% @doc Notify registered log event handler of an info event.
 -spec log_info(iolist()) -> ok.
