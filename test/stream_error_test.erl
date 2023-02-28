@@ -32,8 +32,7 @@ stream_error_tests() ->
 stream_stops(Ctx, Type, ExpectBody, ExpectLength) ->
     WaitRef = test_log_handler:clear_logs(),
     Socket = open_stream_stop_request(Ctx, Type),
-    Logs = test_log_handler:wait_for_logs(
-             WaitRef, #{log_error => 1, log_access => 1}),
+    Logs = test_log_handler:wait_for_logs(WaitRef, #{log_access => 1}),
     %% Logging happens after response sending, so if we
     %% wait until logging happens, we can probably just
     %% read without delay.
@@ -51,15 +50,20 @@ stream_stops(Ctx, Type, ExpectBody, ExpectLength) ->
     ?assertEqual(string:find(Response, "HTTP/1.1", leading),
                  string:find(Response, "HTTP/1.1", trailing)),
 
-    %% the stream error should show up in an error log
-    ErrorLog = lists:keyfind(log_error, 1, Logs),
-    ?assertMatch({log_error, 500, _, {stream_error, _}}, ErrorLog),
+    {log_access, #wm_log_data{response_code=Code,
+                              response_length=ResponseLength,
+                              notes=Notes}} =
+        lists:keyfind(log_access, 1, Logs),
+
+    %% the stream error should show up in an error note
+    ?assertMatch({error, {stream_error, _}},
+                 lists:keyfind(error, 1, Notes)),
+
+    %% the response code should still be OK
+    ?assertEqual(200, webmachine_status_code:status_code(Code)),
 
     %% number of bytes sent before error should be correct
-    AccessLog = lists:keyfind(log_access, 1, Logs),
-    ?assertMatch({log_access,
-                  #wm_log_data{response_length=ExpectLength}},
-                 AccessLog).
+    ?assertMatch(ExpectLength, ResponseLength).
 
 chunked_stream_stops(Ctx) ->
     %% Chunked encoding only counts bytes of data, not length and line

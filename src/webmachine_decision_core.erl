@@ -121,6 +121,7 @@ error_response(Reason) ->
 -spec error_response(webmachine_status:status_code_with_phrase(), any()) -> ok.
 error_response(CodeAndPhrase, Reason) ->
     EndTime = erlang:monotonic_time(),
+    wrcall({add_note, error, Reason}),
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
                               CodeAndPhrase,
