@@ -114,8 +114,7 @@ loop(MochiReq, Name) ->
     end.
 
 -spec new_webmachine_req(mochiweb_request()) ->
-                                {module(),#wm_reqstate{}}
-                                    |{{error, term()}, #wm_reqstate{}}.
+          #wm_reqstate{} |{{error, term()}, #wm_reqstate{}}.
 new_webmachine_req(Request) ->
     Method = mochiweb_request:get(method, Request),
     Scheme = mochiweb_request:get(scheme, Request),
@@ -149,25 +148,23 @@ new_webmachine_req(Request) ->
     InitState = #wm_reqstate{socket=Socket,
                              log_data=InitialLogData,
                              reqdata=InitialReqData},
-    InitReq = {webmachine_request,InitState},
 
-    case webmachine_request:get_peer(InitReq) of
+    case webmachine_request:get_peer(InitState) of
       {ErrorGetPeer = {error,_}, ErrorGetPeerReqState} ->
         % failed to get peer
-        { ErrorGetPeer, webmachine_request:new (ErrorGetPeerReqState) };
+        { ErrorGetPeer, ErrorGetPeerReqState };
       {Peer, _ReqState} ->
-        case webmachine_request:get_sock(InitReq) of
+        case webmachine_request:get_sock(InitState) of
           {ErrorGetSock = {error,_}, ErrorGetSockReqState} ->
             LogDataWithPeer = InitialLogData#wm_log_data {peer=Peer},
             ReqStateWithSockErr =
               ErrorGetSockReqState#wm_reqstate{log_data=LogDataWithPeer},
-            { ErrorGetSock, webmachine_request:new (ReqStateWithSockErr) };
+            { ErrorGetSock, ReqStateWithSockErr };
           {Sock, ReqState} ->
             ReqData = wrq:set_sock(Sock, wrq:set_peer(Peer, InitialReqData)),
             LogData =
               InitialLogData#wm_log_data {peer=Peer, sock=Sock},
-            webmachine_request:new(ReqState#wm_reqstate{log_data=LogData,
-                                                        reqdata=ReqData})
+            ReqState#wm_reqstate{log_data=LogData, reqdata=ReqData}
         end
     end.
 
