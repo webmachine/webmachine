@@ -161,6 +161,19 @@ is_local("172."++Rest) ->
         _ ->
             false
     end;
+is_local("::1") -> true;
+is_local("fc00:"++_) -> true;
+is_local("fe80:"++_) -> true;
+is_local("::ffff:"++Rest) ->   %% IPv4 maps
+    case Rest of
+        "000a:"++_ -> true;    %% 10.*
+        "0:000a:"++_ -> true;
+        "c0a8:"++_ -> true;    %% 192.168.*
+        "0:c0a8:"++_ -> true;
+        "ac1"++_ -> true;      %% 172.{16-31}.*
+        "0:ac1"++_ -> true;
+        _ -> false
+    end;
 is_local(_) ->
     false.
 
@@ -1087,10 +1100,10 @@ metadata_test() ->
     {ok, ReqState} = set_metadata(Key, Value, #wm_reqstate{metadata=orddict:new()}),
     ?assertEqual({Value, ReqState}, get_metadata(Key, ReqState)).
 
-peer_sock_test_helper(Headers, GetFun, ReqStateField, Expect) ->
+peer_sock_test_helper(Listen, Headers, GetFun, ReqStateField, Expect) ->
     Self = self(),
     Pid = spawn_link(fun() ->
-                             {ok, LS} = gen_tcp:listen(0, [binary, {active, false}]),
+                             {ok, LS} = gen_tcp:listen(0, [{ip, Listen}, binary, {active, false}]),
                              {ok, {_, Port}} = inet:sockname(LS),
                              Self ! {port, Port},
                              {ok, S} = gen_tcp:accept(LS),
@@ -1105,7 +1118,7 @@ peer_sock_test_helper(Headers, GetFun, ReqStateField, Expect) ->
                      end),
     receive
         {port, Port} ->
-            {ok, S} = gen_tcp:connect({127,0,0,1}, Port, [binary, {active, false}]),
+            {ok, S} = gen_tcp:connect(Listen, Port, [binary, {active, false}]),
             ReqData = #wm_reqdata{req_headers = mochiweb_headers:make(Headers)},
             ReqState = #wm_reqstate{socket=S, reqdata=ReqData},
             ?assertEqual({S, ReqState}, socket(ReqState)),
@@ -1118,23 +1131,53 @@ peer_sock_test_helper(Headers, GetFun, ReqStateField, Expect) ->
     end.
 
 peer_test() ->
-    peer_sock_test_helper([], fun get_peer/1, #wm_reqstate.peer,
+    peer_sock_test_helper({127,0,0,1}, [], fun get_peer/1, #wm_reqstate.peer,
                           "127.0.0.1").
 
-sock__test() ->
-    peer_sock_test_helper([], fun get_sock/1, #wm_reqstate.sock,
+sock_test() ->
+    peer_sock_test_helper({127,0,0,1}, [], fun get_sock/1, #wm_reqstate.sock,
                           "127.0.0.1").
+
+peer_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [], fun get_peer/1, #wm_reqstate.peer,
+                          "::1").
+
+sock_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [], fun get_sock/1, #wm_reqstate.sock,
+                          "::1").
 
 peer_xforward_test() ->
-    peer_sock_test_helper([{"X-Forwarded-For",
+    peer_sock_test_helper({127,0,0,1},
+                          [{"X-Forwarded-For",
                             "10.0.0.3, 18.4.5.6, 17.7.8.9, 192.168.0.5"}],
                           fun get_peer/1, #wm_reqstate.peer,
                           "18.4.5.6").
 
 sock_xforward_test() ->
-    peer_sock_test_helper([{"X-Forwarded-For",
+    peer_sock_test_helper({127,0,0,1},
+                          [{"X-Forwarded-For",
                             "10.0.0.3, 18.4.5.6, 17.7.8.9, 192.168.0.5"}],
                           fun get_sock/1, #wm_reqstate.sock,
                           "17.7.8.9").
+
+peer_xforward_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"X-Forwarded-For",
+                            "fe80::3, 2603::4000::6"},
+                           {"X-Forwarded-For",
+                            "2001:4860:4860::8844, fc00::5"}],
+                          fun get_peer/1, #wm_reqstate.peer,
+                          "2603::4000::6").
+
+sock_xforward_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"X-Forwarded-For",
+                            "fe80::3, 2503::4000::6"},
+                           {"X-Forwarded-For",
+                            "2001:4860:4860::8844, fc00::5"}],
+                          fun get_sock/1, #wm_reqstate.sock,
+                          "2001:4860:4860::8844").
 
 -endif.
