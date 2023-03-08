@@ -138,10 +138,21 @@ peer_from_peername({ok, {Addr, _Port}}, End, Req) ->
         false ->
             StrAddr;
         true ->
-            case x_peername(End, Req) of
+            case std_peername(End, Req) of
                 undefined ->
-                    StrAddr;
-                Peer ->
+                    case x_peername(End, Req) of
+                        undefined ->
+                            StrAddr;
+                        Peer ->
+                            Peer
+                    end;
+                Fwd ->
+                    [Peer|_] = case string:split(Fwd, "for=") of
+                                   [_, "\"["++Rest] ->
+                                       string:split(Rest, "]");
+                                   [_, Rest] ->
+                                       string:tokens(Rest, ":;")
+                               end,
                     Peer
             end
     end.
@@ -177,8 +188,24 @@ is_local("::ffff:"++Rest) ->   %% IPv4 maps
 is_local(_) ->
     false.
 
+for_is_local(Fwd) ->
+    case string:split(Fwd, "for=") of
+        [_, "\"["++IPv6] ->
+            is_local(IPv6);
+        [_, IPv4] ->
+            is_local(IPv4);
+        [_] ->
+            false
+    end.
+
 x_peername(End, Req) ->
-    case get_header_value("x-forwarded-for", Req) of
+    header_peername(End, Req, "x-forwarded-for", fun is_local/1).
+
+std_peername(End, Req) ->
+    header_peername(End, Req, "forwarded", fun for_is_local/1).
+
+header_peername(End, Req, Header, FilterFun) ->
+    case get_header_value(Header, Req) of
         {undefined, _} ->
             undefined;
         {Hosts, _} ->
@@ -187,7 +214,7 @@ x_peername(End, Req) ->
                           first -> HostList;
                           last -> lists:reverse(HostList)
                       end,
-            case lists:dropwhile(fun is_local/1, DirList) of
+            case lists:dropwhile(FilterFun, DirList) of
                 [] ->
                     undefined;
                 [Peer|_] ->
@@ -1177,6 +1204,26 @@ sock_xforward_inet6_test() ->
                             "fe80::3, 2503::4000::6"},
                            {"X-Forwarded-For",
                             "2001:4860:4860::8844, fc00::5"}],
+                          fun get_sock/1, #wm_reqstate.sock,
+                          "2001:4860:4860::8844").
+
+peer_forwarded_test() ->
+    peer_sock_test_helper({127,0,0,1},
+                          [{"Forwarded",
+                            "by=18.4.5.6;for=10.0.0.3;proto=http, "
+                            "by=unknown;for=18.4.5.6;proto=http, "
+                            "by=\"[fc00::5]\";for=\"[2001:4860:4860::8844]\", "
+                            "by=unknown;for=\"[fc00::5]\""}],
+                          fun get_peer/1, #wm_reqstate.peer,
+                          "18.4.5.6").
+
+sock_forwarded_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"Forwarded",
+                            "by=18.4.5.6;for=10.0.0.3;proto=http, "
+                            "by=unknown;for=18.4.5.6;proto=http, "
+                            "by=\"[fc00::5]\";for=\"[2001:4860:4860::8844]\", "
+                            "by=unknown;for=\"[fc00::5]\""}],
                           fun get_sock/1, #wm_reqstate.sock,
                           "2001:4860:4860::8844").
 
