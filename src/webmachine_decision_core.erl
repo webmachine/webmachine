@@ -116,9 +116,10 @@ finish_response(CodeAndPhrase, EndTime) ->
 
 -spec error_response(any()) -> ok.
 error_response(Reason) ->
-    error_response(500, Reason).
+    error_response({500, undefined}, Reason).
 
--spec error_response(webmachine_status:status_code_with_phrase(), any()) -> ok.
+-spec error_response(
+    webmachine_status_code:status_code_with_phrase(), any()) -> ok.
 error_response(CodeAndPhrase, Reason) ->
     EndTime = erlang:monotonic_time(),
     wrcall({add_note, error, Reason}),
@@ -153,7 +154,7 @@ decision_test_fn(Test,TestFn,TrueFlow,FalseFlow) ->
     end.
 
 decision_flow(X, TestResult) when is_integer(X) ->
-    if X >= 500 -> error_response(X, TestResult);
+    if X >= 500 -> error_response({X, undefined}, TestResult);
        true -> respond(X)
     end;
 decision_flow(X, _TestResult) when is_atom(X) -> d(X).
