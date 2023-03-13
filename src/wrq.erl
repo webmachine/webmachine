@@ -170,7 +170,7 @@ maybe_conflict_body(BodyResponse) ->
 -spec resp_redirect(t()) -> boolean().
 resp_redirect(#wm_reqdata{resp_redirect=R}) -> R.
 
--spec resp_headers(t()) -> webmachine_headers:headers().
+-spec resp_headers(t()) -> webmachine:headers().
 resp_headers(_RD = #wm_reqdata{resp_headers=RespH}) -> RespH. % mochiheaders
 
 -spec resp_body(t()) -> webmachine:response_body().

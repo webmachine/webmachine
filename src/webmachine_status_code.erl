@@ -14,6 +14,9 @@
 -type status_code_optional_phrase() ::
         status_code() | status_code_with_phrase().
 
+-export_type(
+    [status_code_optional_phrase/0, status_code_with_phrase/0, status_code/0]).
+
 %% Extract just the numerical code of the status.
 -spec status_code(status_code_optional_phrase()) -> status_code().
 status_code({Code, _}) when is_integer(Code) ->

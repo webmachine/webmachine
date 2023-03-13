@@ -27,7 +27,7 @@
 -define(MATCH_ALL, '*').
 
 -type pathspec() :: ['*' | atom() | string()].
--type guard() :: fun((wrq:reqdata()) -> boolean()).
+-type guard() :: fun((wrq:t()) -> boolean()).
 -type route() :: {pathspec(), module(), list()} | {pathspec(), guard(), module(), list()}.
 
 -export_type([route/0]).
@@ -177,7 +177,7 @@ default_port(https) -> 443.
 % Any atom pathterm other than '*' will match any token and will
 % create a binding in the result if a complete match occurs.
 
-%% @type guardfun() = (wrq:reqdata()) -> boolean()
+%% @type guardfun() = (wrq:t()) -> boolean()
 %%                  | {Mod::atom(), Fun::atom()}.
 % This function or tuple representing a function, if present, is
 % called after a successful match of the host, port, and path for a
