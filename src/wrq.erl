@@ -142,14 +142,13 @@ req_qs(_RD = #wm_reqdata{req_qs=QS}) when is_list(QS) -> QS.
 req_headers(_RD = #wm_reqdata{req_headers=ReqH}) -> ReqH.
 
 req_body(_RD = #wm_reqdata{wm_state=ReqState0,max_recv_body=MRB}) ->
-    Req = webmachine_request:new(ReqState0),
-    {ReqResp, ReqState} = webmachine_request:req_body(MRB, Req),
+    {ReqResp, ReqState} = webmachine_request:req_body(MRB, ReqState0),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 
 stream_req_body(_RD = #wm_reqdata{wm_state=ReqState0}, MaxHunk) ->
-    Req = webmachine_request:new(ReqState0),
-    {ReqResp, ReqState} = webmachine_request:stream_req_body(MaxHunk, Req),
+    {ReqResp, ReqState} =
+        webmachine_request:stream_req_body(MaxHunk, ReqState0),
     put(tmp_reqstate, ReqState),
     maybe_conflict_body(ReqResp).
 

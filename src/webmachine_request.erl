@@ -17,29 +17,10 @@
 
 %% @doc Webmachine HTTP Request Abstraction.
 %%
-%% If you are using OTP20 or earlier, the functions in this module can
-%% be invoked using either parameterized module syntax or regular
-%% invocation syntax. Parameterized module syntax has been removed in
-%% OTP21 and later. The parameterized module framework has been left
-%% in place here while we continue to support earlier OTP versions,
-%% but we encourage you to write your applications using regular
-%% function syntax, to prepare for future upgrades.
-%%
-%% To use parameterized module syntax, you create an instance and then
-%% invoke functions on that instance, like this:
-%%
-%% <pre><code>
-%%   Req = webmachine_request:new(ReqState),
-%%   Result = Req:some_fun(Args),
-%% </code></pre>
-%%
-%% where `ReqState' is an instance of a `#wm_reqstate' record. The runtime
-%% then ensures the `ReqState' variable is implicitly passed to each
-%% function invoked through the `Req' instance.
-%%
-%% To call functions using regular syntax, simply explicitly pass the
-%% `ReqState' variable yourself; note there's no need to call
-%% `webmachine_request:new/1' to perform regular invocations.
+%% Note: this module used to support parametrized module syntax. If
+%% you have code like, `Req = webmachine_request:new(ReqState),
+%% Req:path()`, please update it to call
+%% `webmachine_request:path(ReqState)`.
 
 -module(webmachine_request).
 -author('Justin Sheehy <justin@basho.com>').
@@ -50,7 +31,6 @@
 
 % actual interface for resource functions
 -export([
-         new/1,
          trim_state/1,
          get_reqdata/1,
          set_reqdata/2,
@@ -107,19 +87,14 @@
 
 -define(IDLE_TIMEOUT, infinity).
 
--type t() :: {?MODULE, #wm_reqstate{}}.
+-type t() :: #wm_reqstate{}.
 -export_type([t/0]).
 
-new(#wm_reqstate{}=ReqState) ->
-    {?MODULE, ReqState}.
-
-trim_state({?MODULE, ReqState}) ->
-    TrimData = (ReqState#wm_reqstate.reqdata)#wm_reqdata{wm_state='WMSTATE'},
-    webmachine_request:new(ReqState#wm_reqstate{reqdata=TrimData});
 trim_state(ReqState) ->
-    trim_state({?MODULE, ReqState}).
+    TrimData = (ReqState#wm_reqstate.reqdata)#wm_reqdata{wm_state='WMSTATE'},
+    ReqState#wm_reqstate{reqdata=TrimData}.
 
-get_peer({?MODULE, ReqState}=Req) ->
+get_peer(ReqState) ->
     case ReqState#wm_reqstate.peer of
     undefined ->
         PeerName = case ReqState#wm_reqstate.socket of
@@ -127,16 +102,14 @@ get_peer({?MODULE, ReqState}=Req) ->
             {ssl,SslSocket} -> ssl:peername(SslSocket);
             _ -> inet:peername(ReqState#wm_reqstate.socket)
         end,
-        Peer = peer_from_peername(PeerName, Req),
+        Peer = peer_from_peername(PeerName, ReqState),
         NewReqState = ReqState#wm_reqstate{peer=Peer},
         {Peer, NewReqState};
     _ ->
         {ReqState#wm_reqstate.peer, ReqState}
-    end;
-get_peer(ReqState) ->
-    get_peer({?MODULE, ReqState}).
+    end.
 
-get_sock({?MODULE, ReqState} = Req) ->
+get_sock(ReqState) ->
     case ReqState#wm_reqstate.sock of
         undefined ->
             Sockname = case ReqState#wm_reqstate.socket of
@@ -144,14 +117,12 @@ get_sock({?MODULE, ReqState} = Req) ->
                 {ssl,SslSocket} -> ssl:sockname(SslSocket);
                 _ -> inet:sockname(ReqState#wm_reqstate.socket)
             end,
-            Sock = peer_from_peername(Sockname, Req),
+            Sock = peer_from_peername(Sockname, ReqState),
             NewReqState = ReqState#wm_reqstate{sock=Sock},
             {Sock, NewReqState};
         _ ->
             {ReqState#wm_reqstate.peer, ReqState}
-    end;
-get_sock(ReqState) ->
-    get_sock({?MODULE, ReqState}).
+    end.
 
 peer_from_peername({error, Error}, _Req) ->
     {error, Error};
@@ -182,21 +153,21 @@ x_peername(Default, Req) ->
         end
     end.
 
-call(base_uri, {?MODULE, ReqState}) ->
+call(base_uri, ReqState) ->
     {wrq:base_uri(ReqState#wm_reqstate.reqdata), ReqState};
-call(socket, {?MODULE, ReqState}) -> {ReqState#wm_reqstate.socket,ReqState};
-call(get_reqdata, {?MODULE, ReqState}) -> {ReqState#wm_reqstate.reqdata, ReqState};
-call({set_reqdata, RD}, {?MODULE, ReqState}) ->
+call(socket, ReqState) -> {ReqState#wm_reqstate.socket,ReqState};
+call(get_reqdata, ReqState) -> {ReqState#wm_reqstate.reqdata, ReqState};
+call({set_reqdata, RD}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=RD}};
-call(method, {?MODULE, ReqState}) ->
+call(method, ReqState) ->
     {wrq:method(ReqState#wm_reqstate.reqdata), ReqState};
-call(version, {?MODULE, ReqState}) ->
+call(version, ReqState) ->
     {wrq:version(ReqState#wm_reqstate.reqdata), ReqState};
-call(raw_path, {?MODULE, ReqState}) ->
+call(raw_path, ReqState) ->
     {wrq:raw_path(ReqState#wm_reqstate.reqdata), ReqState};
-call(req_headers, {?MODULE, ReqState}) ->
+call(req_headers, ReqState) ->
     {wrq:req_headers(ReqState#wm_reqstate.reqdata), ReqState};
-call({req_body, MaxRecvBody}, {?MODULE, ReqState}) ->
+call({req_body, MaxRecvBody}, ReqState) ->
     case ReqState#wm_reqstate.bodyfetch of
         stream ->
             {stream_conflict, ReqState};
@@ -217,7 +188,7 @@ call({req_body, MaxRecvBody}, {?MODULE, ReqState}) ->
             {NewBody, NewReqState#wm_reqstate{
                         bodyfetch=standard,reqdata=NewRD,reqbody=NewBody}}
     end;
-call({stream_req_body, MaxHunk}, {?MODULE, ReqState}) ->
+call({stream_req_body, MaxHunk}, ReqState) ->
     case ReqState#wm_reqstate.bodyfetch of
         standard ->
             {stream_conflict, ReqState};
@@ -225,56 +196,56 @@ call({stream_req_body, MaxHunk}, {?MODULE, ReqState}) ->
             {recv_stream_body(ReqState, MaxHunk),
              ReqState#wm_reqstate{bodyfetch=stream}}
     end;
-call(maybe_flush_req_body, {?MODULE, ReqState}) ->
+call(maybe_flush_req_body, ReqState) ->
     {maybe_flush_req_body(ReqState), ReqState};
-call(resp_headers, {?MODULE, ReqState}) ->
+call(resp_headers, ReqState) ->
     {wrq:resp_headers(ReqState#wm_reqstate.reqdata), ReqState};
-call(resp_redirect, {?MODULE, ReqState}) ->
+call(resp_redirect, ReqState) ->
     {wrq:resp_redirect(ReqState#wm_reqstate.reqdata), ReqState};
-call({get_resp_header, HdrName}, {?MODULE, ReqState}) ->
+call({get_resp_header, HdrName}, ReqState) ->
     Reply = mochiweb_headers:get_value(HdrName,
                 wrq:resp_headers(ReqState#wm_reqstate.reqdata)),
     {Reply, ReqState};
-call(get_path_info, {?MODULE, ReqState}) ->
+call(get_path_info, ReqState) ->
     PropList = orddict:to_list(wrq:path_info(ReqState#wm_reqstate.reqdata)),
     {PropList, ReqState};
-call({get_path_info, Key}, {?MODULE, ReqState}) ->
+call({get_path_info, Key}, ReqState) ->
     {wrq:path_info(Key, ReqState#wm_reqstate.reqdata), ReqState};
 call(peer, Req) -> get_peer(Req);
 call(sock, Req) -> get_sock(Req);
 call(range, Req) -> get_range(Req);
-call(response_code, {?MODULE, ReqState}) ->
+call(response_code, ReqState) ->
     {wrq:response_code(ReqState#wm_reqstate.reqdata), ReqState};
-call(app_root, {?MODULE, ReqState}) ->
+call(app_root, ReqState) ->
     {wrq:app_root(ReqState#wm_reqstate.reqdata), ReqState};
-call(disp_path, {?MODULE, ReqState}) ->
+call(disp_path, ReqState) ->
     {wrq:disp_path(ReqState#wm_reqstate.reqdata), ReqState};
-call(path, {?MODULE, ReqState}) ->
+call(path, ReqState) ->
     {wrq:path(ReqState#wm_reqstate.reqdata), ReqState};
-call({get_req_header, K}, {?MODULE, ReqState}) ->
+call({get_req_header, K}, ReqState) ->
     {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState};
-call({set_response_code, Code}, {?MODULE, ReqState}) ->
+call({set_response_code, Code}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_response_code(
                                      Code, ReqState#wm_reqstate.reqdata)}};
-call({set_resp_header, K, V}, {?MODULE, ReqState}) ->
+call({set_resp_header, K, V}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_resp_header(
                                      K, V, ReqState#wm_reqstate.reqdata)}};
-call({set_resp_headers, Hdrs}, {?MODULE, ReqState}) ->
+call({set_resp_headers, Hdrs}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_resp_headers(
                                      Hdrs, ReqState#wm_reqstate.reqdata)}};
-call({remove_resp_header, K}, {?MODULE, ReqState}) ->
+call({remove_resp_header, K}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:remove_resp_header(
                                      K, ReqState#wm_reqstate.reqdata)}};
-call({merge_resp_headers, Hdrs}, {?MODULE, ReqState}) ->
+call({merge_resp_headers, Hdrs}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:merge_resp_headers(
                                      Hdrs, ReqState#wm_reqstate.reqdata)}};
-call({append_to_response_body, Data}, {?MODULE, ReqState}) ->
+call({append_to_response_body, Data}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:append_to_response_body(
                                      Data, ReqState#wm_reqstate.reqdata)}};
-call({set_disp_path, P}, {?MODULE, ReqState}) ->
+call({set_disp_path, P}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_disp_path(
                                      P, ReqState#wm_reqstate.reqdata)}};
-call(do_redirect, {?MODULE, ReqState}) ->
+call(do_redirect, ReqState) ->
     {ok, ReqState#wm_reqstate{
            reqdata=wrq:do_redirect(true, ReqState#wm_reqstate.reqdata)}};
 call({send_response, CodeAndPhrase}, Req) ->
@@ -289,52 +260,50 @@ call({send_response, CodeAndPhrase}, Req) ->
     LogData = NewState#wm_reqstate.log_data,
     NewLogData = LogData#wm_log_data{finish_time=erlang:monotonic_time()},
     {Reply, NewState#wm_reqstate{log_data=NewLogData}};
-call(resp_body, {?MODULE, ReqState}) ->
+call(resp_body, ReqState) ->
     {wrq:resp_body(ReqState#wm_reqstate.reqdata), ReqState};
-call({set_resp_body, Body}, {?MODULE, ReqState}) ->
+call({set_resp_body, Body}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:set_resp_body(Body,
                                        ReqState#wm_reqstate.reqdata)}};
-call(has_resp_body, {?MODULE, ReqState}) ->
+call(has_resp_body, ReqState) ->
     Reply =
         case wrq:resp_body(ReqState#wm_reqstate.reqdata) of
             <<>> -> false;
             _ -> true
         end,
     {Reply, ReqState};
-call({get_metadata, Key}, {?MODULE, ReqState}) ->
+call({get_metadata, Key}, ReqState) ->
     Reply = case orddict:find(Key, ReqState#wm_reqstate.metadata) of
                 {ok, Value} -> Value;
                 error -> undefined
             end,
     {Reply, ReqState};
-call({set_metadata, Key, Value}, {?MODULE, ReqState}) ->
+call({set_metadata, Key, Value}, ReqState) ->
     NewDict = orddict:store(Key, Value, ReqState#wm_reqstate.metadata),
     {ok, ReqState#wm_reqstate{metadata=NewDict}};
-call(path_tokens, {?MODULE, ReqState}) ->
+call(path_tokens, ReqState) ->
     {wrq:path_tokens(ReqState#wm_reqstate.reqdata), ReqState};
-call(req_cookie, {?MODULE, ReqState}) ->
+call(req_cookie, ReqState) ->
     {wrq:req_cookie(ReqState#wm_reqstate.reqdata), ReqState};
-call(req_qs, {?MODULE, ReqState}) ->
+call(req_qs, ReqState) ->
     {wrq:req_qs(ReqState#wm_reqstate.reqdata), ReqState};
 call({load_dispatch_data, PathProps, HostTokens, Port,
-      PathTokens, AppRoot, DispPath}, {?MODULE, ReqState}) ->
+      PathTokens, AppRoot, DispPath}, ReqState) ->
     PathInfo = orddict:from_list(PathProps),
     NewState = ReqState#wm_reqstate{reqdata=wrq:load_dispatch_data(
                         PathInfo,HostTokens,Port,PathTokens,AppRoot,
                         DispPath,ReqState#wm_reqstate.reqdata)},
     {ok, NewState};
-call(log_data, {?MODULE, ReqState}) -> {ReqState#wm_reqstate.log_data, ReqState};
-call(notes, {?MODULE, ReqState}) -> {wrq:get_notes(ReqState#wm_reqstate.reqdata), ReqState};
-call({add_note, Key, Value}, {?MODULE, ReqState}) ->
+call(log_data, ReqState) -> {ReqState#wm_reqstate.log_data, ReqState};
+call(notes, ReqState) -> {wrq:get_notes(ReqState#wm_reqstate.reqdata), ReqState};
+call({add_note, Key, Value}, ReqState) ->
     {ok, ReqState#wm_reqstate{reqdata=wrq:add_note(Key, Value, ReqState#wm_reqstate.reqdata)}};
-call(Arg, #wm_reqstate{}=ReqState) -> call(Arg, {?MODULE, ReqState}).
+call(Arg, #wm_reqstate{}=ReqState) -> call(Arg, ReqState).
 
-get_header_value(K, {?MODULE, ReqState}) ->
-    {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState};
 get_header_value(K, ReqState) ->
-    get_header_value(K, {?MODULE, ReqState}).
+    {wrq:get_req_header(K, ReqState#wm_reqstate.reqdata), ReqState}.
 
-get_outheader_value(K, {?MODULE, ReqState}) ->
+get_outheader_value(K, ReqState) ->
     {mochiweb_headers:get_value(K,
                                 wrq:resp_headers(ReqState#wm_reqstate.reqdata)), ReqState}.
 
@@ -420,33 +389,31 @@ send_chunk(Socket, Data) ->
     {send(Socket, [mochihex:to_hex(Size), <<"\r\n">>, Data, <<"\r\n">>]),
      Size}.
 
-send_ok_response(ReasonPhrase, {?MODULE, ReqState}=Req) ->
+send_ok_response(ReasonPhrase, ReqState) ->
     RD0 = ReqState#wm_reqstate.reqdata,
-    {Range, State} = get_range(Req),
+    {Range, State} = get_range(ReqState),
     case Range of
         X when X =:= undefined; X =:= fail; X =:= ignore ->
-            send_response({200, ReasonPhrase}, Req);
+            send_response({200, ReasonPhrase}, ReqState);
         Ranges ->
             {PartList, Size} = range_parts(RD0, Ranges),
             case PartList of
                 [] -> %% no valid ranges
                     %% could be 416, for now we'll just return 200
-                    send_response({200, ReasonPhrase}, Req);
+                    send_response({200, ReasonPhrase}, ReqState);
                 PartList ->
                     {RangeHeaders, RangeBody} =
-                        parts_to_body(PartList, Size, Req),
+                        parts_to_body(PartList, Size, ReqState),
                     RespHdrsRD = wrq:set_resp_headers(
                              [{"Accept-Ranges", "bytes"} | RangeHeaders], RD0),
                     RespBodyRD = wrq:set_resp_body(
                                    RangeBody, RespHdrsRD),
                     NewState = State#wm_reqstate{reqdata=RespBodyRD},
-                    send_response({206, ReasonPhrase}, NewState, Req)
+                    send_response({206, ReasonPhrase}, NewState)
             end
     end.
 
-send_response(Code, #wm_reqstate{}=ReqState) -> send_response(Code,ReqState,{?MODULE,ReqState});
-send_response(Code, {?MODULE, ReqState}=Req) -> send_response(Code,ReqState,Req).
-send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}, _Req) ->
+send_response(CodeAndPhrase, PassedState=#wm_reqstate{reqdata=RD}) ->
     Body0 = wrq:resp_body(RD),
     {Body,Length} = case Body0 of
         {stream, StreamBody} -> {{stream, StreamBody}, chunked};
@@ -732,12 +699,12 @@ flush_req_body({Bytes, Next}, MaxFlush) when is_binary(Bytes),
     end.
 
 
-get_range({?MODULE, #wm_reqstate{reqdata = RD}=ReqState}=Req) ->
+get_range(#wm_reqstate{reqdata = RD}=ReqState) ->
     case RD#wm_reqdata.resp_range of
         ignore_request ->
             {ignore, ReqState#wm_reqstate{range=undefined}};
         follow_request ->
-            case get_header_value("range", Req) of
+            case get_header_value("range", ReqState) of
                 {undefined, _} ->
                     {undefined, ReqState#wm_reqstate{range=undefined}};
                 {RawRange, _} ->
@@ -946,48 +913,33 @@ make_headers(Code, Length, RD) when is_integer(Code) ->
         end,
     lists:foldl(F, [<<"\r\n">>], mochiweb_headers:to_list(Hdrs)).
 
-get_reqdata(#wm_reqstate{}=ReqState) -> call(get_reqdata, {?MODULE, ReqState});
 get_reqdata(Req) -> call(get_reqdata, Req).
 
-set_reqdata(RD, #wm_reqstate{}=ReqState) -> call({set_reqdata, RD}, {?MODULE, ReqState});
 set_reqdata(RD, Req) -> call({set_reqdata, RD}, Req).
 
-socket(#wm_reqstate{}=ReqState) -> call(socket, {?MODULE, ReqState});
 socket(Req) -> call(socket, Req).
 
-method(#wm_reqstate{}=ReqState) -> call(method, {?MODULE, ReqState});
 method(Req) -> call(method, Req).
 
-version(#wm_reqstate{}=ReqState) -> call(version, {?MODULE, ReqState});
 version(Req) -> call(version, Req).
 
-disp_path(#wm_reqstate{}=ReqState) -> call(disp_path, {?MODULE, ReqState});
 disp_path(Req) -> call(disp_path, Req).
 
-path(#wm_reqstate{}=ReqState) -> call(path, {?MODULE, ReqState});
 path(Req) -> call(path, Req).
 
-raw_path(#wm_reqstate{}=ReqState) -> call(raw_path, {?MODULE, ReqState});
 raw_path(Req) -> call(raw_path, Req).
 
-req_headers(#wm_reqstate{}=ReqState) -> call(req_headers, {?MODULE, ReqState});
 req_headers(Req) -> call(req_headers, Req).
 headers(Req) -> req_headers(Req).
 
-req_body(MaxRevBody, #wm_reqstate{}=ReqState) -> call({req_body,MaxRevBody}, {?MODULE, ReqState});
 req_body(MaxRevBody, Req) -> call({req_body,MaxRevBody}, Req).
-stream_req_body(MaxHunk, #wm_reqstate{}=ReqState) ->
-    call({stream_req_body, MaxHunk}, {?MODULE, ReqState});
 stream_req_body(MaxHunk, Req) -> call({stream_req_body, MaxHunk}, Req).
 
-resp_headers(#wm_reqstate{}=ReqState) -> call(resp_headers, {?MODULE, ReqState});
 resp_headers(Req) -> call(resp_headers, Req).
 out_headers(Req) -> resp_headers(Req).
 
 get_resp_header(HeaderName, Req) ->
     call({get_resp_header, HeaderName}, Req).
-get_out_header(HeaderName, #wm_reqstate{}=ReqState) ->
-    get_resp_header(HeaderName, {?MODULE, ReqState});
 get_out_header(HeaderName, Req) -> get_resp_header(HeaderName, Req).
 
 has_resp_header(HeaderName, Req) ->
@@ -995,31 +947,21 @@ has_resp_header(HeaderName, Req) ->
         {undefined, _} -> false;
         {_, _}         -> true
     end.
-has_out_header(HeaderName, #wm_reqstate{}=ReqState) ->
-    has_resp_header(HeaderName, {?MODULE, ReqState});
 has_out_header(HeaderName, Req) -> has_resp_header(HeaderName, Req).
 
-has_resp_body(#wm_reqstate{}=ReqState) -> call(has_resp_body, {?MODULE, ReqState});
 has_resp_body(Req) -> call(has_resp_body, Req).
 has_response_body(Req) -> has_resp_body(Req).
 
-response_code(#wm_reqstate{}=ReqState) -> call(response_code, {?MODULE, ReqState});
 response_code(Req) -> call(response_code, Req).
-set_response_code(Code, {?MODULE, ReqState}=Req) ->
-    call({ReqState, set_response_code, Code}, Req);
 set_response_code(Code, ReqState) ->
-    set_response_code(Code, {?MODULE, ReqState}).
+    set_response_code({set_response_code, Code}, ReqState).
 
-peer(#wm_reqstate{}=ReqState) -> call(peer, {?MODULE, ReqState});
 peer(Req) -> call(peer, Req).
 
-range(#wm_reqstate{}=ReqState) -> call(range, {?MODULE, ReqState});
 range(Req) -> call(range, Req).
 
-req_cookie(#wm_reqstate{}=ReqState) -> call(req_cookie, {?MODULE, ReqState});
 req_cookie(Req) -> call(req_cookie, Req).
 parse_cookie(Req) -> req_cookie(Req).
-get_cookie_value(Key, #wm_reqstate{}=ReqState) -> get_cookie_value(Key, {?MODULE, ReqState});
 get_cookie_value(Key, Req) ->
     {ReqCookie, NewReqState} = req_cookie(Req),
     case lists:keyfind(Key, 1, ReqCookie) of
@@ -1027,92 +969,65 @@ get_cookie_value(Key, Req) ->
         {Key, Value} -> {Value, NewReqState}
     end.
 
-req_qs(#wm_reqstate{}=ReqState) -> call(req_qs, {?MODULE, ReqState});
 req_qs(Req) -> call(req_qs, Req).
 parse_qs(Req) -> req_qs(Req).
-get_qs_value(Key, #wm_reqstate{}=ReqState) -> get_qs_value(Key, {?MODULE, ReqState});
 get_qs_value(Key, Req) ->
     {ReqQS, NewReqState} = req_qs(Req),
     case lists:keyfind(Key, 1, ReqQS) of
         false -> {undefined, NewReqState};
         {Key, Value} -> {Value, NewReqState}
     end.
-get_qs_value(Key, Default, #wm_reqstate{}=ReqState) ->
-    get_qs_value(Key, Default, {?MODULE, ReqState});
 get_qs_value(Key, Default, Req) ->
     {ReqQS, NewReqState} = req_qs(Req),
     case lists:keyfind(Key, 1, ReqQS) of
         false -> {Default, NewReqState};
         {Key, Value} -> {Value, NewReqState}
     end.
-set_resp_body(Body, #wm_reqstate{}=ReqState) -> call({set_resp_body, Body}, {?MODULE, ReqState});
+
 set_resp_body(Body, Req) -> call({set_resp_body, Body}, Req).
-resp_body(#wm_reqstate{}=ReqState) -> call(resp_body, {?MODULE, ReqState});
 resp_body(Req) -> call(resp_body, Req).
 response_body(Req) -> resp_body(Req).
 
-get_req_header(K, #wm_reqstate{}=ReqState) -> call({get_req_header, K}, {?MODULE, ReqState});
 get_req_header(K, Req) -> call({get_req_header, K}, Req).
 
 set_resp_header(K, V, Req) -> call({set_resp_header, K, V}, Req).
-add_response_header(K, V, #wm_reqstate{}=ReqState) -> set_resp_header(K, V, {?MODULE, ReqState});
 add_response_header(K, V, Req) -> set_resp_header(K, V, Req).
 
 set_resp_headers(Hdrs, Req) -> call({set_resp_headers, Hdrs}, Req).
-add_response_headers(Hdrs, #wm_reqstate{}=ReqState) -> set_resp_headers(Hdrs, {?MODULE, ReqState});
 add_response_headers(Hdrs, Req) -> set_resp_headers(Hdrs, Req).
 
 remove_resp_header(K, Req) -> call({remove_resp_header, K}, Req).
-remove_response_header(K, #wm_reqstate{}=ReqState) -> remove_resp_header(K, {?MODULE, ReqState});
 remove_response_header(K, Req) -> remove_resp_header(K, Req).
 
 merge_resp_headers(Hdrs, Req) -> call({merge_resp_headers, Hdrs}, Req).
-merge_response_headers(Hdrs, #wm_reqstate{}=ReqState) ->
-    merge_resp_headers(Hdrs, {?MODULE, ReqState});
 merge_response_headers(Hdrs, Req) -> merge_resp_headers(Hdrs, Req).
 
-append_to_response_body(Data, #wm_reqstate{}=ReqState) ->
-    call({append_to_response_body, Data}, {?MODULE, ReqState});
 append_to_response_body(Data, Req) ->
     call({append_to_response_body, Data}, Req).
 
-do_redirect(#wm_reqstate{}=ReqState) -> call(do_redirect, {?MODULE, ReqState});
 do_redirect(Req) -> call(do_redirect, Req).
 
-resp_redirect(#wm_reqstate{}=ReqState) -> call(resp_redirect, {?MODULE, ReqState});
 resp_redirect(Req) -> call(resp_redirect, Req).
 
-get_metadata(Key, #wm_reqstate{}=ReqState) -> call({get_metadata, Key}, {?MODULE, ReqState});
 get_metadata(Key, Req) -> call({get_metadata, Key}, Req).
 
-set_metadata(Key, Value, #wm_reqstate{}=ReqState) ->
-    call({set_metadata, Key, Value}, {?MODULE, ReqState});
 set_metadata(Key, Value, Req) -> call({set_metadata, Key, Value}, Req).
 
-get_path_info(#wm_reqstate{}=ReqState) -> call(get_path_info, {?MODULE, ReqState});
 get_path_info(Req) -> call(get_path_info, Req).
 
-get_path_info(Key, #wm_reqstate{}=ReqState) -> call({get_path_info, Key}, {?MODULE, ReqState});
 get_path_info(Key, Req) -> call({get_path_info, Key}, Req).
 
-path_tokens(#wm_reqstate{}=ReqState) -> call(path_tokens, {?MODULE, ReqState});
 path_tokens(Req) -> call(path_tokens, Req).
 get_path_tokens(Req) -> path_tokens(Req).
 
-app_root(#wm_reqstate{}=ReqState) -> call(app_root, {?MODULE, ReqState});
 app_root(Req) -> call(app_root, Req).
 get_app_root(Req) -> app_root(Req).
 
-load_dispatch_data(Bindings, HostTokens, Port, PathTokens,
-                   AppRoot, DispPath, #wm_reqstate{}=ReqState) ->
-    call({load_dispatch_data, Bindings, HostTokens, Port,
-          PathTokens, AppRoot, DispPath}, {?MODULE, ReqState});
 load_dispatch_data(Bindings, HostTokens, Port, PathTokens,
                    AppRoot, DispPath, Req) ->
     call({load_dispatch_data, Bindings, HostTokens, Port,
           PathTokens, AppRoot, DispPath}, Req).
 
-log_data(#wm_reqstate{}=ReqState) -> call(log_data, {?MODULE, ReqState});
 log_data(Req) -> call(log_data, Req).
 
 -ifdef(TEST).

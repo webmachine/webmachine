@@ -38,8 +38,7 @@ handle_request(Resource, ReqState) ->
 
 wrcall(X) ->
     RS0 = get(reqstate),
-    Req = webmachine_request:new(RS0),
-    {Response, RS1} = webmachine_request:call(X, Req),
+    {Response, RS1} = webmachine_request:call(X, RS0),
     put(reqstate, RS1),
     Response.
 
@@ -125,9 +124,7 @@ error_response(CodeAndPhrase, Reason) ->
     wrcall({add_note, error, Reason}),
     {ok, ErrorHandler} = application:get_env(webmachine, error_handler),
     {ErrorHTML, ReqState} = ErrorHandler:render_error(
-                              CodeAndPhrase,
-                              {webmachine_request,get(reqstate)},
-                              Reason),
+                              CodeAndPhrase, get(reqstate), Reason),
     put(reqstate, ReqState),
     wrcall({set_resp_body, encode_body(ErrorHTML)}),
     finish_response(CodeAndPhrase, EndTime).
