@@ -94,6 +94,9 @@ trim_state(ReqState) ->
     TrimData = (ReqState#wm_reqstate.reqdata)#wm_reqdata{wm_state='WMSTATE'},
     ReqState#wm_reqstate{reqdata=TrimData}.
 
+%% Get the public IP address closest to the client. This might be the
+%% socket's peer, or it might be the earliest non-private IP in the
+%% X-Forwarded-For header.
 get_peer(ReqState) ->
     case ReqState#wm_reqstate.peer of
     undefined ->
@@ -102,13 +105,16 @@ get_peer(ReqState) ->
             {ssl,SslSocket} -> ssl:peername(SslSocket);
             _ -> inet:peername(ReqState#wm_reqstate.socket)
         end,
-        Peer = peer_from_peername(PeerName, ReqState),
+        Peer = peer_from_peername(PeerName, first, ReqState),
         NewReqState = ReqState#wm_reqstate{peer=Peer},
         {Peer, NewReqState};
     _ ->
         {ReqState#wm_reqstate.peer, ReqState}
     end.
 
+%% Get the the public IP closest to the server. This might be the
+%% socket's IP, or it might be the latest non-private IP in the
+%% X-Forwarded-For header.
 get_sock(ReqState) ->
     case ReqState#wm_reqstate.sock of
         undefined ->
@@ -117,40 +123,103 @@ get_sock(ReqState) ->
                 {ssl,SslSocket} -> ssl:sockname(SslSocket);
                 _ -> inet:sockname(ReqState#wm_reqstate.socket)
             end,
-            Sock = peer_from_peername(Sockname, ReqState),
+            Sock = peer_from_peername(Sockname, last, ReqState),
             NewReqState = ReqState#wm_reqstate{sock=Sock},
             {Sock, NewReqState};
         _ ->
             {ReqState#wm_reqstate.peer, ReqState}
     end.
 
-peer_from_peername({error, Error}, _Req) ->
+peer_from_peername({error, Error}, _End, _Req) ->
     {error, Error};
-peer_from_peername({ok, {Addr={10, _, _, _}, _Port}}, Req) ->
-    x_peername(inet_parse:ntoa(Addr), Req);
-peer_from_peername({ok, {Addr={172, Second, _, _}, _Port}}, Req)
-  when (Second > 15) andalso (Second < 32) ->
-    x_peername(inet_parse:ntoa(Addr), Req);
-peer_from_peername({ok, {Addr={192, 168, _, _}, _Port}}, Req) ->
-    x_peername(inet_parse:ntoa(Addr), Req);
-peer_from_peername({ok, {{127, 0, 0, 1}, _Port}}, Req) ->
-    x_peername("127.0.0.1", Req);
-peer_from_peername({ok, {Addr, _Port}}, _Req) ->
-    inet_parse:ntoa(Addr).
+peer_from_peername({ok, {Addr, _Port}}, End, Req) ->
+    StrAddr = inet_parse:ntoa(Addr),
+    case is_local(StrAddr) of
+        false ->
+            StrAddr;
+        true ->
+            case std_peername(End, Req) of
+                undefined ->
+                    case x_peername(End, Req) of
+                        undefined ->
+                            StrAddr;
+                        Peer ->
+                            Peer
+                    end;
+                Fwd ->
+                    [Peer|_] = case string:split(Fwd, "for=") of
+                                   [_, "\"["++Rest] ->
+                                       string:split(Rest, "]");
+                                   [_, Rest] ->
+                                       string:tokens(Rest, ":;")
+                               end,
+                    Peer
+            end
+    end.
 
-x_peername(Default, Req) ->
-    case get_header_value("x-forwarded-for", Req) of
-    {undefined, _} ->
-        Default;
-    {Hosts, _} ->
-        case string:tokens(Hosts, ",") of
-            [] ->
-                %% both Hosts="" and Hosts=",,," cause this, so check
-                %% here instead of before tokenization
-                Default;
-            HostList ->
-                string:strip(lists:last(HostList))
-        end
+is_local("127.0.0.1") -> true;
+is_local("10."++_) -> true;
+is_local("192.168."++_) -> true;
+is_local("172."++Rest) ->
+    case string:tokens(Rest, ".") of
+        [Next|_] ->
+            case catch list_to_integer(Next) of
+                N when N > 15, N < 32 ->
+                    true;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end;
+is_local("::1") -> true;
+is_local("fc00:"++_) -> true;
+is_local("fe80:"++_) -> true;
+is_local("::ffff:"++Rest) ->   %% IPv4 maps
+    case Rest of
+        "000a:"++_ -> true;    %% 10.*
+        "0:000a:"++_ -> true;
+        "c0a8:"++_ -> true;    %% 192.168.*
+        "0:c0a8:"++_ -> true;
+        "ac1"++_ -> true;      %% 172.{16-31}.*
+        "0:ac1"++_ -> true;
+        _ -> false
+    end;
+is_local(_) ->
+    false.
+
+for_is_local(Fwd) ->
+    case string:split(Fwd, "for=") of
+        [_, "\"["++IPv6] ->
+            is_local(IPv6);
+        [_, IPv4] ->
+            is_local(IPv4);
+        [_] ->
+            false
+    end.
+
+x_peername(End, Req) ->
+    header_peername(End, Req, "x-forwarded-for", fun is_local/1).
+
+std_peername(End, Req) ->
+    header_peername(End, Req, "forwarded", fun for_is_local/1).
+
+header_peername(End, Req, Header, FilterFun) ->
+    case get_header_value(Header, Req) of
+        {undefined, _} ->
+            undefined;
+        {Hosts, _} ->
+            HostList = string:tokens(Hosts, ", "),
+            DirList = case End of
+                          first -> HostList;
+                          last -> lists:reverse(HostList)
+                      end,
+            case lists:dropwhile(FilterFun, DirList) of
+                [] ->
+                    undefined;
+                [Peer|_] ->
+                    Peer
+            end
     end.
 
 call(base_uri, ReqState) ->
@@ -1058,10 +1127,10 @@ metadata_test() ->
     {ok, ReqState} = set_metadata(Key, Value, #wm_reqstate{metadata=orddict:new()}),
     ?assertEqual({Value, ReqState}, get_metadata(Key, ReqState)).
 
-peer_test() ->
+peer_sock_test_helper(Listen, Headers, GetFun, ReqStateField, Expect) ->
     Self = self(),
     Pid = spawn_link(fun() ->
-                             {ok, LS} = gen_tcp:listen(0, [binary, {active, false}]),
+                             {ok, LS} = gen_tcp:listen(0, [{ip, Listen}, binary, {active, false}]),
                              {ok, {_, Port}} = inet:sockname(LS),
                              Self ! {port, Port},
                              {ok, S} = gen_tcp:accept(LS),
@@ -1076,47 +1145,86 @@ peer_test() ->
                      end),
     receive
         {port, Port} ->
-            {ok, S} = gen_tcp:connect({127,0,0,1}, Port, [binary, {active, false}]),
-            ReqData = #wm_reqdata{req_headers = mochiweb_headers:make([])},
+            {ok, S} = gen_tcp:connect(Listen, Port, [binary, {active, false}]),
+            ReqData = #wm_reqdata{req_headers = mochiweb_headers:make(Headers)},
             ReqState = #wm_reqstate{socket=S, reqdata=ReqData},
             ?assertEqual({S, ReqState}, socket(ReqState)),
-            {"127.0.0.1", NReqState} = get_peer(ReqState),
-            ?assertEqual("127.0.0.1", NReqState#wm_reqstate.peer),
+            {Expect, NReqState} = GetFun(ReqState),
+            ?assertEqual(Expect, element(ReqStateField, NReqState)),
             Pid ! stop,
             gen_tcp:close(S)
     after 2000 ->
             exit({error, listener_fail})
     end.
+
+peer_test() ->
+    peer_sock_test_helper({127,0,0,1}, [], fun get_peer/1, #wm_reqstate.peer,
+                          "127.0.0.1").
 
 sock_test() ->
-    Self = self(),
-    Pid = spawn_link(fun() ->
-                             {ok, LS} = gen_tcp:listen(0, [binary, {active, false}]),
-                             {ok, {_, Port}} = inet:sockname(LS),
-                             Self ! {port, Port},
-                             {ok, S} = gen_tcp:accept(LS),
-                             receive
-                                 stop ->
-                                     ok
-                             after 2000 ->
-                                     ok
-                             end,
-                             gen_tcp:close(S),
-                             gen_tcp:close(LS)
-                     end),
-    receive
-        {port, Port} ->
-            {ok, S} = gen_tcp:connect({127,0,0,1}, Port, [binary, {active, false}]),
-            ReqData = #wm_reqdata{req_headers = mochiweb_headers:make([])},
-            ReqState = #wm_reqstate{socket=S, reqdata=ReqData},
-            ?assertEqual({S, ReqState}, socket(ReqState)),
-            {"127.0.0.1", NReqState} = get_sock(ReqState),
-            ?assertEqual("127.0.0.1", NReqState#wm_reqstate.sock),
-            Pid ! stop,
-            gen_tcp:close(S)
-    after 2000 ->
-            exit({error, listener_fail})
-    end.
+    peer_sock_test_helper({127,0,0,1}, [], fun get_sock/1, #wm_reqstate.sock,
+                          "127.0.0.1").
 
+peer_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [], fun get_peer/1, #wm_reqstate.peer,
+                          "::1").
+
+sock_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [], fun get_sock/1, #wm_reqstate.sock,
+                          "::1").
+
+peer_xforward_test() ->
+    peer_sock_test_helper({127,0,0,1},
+                          [{"X-Forwarded-For",
+                            "10.0.0.3, 18.4.5.6, 17.7.8.9, 192.168.0.5"}],
+                          fun get_peer/1, #wm_reqstate.peer,
+                          "18.4.5.6").
+
+sock_xforward_test() ->
+    peer_sock_test_helper({127,0,0,1},
+                          [{"X-Forwarded-For",
+                            "10.0.0.3, 18.4.5.6, 17.7.8.9, 192.168.0.5"}],
+                          fun get_sock/1, #wm_reqstate.sock,
+                          "17.7.8.9").
+
+peer_xforward_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"X-Forwarded-For",
+                            "fe80::3, 2603::4000::6"},
+                           {"X-Forwarded-For",
+                            "2001:4860:4860::8844, fc00::5"}],
+                          fun get_peer/1, #wm_reqstate.peer,
+                          "2603::4000::6").
+
+sock_xforward_inet6_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"X-Forwarded-For",
+                            "fe80::3, 2503::4000::6"},
+                           {"X-Forwarded-For",
+                            "2001:4860:4860::8844, fc00::5"}],
+                          fun get_sock/1, #wm_reqstate.sock,
+                          "2001:4860:4860::8844").
+
+peer_forwarded_test() ->
+    peer_sock_test_helper({127,0,0,1},
+                          [{"Forwarded",
+                            "by=18.4.5.6;for=10.0.0.3;proto=http, "
+                            "by=unknown;for=18.4.5.6;proto=http, "
+                            "by=\"[fc00::5]\";for=\"[2001:4860:4860::8844]\", "
+                            "by=unknown;for=\"[fc00::5]\""}],
+                          fun get_peer/1, #wm_reqstate.peer,
+                          "18.4.5.6").
+
+sock_forwarded_test() ->
+    peer_sock_test_helper({0,0,0,0,0,0,0,1},
+                          [{"Forwarded",
+                            "by=18.4.5.6;for=10.0.0.3;proto=http, "
+                            "by=unknown;for=18.4.5.6;proto=http, "
+                            "by=\"[fc00::5]\";for=\"[2001:4860:4860::8844]\", "
+                            "by=unknown;for=\"[fc00::5]\""}],
+                          fun get_sock/1, #wm_reqstate.sock,
+                          "2001:4860:4860::8844").
 
 -endif.
