@@ -264,15 +264,15 @@ do_choose(Choices, Header, Default) ->
     DefaultOkay = case DefaultPrio of
         [] ->
             case StarPrio of
-                [0.0] -> no;
+                [SP] when SP == 0.0 -> no;
                 _ -> yes
             end;
-        [0.0] -> no;
+        [DP] when DP == 0.0 -> no;
         _ -> yes
     end,
     AnyOkay = case StarPrio of
         [] -> no;
-        [0.0] -> no;
+        [SP2] when SP2 == 0.0 -> no;
         _ -> yes
     end,
     do_choose(Default, DefaultOkay, AnyOkay, Choices, Accepted).
@@ -296,7 +296,7 @@ do_choose(Default, DefaultOkay, AnyOkay, Choices, []) ->
 do_choose(Default, DefaultOkay, AnyOkay, Choices, [AccPair|AccRest]) ->
     {Prio, Acc} = AccPair,
     case Prio of
-        0.0 ->
+        _ when Prio == 0.0 ->
             do_choose(Default, DefaultOkay, AnyOkay,
                             lists:delete(Acc, Choices), AccRest);
         _ ->
