@@ -264,15 +264,15 @@ do_choose(Choices, Header, Default) ->
     DefaultOkay = case DefaultPrio of
         [] ->
             case StarPrio of
-                [SP] when SP == 0.0 -> no;
+                [SP] when SP == +0.0 -> no;
                 _ -> yes
             end;
-        [DP] when DP == 0.0 -> no;
+        [DP] when DP == +0.0 -> no;
         _ -> yes
     end,
     AnyOkay = case StarPrio of
         [] -> no;
-        [SP2] when SP2 == 0.0 -> no;
+        [SP2] when SP2 == +0.0 -> no;
         _ -> yes
     end,
     do_choose(Default, DefaultOkay, AnyOkay, Choices, Accepted).
@@ -296,7 +296,7 @@ do_choose(Default, DefaultOkay, AnyOkay, Choices, []) ->
 do_choose(Default, DefaultOkay, AnyOkay, Choices, [AccPair|AccRest]) ->
     {Prio, Acc} = AccPair,
     case Prio of
-        _ when Prio == 0.0 ->
+        _ when Prio == +0.0 ->
             do_choose(Default, DefaultOkay, AnyOkay,
                             lists:delete(Acc, Choices), AccRest);
         _ ->
@@ -321,7 +321,7 @@ build_conneg_list([Acc|AccRest], Result) ->
     Pair = case XPair of
         {Choice, "q=" ++ PrioStr} ->
             case PrioStr of
-                "0" -> {0.0, Choice};
+                "0" -> {+0.0, Choice};
                 "1" -> {1.0, Choice};
                 [$.|_] ->
                     %% handle strange FeedBurner Accept
