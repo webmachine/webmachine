@@ -27,7 +27,7 @@
 
 -include("webmachine_logger.hrl").
 
--define(QUIP, "greased slide to failure").
+-define(QUIP, "Stuff just happened.").
 
 %% @spec start(_Type, _StartArgs) -> ServerRet
 %% @doc application start callback for webmachine.
