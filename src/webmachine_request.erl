@@ -87,6 +87,12 @@
 
 -define(IDLE_TIMEOUT, infinity).
 
+%% Finite timeout used when we're only draining leftover request bytes
+%% (see maybe_flush_req_body/1). Kept intentionally short so that a
+%% misbehaving or already-drained peer can never wedge the request
+%% pipeline. Legitimate streaming reads still use ?IDLE_TIMEOUT.
+-define(FLUSH_TIMEOUT, 5000).
+
 -type t() :: #wm_reqstate{}.
 -export_type([t/0]).
 
@@ -588,7 +594,10 @@ expects_continue(PassedState) ->
 sent_continue() ->
     get(webmachine_sent_continue) =:= true.
 
-recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
+recv_stream_body(PassedState, MaxHunkSize) ->
+    recv_stream_body(PassedState, MaxHunkSize, ?IDLE_TIMEOUT).
+
+recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize, Timeout) ->
     case expects_continue(PassedState) and (not sent_continue()) of
         true ->
             put(webmachine_sent_continue, true),
@@ -608,28 +617,29 @@ recv_stream_body(PassedState=#wm_reqstate{reqdata=RD}, MaxHunkSize) ->
             {<<>>, done};
         chunked ->
             start_recv_chunked_body(PassedState#wm_reqstate.socket,
-                                    MaxHunkSize);
+                                    MaxHunkSize, Timeout);
         Length ->
             recv_unchunked_body(PassedState#wm_reqstate.socket,
-                                MaxHunkSize, Length)
+                                MaxHunkSize, Length, Timeout)
     end.
 
-recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
+recv_unchunked_body(Socket, MaxHunk, DataLeft, Timeout) ->
     case MaxHunk >= DataLeft of
         true ->
-            case mochiweb_socket:recv(Socket,DataLeft,?IDLE_TIMEOUT) of
-                {ok,Data1} ->
+            case mochiweb_socket:recv(Socket, DataLeft, Timeout) of
+                {ok, Data1} ->
                     record_stream_progress(done),
                     {Data1, done};
                 {error, Error} ->
                     throw({webmachine_recv_error, Error})
             end;
         false ->
-            case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
-                {ok,Data2} ->
+            case mochiweb_socket:recv(Socket, MaxHunk, Timeout) of
+                {ok, Data2} ->
                     Next = fun() ->
                                    recv_unchunked_body(Socket, MaxHunk,
-                                                       DataLeft-MaxHunk)
+                                                       DataLeft - MaxHunk,
+                                                       Timeout)
                            end,
                     record_stream_progress(Next),
                     {Data2, Next};
@@ -638,21 +648,22 @@ recv_unchunked_body(Socket, MaxHunk, DataLeft) ->
             end
     end.
 
-start_recv_chunked_body(Socket, MaxHunk) ->
-    case read_chunk_length(Socket, false) of
+start_recv_chunked_body(Socket, MaxHunk, Timeout) ->
+    case read_chunk_length(Socket, false, Timeout) of
         0 ->
             record_stream_progress(done),
             {<<>>, done};
         ChunkLength ->
-            recv_chunked_body(Socket,MaxHunk, ChunkLength)
+            recv_chunked_body(Socket, MaxHunk, ChunkLength, Timeout)
     end.
-recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
+recv_chunked_body(Socket, MaxHunk, LeftInChunk, Timeout) ->
     case MaxHunk >= LeftInChunk of
         true ->
-            case mochiweb_socket:recv(Socket,LeftInChunk,?IDLE_TIMEOUT) of
-                {ok,Data1} ->
+            case mochiweb_socket:recv(Socket, LeftInChunk, Timeout) of
+                {ok, Data1} ->
                     Next = fun() ->
-                                   start_recv_chunked_body(Socket, MaxHunk)
+                                   start_recv_chunked_body(Socket, MaxHunk,
+                                                           Timeout)
                            end,
                     record_stream_progress(Next),
                     {Data1, Next};
@@ -660,11 +671,12 @@ recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
                     throw({webmachine_recv_error, Error})
             end;
         false ->
-            case mochiweb_socket:recv(Socket,MaxHunk,?IDLE_TIMEOUT) of
-                {ok,Data2} ->
+            case mochiweb_socket:recv(Socket, MaxHunk, Timeout) of
+                {ok, Data2} ->
                     Next = fun() ->
                                    recv_chunked_body(Socket, MaxHunk,
-                                                     LeftInChunk-MaxHunk)
+                                                     LeftInChunk - MaxHunk,
+                                                     Timeout)
                            end,
                     record_stream_progress(Next),
                     {Data2, Next};
@@ -673,9 +685,9 @@ recv_chunked_body(Socket, MaxHunk, LeftInChunk) ->
             end
     end.
 
-read_chunk_length(Socket, MaybeLastChunk) ->
+read_chunk_length(Socket, MaybeLastChunk, Timeout) ->
     mochiweb_socket:setopts(Socket, [{packet, line}]),
-    case mochiweb_socket:recv(Socket, 0, ?IDLE_TIMEOUT) of
+    case mochiweb_socket:recv(Socket, 0, Timeout) of
         {ok, Header} ->
             mochiweb_socket:setopts(Socket, [{packet, raw}]),
             Splitter = fun (C) ->
@@ -689,7 +701,7 @@ read_chunk_length(Socket, MaybeLastChunk) ->
                     %% allow [badly formed] last chunk header to be
                     %% empty instead of '0' explicitly
                     if MaybeLastChunk -> 0;
-                       true -> read_chunk_length(Socket, true)
+                       true -> read_chunk_length(Socket, true, Timeout)
                     end;
                 _ ->
                     erlang:list_to_integer(Hex, 16)
@@ -713,28 +725,34 @@ maybe_flush_req_body(Req) ->
             put(mochiweb_request_recv, true),
             true;
         undefined ->
-            case expects_continue(Req) and (not sent_continue()) of
+            case get(mochiweb_request_recv) of
                 true ->
-                    %% If the request expected continue, but we didn't
-                    %% send it, then tell mochiweb to ignore what the
-                    %% content length or transfer encoding says about
-                    %% a body.
-                    put(mochiweb_request_recv, true),
+                    %% The request body was already consumed via
+                    %% wrq:req_body/1 (eager read). mochiweb's
+                    %% request_recv flag is set but our own
+                    %% webmachine_stream_progress was never touched
+                    %% because the eager path bypasses
+                    %% recv_stream_body/2. There is nothing left on
+                    %% the socket to drain; attempting to recv here
+                    %% would block on an already-empty socket.
                     true;
-                false ->
-                    MaxFlush = max_flush_bytes(),
-                    case MaxFlush of
-                        0 ->
-                            %% this server has been configured to
-                            %% close connections on clients who send
-                            %% requests whose bodies are ignored
-                            false;
-                        _ ->
-                            %% There might be a body sitting out there we
-                            %% haven't read - give it a try.
-                            ReadSize = erlang:min(65535, MaxFlush),
-                            flush_req_body(
-                              catch recv_stream_body(Req, ReadSize), MaxFlush)
+                _ ->
+                    %% Cross-process-safe fallback: some
+                    %% applications dispatch body reads to a
+                    %% separate worker process, so the
+                    %% mochiweb_request_recv pdict flag never lands
+                    %% on the mochiweb loop process even though the
+                    %% body was consumed. The bodyfetch field is
+                    %% set to `standard` or `stream` inside
+                    %% call({req_body, MaxRecvBody}, ReqState) when
+                    %% the body is read, and travels with the
+                    %% ReqState by value across process boundaries
+                    %% (unlike the pdict). Consult it before
+                    %% falling into the drain path.
+                    case Req#wm_reqstate.bodyfetch of
+                        standard -> true;
+                        stream -> true;
+                        _ -> maybe_flush_undefined_drain(Req)
                     end
             end;
         Next ->
@@ -746,6 +764,39 @@ maybe_flush_req_body(Req) ->
                     %% request processing stopped in the middle of a stream -
                     %% can we finish it?
                     flush_req_body(catch Next(), MaxFlush)
+            end
+    end.
+
+%% Handles the "we have no idea whether a body is on the wire" branch
+%% of maybe_flush_req_body/1. Only reached when
+%% get(mochiweb_request_recv) is not `true` (i.e. no eager read has
+%% claimed the body), so an actual attempt to recv is warranted. The
+%% recv is bounded by ?FLUSH_TIMEOUT rather than ?IDLE_TIMEOUT so that
+%% a bogus content-length or a peer that closed without shutting down
+%% write cleanly cannot wedge the request pipeline.
+maybe_flush_undefined_drain(Req) ->
+    case expects_continue(Req) and (not sent_continue()) of
+        true ->
+            %% If the request expected continue, but we didn't send
+            %% it, then tell mochiweb to ignore what the content
+            %% length or transfer encoding says about a body.
+            put(mochiweb_request_recv, true),
+            true;
+        false ->
+            MaxFlush = max_flush_bytes(),
+            case MaxFlush of
+                0 ->
+                    %% this server has been configured to close
+                    %% connections on clients who send requests whose
+                    %% bodies are ignored
+                    false;
+                _ ->
+                    %% There might be a body sitting out there we
+                    %% haven't read - give it a bounded try.
+                    ReadSize = erlang:min(65535, MaxFlush),
+                    flush_req_body(
+                      catch recv_stream_body(Req, ReadSize, ?FLUSH_TIMEOUT),
+                      MaxFlush)
             end
     end.
 
