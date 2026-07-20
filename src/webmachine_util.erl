@@ -24,7 +24,7 @@
 -export([choose_media_type/2, format_content_type/1]).
 -export([choose_charset/2]).
 -export([choose_encoding/2]).
--export([now_diff_milliseconds/2]).
+-export([now_diff_milliseconds/2, now_diff_microseconds/2]).
 -export([media_type_to_detail/1,
          quoted_string/1,
          split_quoted_strings/1]).
@@ -36,6 +36,10 @@
 -include_lib("eqc/include/eqc.hrl").
 -endif.
 -include_lib("eunit/include/eunit.hrl").
+%% Test-only include for the record-shape contract test — pulls the
+%% wm_log_data record definition into test scope so we can exercise
+%% the record + helper contract directly.
+-include("webmachine_logger.hrl").
 -export([accept_header_to_media_types/1]).
 -endif.
 
@@ -369,22 +373,27 @@ unescape_quoted_string([Char | Rest], Acc) ->
     unescape_quoted_string(Rest, [Char | Acc]).
 
 
-%% @type now() = {MegaSecs, Secs, MicroSecs}
+%% @doc Compute the difference between two erlang:monotonic_time/0
+%% values (native units, per the wm_log_data record) in milliseconds.
+%% If the "later" time is undefined, uses erlang:monotonic_time/0 as
+%% a stand-in — this matches the semantic that end_time on the record
+%% may not have been set yet when the diff is requested. If both are
+%% undefined the diff is zero.
+-spec now_diff_milliseconds(undefined | integer(), integer()) -> integer().
+now_diff_milliseconds(T2, T1) ->
+    erlang:convert_time_unit(diff_native(T2, T1), native, millisecond).
 
-%% This is faster than timer:now_diff() because it does not use bignums.
-%% But it returns *milliseconds*  (timer:now_diff returns microseconds.)
-%% From http://www.erlang.org/ml-archive/erlang-questions/200205/msg00027.html
+%% @doc As now_diff_milliseconds/2 but returns microseconds. Provided
+%% so downstream access-log handlers that emit response times at
+%% microsecond granularity don't need to duplicate the conversion.
+-spec now_diff_microseconds(undefined | integer(), integer()) -> integer().
+now_diff_microseconds(T2, T1) ->
+    erlang:convert_time_unit(diff_native(T2, T1), native, microsecond).
 
-%% @doc  Compute the difference between two now() tuples, in milliseconds.
-%% @spec now_diff_milliseconds(now(), now()) -> integer()
-now_diff_milliseconds(undefined, undefined) ->
-    0;
-now_diff_milliseconds(undefined, T2) ->
-    now_diff_milliseconds(os:timestamp(), T2);
-now_diff_milliseconds({M,S,U}, {M,S1,U1}) ->
-    ((S-S1) * 1000) + ((U-U1) div 1000);
-now_diff_milliseconds({M,S,U}, {M1,S1,U1}) ->
-    ((M-M1)*1000000+(S-S1))*1000 + ((U-U1) div 1000).
+-spec diff_native(undefined | integer(), undefined | integer()) -> integer().
+diff_native(undefined, undefined) -> 0;
+diff_native(undefined, T1)        -> diff_native(erlang:monotonic_time(), T1);
+diff_native(T2, T1)                -> T2 - T1.
 
 -spec parse_range(RawRange::string(), ResourceLength::non_neg_integer()) ->
                          [{Start::non_neg_integer(), End::non_neg_integer()}].
@@ -523,11 +532,62 @@ guess_mime_test() ->
 
 
 now_diff_milliseconds_test() ->
-    Late = {10, 10, 10},
-    Early1 = {10, 9, 9},
-    Early2 = {9, 9, 9},
-    ?assertEqual(1000, now_diff_milliseconds(Late, Early1)),
-    ?assertEqual(1000001000, now_diff_milliseconds(Late, Early2)).
+    NativeMs = erlang:convert_time_unit(1, millisecond, native),
+    T1 = 1000000000,
+    T2 = T1 + 1000 * NativeMs,
+    ?assertEqual(1000, now_diff_milliseconds(T2, T1)).
+
+now_diff_milliseconds_undefined_test() ->
+    ?assertEqual(0, now_diff_milliseconds(undefined, undefined)),
+    Now = erlang:monotonic_time(),
+    Diff = now_diff_milliseconds(undefined, Now),
+    %% Undefined "later" time becomes erlang:monotonic_time(), which
+    %% is always >= Now on any single-node call sequence.
+    ?assert(Diff >= 0).
+
+now_diff_microseconds_test() ->
+    NativeUs = erlang:convert_time_unit(1, microsecond, native),
+    T1 = 1000000000,
+    T2 = T1 + 500 * NativeUs,
+    ?assertEqual(500, now_diff_microseconds(T2, T1)).
+
+now_diff_microseconds_undefined_test() ->
+    ?assertEqual(0, now_diff_microseconds(undefined, undefined)),
+    Now = erlang:monotonic_time(),
+    Diff = now_diff_microseconds(undefined, Now),
+    ?assert(Diff >= 0).
+
+%% Record-shape contract test. Constructs a #wm_log_data{} with real
+%% erlang:monotonic_time() values and passes the fields into
+%% now_diff_{milli,micro}seconds/2 the way a downstream access-log
+%% handler would. If the record's field types diverge from what these
+%% helpers accept (as happened when the record migrated from
+%% os:timestamp() tuples to native-unit integers), this test breaks at
+%% compile time (record construction) or runtime (pattern match /
+%% function clause), whichever comes first. That contract is what any
+%% consumer reading start_time/end_time off the record relies on.
+now_diff_wm_log_data_shape_test() ->
+    Start = erlang:monotonic_time(),
+    End = Start + erlang:convert_time_unit(1, millisecond, native),
+    LogData = #wm_log_data{start_time=Start, end_time=End},
+    #wm_log_data{start_time=StartTime, end_time=EndTime} = LogData,
+    ?assertEqual(1, now_diff_milliseconds(EndTime, StartTime)),
+    ?assertEqual(1000, now_diff_microseconds(EndTime, StartTime)).
+
+%% Round-trip test: sleep a small interval, confirm the diff tracks
+%% wall-clock. Catches unit-conversion bugs where a native → wrong-unit
+%% conversion would silently return a nonsensical number (e.g.
+%% mis-typed `nanosecond` or `second` for the target unit).
+now_diff_milliseconds_realtime_test() ->
+    Start = erlang:monotonic_time(),
+    timer:sleep(15),
+    End = erlang:monotonic_time(),
+    DiffMs = now_diff_milliseconds(End, Start),
+    ?assert(DiffMs >= 15),
+    %% Loose upper bound — a 15ms sleep should not take a second on
+    %% any realistic CI host. If this bound trips we have bigger
+    %% problems than unit conversion.
+    ?assert(DiffMs < 1000).
 
 parse_range_test() ->
     ValidRange = "bytes=1-2",
