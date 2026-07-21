@@ -7,8 +7,19 @@ jobs:
     strategy:
       matrix:
         otp_version: [28, 27, 26, 25, 24]
-        rebar3_version: ["3.20"]
         os: ["ubuntu-latest"]
+        include:
+          - otp_version: 28
+            rebar3_version: "3.25.1"
+          - otp_version: 27
+            rebar3_version: "3.25.1"
+          - otp_version: 26
+            rebar3_version: "3.25.1"
+          - otp_version: 25
+            rebar3_version: "3.24"
+          - otp_version: 24
+            rebar3_version: "3.21"
+
       fail-fast: false
       max-parallel: 2
 
