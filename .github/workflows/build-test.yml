@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        otp_version: [25, 24]
+        otp_version: [28, 27, 26, 25, 24]
         rebar3_version: ["3.20"]
         os: ["ubuntu-latest"]
       fail-fast: false
