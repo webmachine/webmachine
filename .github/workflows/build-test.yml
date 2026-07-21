@@ -17,7 +17,7 @@ jobs:
     name: "OTP${{ matrix.otp_version}}, rebar3 v${{ matrix.rebar3_version }}"
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     - uses: erlef/setup-beam@v1
       with:
         otp-version: ${{ matrix.otp_version }}
