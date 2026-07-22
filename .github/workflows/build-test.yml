@@ -6,22 +6,20 @@ jobs:
   build:
     strategy:
       matrix:
-        otp_version: [25, 24]
-        rebar3_version: ["3.20"]
+        otp_version: [28, 27, 26, 25, 24]
         os: ["ubuntu-latest"]
         include:
-          - otp_version: 23
-            rebar3_version: "3.20"
-            os: "ubuntu-20.04"
-          - otp_version: 22
-            rebar3_version: "3.16"
-            os: "ubuntu-20.04"
-          - otp_version: 21
-            rebar3_version: "3.15"
-            os: "ubuntu-20.04"
-          - otp_version: 20
-            rebar3_version: "3.15"
-            os: "ubuntu-20.04"
+          - otp_version: 28
+            rebar3_version: "3.25.1"
+          - otp_version: 27
+            rebar3_version: "3.25.1"
+          - otp_version: 26
+            rebar3_version: "3.25.1"
+          - otp_version: 25
+            rebar3_version: "3.24"
+          - otp_version: 24
+            rebar3_version: "3.21"
+
       fail-fast: false
       max-parallel: 2
 
@@ -30,7 +28,7 @@ jobs:
     name: "OTP${{ matrix.otp_version}}, rebar3 v${{ matrix.rebar3_version }}"
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v5
     - uses: erlef/setup-beam@v1
       with:
         otp-version: ${{ matrix.otp_version }}
